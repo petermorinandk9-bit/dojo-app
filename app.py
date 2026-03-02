@@ -207,6 +207,8 @@ if "msgs" not in st.session_state:           st.session_state.msgs = []
 if "_match_count" not in st.session_state:   st.session_state["_match_count"] = None
 if "_embed_fail" not in st.session_state:    st.session_state["_embed_fail"] = False
 if "exchange_count" not in st.session_state: st.session_state.exchange_count = {0:0, 1:0, 2:0, 3:0}
+if "_clusters" not in st.session_state:      st.session_state._clusters = None
+if "_pending" not in st.session_state:       st.session_state._pending = None
 
 def reset():
     st.session_state.msgs = []
@@ -269,6 +271,11 @@ with st.sidebar:
     if st.button("Reset Round"):
         reset()
         st.session_state.phase = 0
+        st.rerun()
+
+    st.divider()
+    if st.button("🗺️ Generate Map"):
+        st.session_state._clusters = cluster_records()
         st.rerun()
 
 # ==================================================
@@ -338,22 +345,17 @@ if phase == 2 and st.session_state._pending:
         st.rerun()
 
 # --- THE SOVEREIGN MAP (The Landscape) ---
-if st.sidebar.button("Generate Sovereign Map"):
-    st.session_state._clusters = cluster_records()
-
-if st.session_state._clusters:
+if "_clusters" in st.session_state and st.session_state._clusters:
     st.divider()
-    st.subheader("Sovereign Map")
-    if not st.session_state._clusters:
-        st.info("No clusters yet")
-    else:
-        labeled = []
-        for i, c in enumerate(st.session_state._clusters):
-            texts = [t for _, t, _ in c["i"][:5]]
-            label = llm(AGENTS["fast"], [{"role":"system","content":CLUSTER_NAMER_ROLE}, {"role":"user","content":"\n".join(texts)}], temp=0.2).strip() or f"C{i+1}"
-            labeled.append((label, c))
-        data = [{"Time": pd.to_datetime(ts, unit="s"), "Pattern": label, "Truth": content} for label, c in labeled for ts, content, _ in c["i"]]
-        st.altair_chart(alt.Chart(pd.DataFrame(data)).mark_circle(size=120, opacity=0.8).encode(x="Time:T", y="Pattern:N", color="Pattern:N", tooltip=["Time","Pattern","Truth"]).interactive().properties(height=350), use_container_width=True)
+    st.subheader("🗺️ Sovereign Map")
+    clusters = st.session_state._clusters
+    labeled = []
+    for i, c in enumerate(clusters):
+        texts = [t for _, t, _ in c["i"][:5]]
+        label = llm(AGENTS["fast"], [{"role":"system","content":CLUSTER_NAMER_ROLE}, {"role":"user","content":"\n".join(texts)}], temp=0.2).strip() or f"C{i+1}"
+        labeled.append((label, c))
+    data = [{"Time": pd.to_datetime(ts, unit="s"), "Pattern": label, "Truth": content} for label, c in labeled for ts, content, _ in c["i"]]
+    st.altair_chart(alt.Chart(pd.DataFrame(data)).mark_circle(size=120, opacity=0.8).encode(x="Time:T", y="Pattern:N", color="Pattern:N", tooltip=["Time","Pattern","Truth"]).interactive().properties(height=350), use_container_width=True)
 
 st.markdown("---")
 st.caption("**Important:** This is supportive conversation, not therapy or professional mental health care. If you're in crisis: 988 / Text HOME to 741741")
