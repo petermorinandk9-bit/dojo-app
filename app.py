@@ -39,7 +39,6 @@ MASTER_PROMPT = """
 ROLE: Communicator. Gentle Warrior.
 Be fully present with whatever is here.
 Name the feeling gently, hold space without rushing.
-No advice, no fixing — just witness and reflect.
 Warm, human, grounding. Max 3 lines.
 """
 
@@ -101,11 +100,19 @@ def detect_sentiment(text):
 
 def detect_closure(text):
     t = text.lower()
-    if any(phrase in t for phrase in ["thank you", "thanks", "feeling better", "feel better", "much better", "spirits lifted"]):
+    if any(p in t for p in ["thank you", "thanks", "feeling better", "feel better", "much better", "spirits lifted", "things are feeling lighter"]):
         return "light_closure"
-    if any(phrase in t for phrase in ["great help", "a lot better", "you've been a great help", "thank you so much"]):
+    if any(p in t for p in ["great help", "a lot better", "you've been a great help", "thank you so much", "im feeling alot better"]):
         return "strong_closure"
     return None
+
+def detect_resonance(text):
+    t = text.lower()
+    return any(p in t for p in ["yeah", "yes", "exactly", "that fits", "that's true", "i guess", "right", "i do", "makes sense"])
+
+def detect_insight(text):
+    t = text.lower()
+    return any(p in t for p in ["i realize", "i think", "maybe i", "i've been", "because i", "i see", "i notice"])
 
 # ==================================================
 # DB
@@ -257,7 +264,7 @@ phase_name = PHASE_SETS[rank][st.session_state.phase]
 st.subheader(phase_name)
 
 # ==================================================
-# PHASE ENGINE (3+ exchanges + closure detection)
+# PHASE ENGINE (3 exchanges + closure/resonance/insight)
 # ==================================================
 MIN_EXCHANGES = 3
 
@@ -266,6 +273,8 @@ if p := st.chat_input("Speak..."):
     phase = st.session_state.phase
     sentiment = detect_sentiment(p)
     closure = detect_closure(p)
+    resonance = detect_resonance(p)
+    insight = detect_insight(p)
     st.session_state.exchange_count[phase] += 1
 
     # Phase 0 - Arrival
@@ -274,7 +283,7 @@ if p := st.chat_input("Speak..."):
         ans = llm(AGENTS["logic"], [{"role":"system","content":role}] + st.session_state.msgs[-10:])
         st.session_state.msgs.append({"role":"assistant","content":ans})
 
-        if closure == "light_closure" or (sentiment == "positive" and st.session_state.exchange_count[phase] >= MIN_EXCHANGES):
+        if closure == "light_closure" or closure == "strong_closure" or (sentiment == "positive" and st.session_state.exchange_count[phase] >= MIN_EXCHANGES):
             st.session_state.phase = 1
         st.rerun()
 
@@ -286,7 +295,7 @@ if p := st.chat_input("Speak..."):
         soft = llm(AGENTS["fast"], [{"role":"system","content":"Refine tone, keep insight."}, {"role":"user","content":core}])
         st.session_state.msgs.append({"role":"assistant","content":soft})
 
-        if closure == "light_closure" or (sentiment == "positive" and st.session_state.exchange_count[phase] >= MIN_EXCHANGES):
+        if closure == "light_closure" or closure == "strong_closure" or resonance or insight or (sentiment == "positive" and st.session_state.exchange_count[phase] >= MIN_EXCHANGES):
             st.session_state.phase = 2
         st.rerun()
 
@@ -295,7 +304,8 @@ if p := st.chat_input("Speak..."):
         last = next((m["content"] for m in reversed(st.session_state.msgs) if m["role"]=="assistant"), "")
         if last:
             st.write("**Reflection:**", last)
-        if st.button("Seal") or closure == "strong_closure":
+
+        if closure == "strong_closure" or insight or (sentiment == "positive" and st.session_state.exchange_count[phase] >= MIN_EXCHANGES):
             if len(last) > 10:
                 save(last, rank, phase_name)
                 d = semantic_density(last)
@@ -305,11 +315,9 @@ if p := st.chat_input("Speak..."):
                 st.rerun()
             else:
                 st.warning("Insight too thin.")
-        if sentiment == "positive" and st.session_state.exchange_count[phase] >= MIN_EXCHANGES:
-            st.session_state.phase = 3
-            st.rerun()
+        st.rerun()
 
-    # Phase 3 - Action / Cool Down
+    # Phase 3 - Cool Down
     elif phase == 3:
         core = llm(AGENTS["fast"], [{"role":"system","content":SENTINEL_PROMPT}] + st.session_state.msgs[-5:], temp=0.1)
         soft = llm(AGENTS["logic"], [{"role":"system","content":"Encourage gently."}, {"role":"user","content":core}])
