@@ -35,7 +35,7 @@ RANK_CAPTION = {
     "Sovereign": "Sovereign field"
 }
 
-MASTER_PROMPT = "ROLE: Communicator. Gentle Warrior. Be present with the user exactly as they are."
+MASTER_PROMPT = "ROLE: Communicator. Gentle Warrior."
 MIRROR_PROMPT = """
 ROLE: Dojo Mirror
 TASK:
@@ -163,10 +163,6 @@ def reset():
     st.session_state.msgs = []
     st.session_state["_match_count"] = None
 
-def on_phase_change():
-    st.session_state.phase = st.session_state._phase_sel
-    reset()
-
 # ==================================================
 # HEADER + AUTO-RANK
 # ==================================================
@@ -194,22 +190,34 @@ st.markdown(f"**Rank:** {rank} • **Ledger:** {count} sealed • **{min(int(cou
 st.caption(RANK_CAPTION[rank])
 
 # ==================================================
-# SIDEBAR
+# SIDEBAR PATH (read-only, greyed future ranks)
 # ==================================================
 with st.sidebar:
-    phase = st.radio(
-        "Phase",
-        range(4),
-        format_func=lambda i: PHASE_SETS[rank][i],
-        index=min(st.session_state.phase, 3),
-        key="_phase_sel",
-        on_change=on_phase_change
-    )
-    thresh = st.slider("Clustering sensitivity", 0.75, 0.92, 0.85, 0.01)
-    if st.button("Clear round"): reset()
-    if st.button("Generate Sovereign Map"):
-        with st.spinner("Mapping patterns..."):
-            st.session_state._clusters = cluster_records(thresh)
+    st.markdown("### Rank Path")
+    ranks = ["Student", "Practitioner", "Sentinel", "Sovereign"]
+    current_idx = ranks.index(rank)
+    for i, r in enumerate(ranks):
+        if i < current_idx:
+            st.markdown(f"● {r}")
+        elif i == current_idx:
+            st.markdown(f"**➤ {r}**")
+        else:
+            st.markdown(f"<span style='color:gray'>● {r}</span>", unsafe_allow_html=True)
+
+    st.divider()
+
+    st.markdown("### Phase Progress")
+    phases = PHASE_SETS[rank]
+    for i, p in enumerate(phases):
+        if i < st.session_state.phase:
+            st.markdown(f"● {p}")
+        elif i == st.session_state.phase:
+            st.markdown(f"**➤ {p}**")
+        else:
+            st.markdown(f"<span style='color:gray'>● {p}</span>", unsafe_allow_html=True)
+
+    if st.button("Reset Round"):
+        reset()
         st.rerun()
 
 # ==================================================
@@ -219,13 +227,13 @@ for m in st.session_state.msgs:
     with st.chat_message(m["role"]):
         st.markdown(m["content"])
 
-phase_name = PHASE_SETS[rank][phase]
+phase_name = PHASE_SETS[rank][st.session_state.phase]
 st.subheader(phase_name)
 
 # ==================================================
 # PHASE ENGINE
 # ==================================================
-if phase == 0:
+if st.session_state.phase == 0:
     if p := st.chat_input("How are you arriving?"):
         st.session_state.msgs.append({"role":"user","content":p})
         role = MASTER_PROMPT + "\n" + tone
@@ -236,7 +244,7 @@ if phase == 0:
         st.session_state.phase = 1
         st.rerun()
 
-elif phase == 1:
+elif st.session_state.phase == 1:
     if st.session_state.get("_match_count") is not None:
         cnt = st.session_state["_match_count"]
         st.caption(f"Last search: {cnt} related patterns")
@@ -253,7 +261,7 @@ elif phase == 1:
         st.session_state.phase = 2
         st.rerun()
 
-elif phase == 2:
+elif st.session_state.phase == 2:
     last = next((m["content"] for m in reversed(st.session_state.msgs) if m["role"]=="assistant"), "")
     if last:
         st.write("**Reflection:**", last)
@@ -268,7 +276,7 @@ elif phase == 2:
         else:
             st.warning("Insight too thin.")
 
-elif phase == 3:
+elif st.session_state.phase == 3:
     if p := st.chat_input("Next step"):
         st.session_state.msgs.append({"role":"user","content":p})
         core = llm(AGENTS["fast"], [{"role":"system","content":SENTINEL_PROMPT}] + st.session_state.msgs[-5:], temp=0.1)
