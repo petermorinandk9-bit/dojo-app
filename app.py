@@ -1,5 +1,5 @@
 import streamlit as st
-import sqlite3, time
+import sqlite3, time, json, os
 import numpy as np, pandas as pd, altair as alt
 from litellm import completion, embedding
 
@@ -51,9 +51,15 @@ CLUSTER_NAMER_ROLE = "Name the shared theme in 1–3 archetypal words."
 DB_PATH = "dojo_records.db"
 
 # ==================================================
-# LLM + EMBEDDING (cached where possible)
+# LLM + EMBEDDING
 # ==================================================
-@st.cache_data(ttl=3600)  # cache embeddings 1 hour
+def llm(model, messages, temp=0.3):
+    try:
+        r = completion(model=model, messages=messages, temperature=temp, timeout=25, num_retries=2)
+        return r.choices[0].message.content
+    except Exception as e:
+        return f"Flicker — {str(e)[:60]}"
+
 def embed(text):
     try:
         r = embedding(model="text-embedding-3-small", input=[text[:1000]])
@@ -61,13 +67,6 @@ def embed(text):
     except:
         st.session_state["_embed_fail"] = True
         return None
-
-def llm(model, messages, temp=0.3):
-    try:
-        r = completion(model=model, messages=messages, temperature=temp, timeout=25, num_retries=2)
-        return r.choices[0].message.content
-    except Exception as e:
-        return f"Flicker — {str(e)[:60]}"
 
 def detect_crisis(text):
     try:
@@ -144,18 +143,15 @@ def cluster_records(th=0.85):
     rows = db().execute("SELECT timestamp,content,vector FROM records WHERE vector IS NOT NULL").fetchall()
     clusters = []
     for ts, c, v_json in rows:
-        try:
-            v = np.array(json.loads(v_json))
-        except:
-            continue
+        try: v = np.array(json.loads(v_json))
+        except: continue
         placed = False
         for cl in clusters:
             s = np.dot(v, cl["c"]) / (np.linalg.norm(v) * np.linalg.norm(cl["c"]))
             if s > th:
                 cl["i"].append((ts, c, v))
                 cl["c"] = np.mean([x[2] for x in cl["i"]], axis=0)
-                placed = True
-                break
+                placed = True; break
         if not placed:
             clusters.append({"c": v, "i": [(ts, c, v)]})
     return clusters
@@ -235,7 +231,7 @@ with st.sidebar:
         st.rerun()
 
 # ==================================================
-# CHAT
+# CHAT (persistent across phases)
 # ==================================================
 for m in st.session_state.msgs:
     with st.chat_message(m["role"]):
@@ -245,7 +241,7 @@ phase_name = PHASE_SETS[rank][st.session_state.phase]
 st.subheader(phase_name)
 
 # ==================================================
-# PHASE ENGINE (multi-exchange + sentiment-based progression)
+# PHASE ENGINE (multi-exchange + sentiment-based)
 # ==================================================
 MIN_EXCHANGES = 4
 
@@ -262,7 +258,7 @@ if p := st.chat_input("Speak..."):
         st.session_state.msgs.append({"role":"assistant","content":ans})
         if sentiment == "positive" and st.session_state.exchange_count[phase] >= MIN_EXCHANGES:
             st.session_state.phase = 1
-            reset()
+            # Do NOT reset messages here — keep history
 
     # Phase 1 - Mirror
     elif phase == 1:
@@ -273,7 +269,7 @@ if p := st.chat_input("Speak..."):
         st.session_state.msgs.append({"role":"assistant","content":soft})
         if sentiment == "positive" and st.session_state.exchange_count[phase] >= MIN_EXCHANGES:
             st.session_state.phase = 2
-            reset()
+            # Keep messages
 
     # Phase 2 - Seal
     elif phase == 2:
@@ -286,13 +282,13 @@ if p := st.chat_input("Speak..."):
                 d = semantic_density(last)
                 st.caption(f"Semantic density: {d:.2f}")
                 st.session_state.phase = 3
-                reset()
+                # Keep messages for now
                 st.rerun()
             else:
                 st.warning("Insight too thin.")
         if sentiment == "positive" and st.session_state.exchange_count[phase] >= MIN_EXCHANGES:
             st.session_state.phase = 3
-            reset()
+            # Keep messages
 
     # Phase 3 - Action
     elif phase == 3:
@@ -302,7 +298,7 @@ if p := st.chat_input("Speak..."):
         if sentiment == "positive" and st.session_state.exchange_count[phase] >= MIN_EXCHANGES:
             st.session_state.msgs.append({"role":"assistant","content":"Is there anything else we can work on today?"})
             st.session_state.phase = 0
-            reset()
+            reset()  # full reset only at very end
 
     st.rerun()
 
