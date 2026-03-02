@@ -52,10 +52,21 @@ STYLE: Warm, present, human. Max 3 lines. Stay with the feeling.
 """
 
 SENTINEL_PROMPT = "ROLE: Sentinel. Validate the next small step clearly and gently."
-CRISIS_PROMPT = "ROLE: Sensei. Ground the user. Short, calming, breathing-focused lines only."
+
+CRISIS_PROMPT = """
+ROLE: Sensei. Ground the user. Short, calming, breathing-focused lines only.
+
+If in crisis, gently remind:
+- Call or text 988 (Suicide & Crisis Lifeline, 24/7, free & confidential)
+- Text HOME to 741741 (Crisis Text Line, 24/7)
+Stay present, no pressure. You're not alone.
+"""
+
 CLUSTER_NAMER_ROLE = "Name the shared theme in 1–3 archetypal words."
 
 DB_PATH = "dojo_records.db"
+
+MIN_EXCHANGES = 3
 
 # ==================================================
 # LLM + EMBEDDING
@@ -113,6 +124,13 @@ def detect_resonance(text):
 def detect_insight(text):
     t = text.lower()
     return any(p in t for p in ["i realize", "i think", "maybe i", "i've been", "because i", "i see", "i notice"])
+
+def check_advance(phase, sentiment, closure, resonance, insight, exchanges):
+    if phase == 0: return closure in ["light_closure", "strong_closure"] or (sentiment == "positive" and exchanges >= MIN_EXCHANGES)
+    elif phase == 1: return closure in ["light_closure", "strong_closure"] or resonance or insight or (sentiment == "positive" and exchanges >= MIN_EXCHANGES)
+    elif phase == 2: return closure == "strong_closure" or insight or (sentiment == "positive" and exchanges >= MIN_EXCHANGES)
+    elif phase == 3: return closure == "strong_closure" or (sentiment == "positive" and exchanges >= MIN_EXCHANGES)
+    return False
 
 # ==================================================
 # DB
@@ -193,7 +211,7 @@ if "exchange_count" not in st.session_state: st.session_state.exchange_count = {
 def reset():
     st.session_state.msgs = []
     st.session_state["_match_count"] = None
-    st.session_state.exchange_count[st.session_state.phase] = 0
+    st.session_state.exchange_count = {0:0, 1:0, 2:0, 3:0}
 
 # ==================================================
 # HEADER + AUTO-RANK
@@ -254,111 +272,88 @@ with st.sidebar:
         st.rerun()
 
 # ==================================================
-# CHAT (persistent across phases)
+# CHAT DISPLAY & INPUT
 # ==================================================
 for m in st.session_state.msgs:
     with st.chat_message(m["role"]):
         st.markdown(m["content"])
 
-phase_name = PHASE_SETS[rank][st.session_state.phase]
-st.subheader(phase_name)
+phase = st.session_state.phase
+phase_name = PHASE_SETS[rank][phase]
+st.subheader(f"Phase: {phase_name}")
 
-# ==================================================
-# PHASE ENGINE (3 exchanges + closure/resonance/insight)
-# ==================================================
-MIN_EXCHANGES = 3
+if p := st.chat_input("Speak to the Dojo..."):
+    st.session_state.msgs.append({"role": "user", "content": p})
+    st.session_state.exchange_count[phase] += 1
+    
+    # --- 1. THE CRISIS SENTINEL (The Safety Net) ---
+    if detect_crisis(p):
+        ans = llm(AGENTS["logic"], [{"role": "system", "content": CRISIS_PROMPT}] + st.session_state.msgs[-5:])
+        st.session_state.msgs.append({"role": "assistant", "content": ans})
+        st.rerun()
 
-if p := st.chat_input("Speak..."):
-    st.session_state.msgs.append({"role":"user","content":p})
-    phase = st.session_state.phase
+    # --- 2. ANALYTICS (The Teacher's Observation) ---
     sentiment = detect_sentiment(p)
     closure = detect_closure(p)
     resonance = detect_resonance(p)
     insight = detect_insight(p)
-    st.session_state.exchange_count[phase] += 1
-
-    # Phase 0 - Arrival
-    if phase == 0:
-        role = CRISIS_PROMPT if detect_crisis(p) else MASTER_PROMPT + "\n" + tone
-        ans = llm(AGENTS["logic"], [{"role":"system","content":role}] + st.session_state.msgs[-10:])
-        st.session_state.msgs.append({"role":"assistant","content":ans})
-
-        if closure == "light_closure" or closure == "strong_closure" or (sentiment == "positive" and st.session_state.exchange_count[phase] >= MIN_EXCHANGES):
-            st.session_state.phase = 1
-        st.rerun()
-
-    # Phase 1 - Mirror
-    elif phase == 1:
+    
+    # --- 3. PHASE LOGIC ---
+    if phase == 0: # Arrival
+        role = MASTER_PROMPT + "\n" + tone
+        ans = llm(AGENTS["logic"], [{"role": "system", "content": role}] + st.session_state.msgs[-5:])
+        
+    elif phase == 1: # Mirror
         matches = semantic_matches(p)
-        sys = MIRROR_PROMPT + "\n" + tone + "\n" + "\n".join(matches)
-        core = llm(AGENTS["logic"], [{"role":"system","content":sys}] + st.session_state.msgs[-10:], temp=0.4)
-        soft = llm(AGENTS["fast"], [{"role":"system","content":"Refine tone, keep insight."}, {"role":"user","content":core}])
-        st.session_state.msgs.append({"role":"assistant","content":soft})
+        sys = MIRROR_PROMPT + "\n" + tone
+        if matches: sys += "\n\nPast echoes:\n" + "\n".join(matches)
+        core = llm(AGENTS["logic"], [{"role": "system", "content": sys}] + st.session_state.msgs[-5:], temp=0.4)
+        ans = llm(AGENTS["fast"], [{"role": "system", "content": "Refine tone, keep insight."}, {"role": "user", "content": core}])
+        
+    elif phase == 2: # Seal
+        ans = "The insight is forming. Would you like to seal this truth into your ledger?"
+        st.session_state._pending = next((m["content"] for m in reversed(st.session_state.msgs) if m["role"] == "assistant"), "")
 
-        if closure == "light_closure" or closure == "strong_closure" or resonance or insight or (sentiment == "positive" and st.session_state.exchange_count[phase] >= MIN_EXCHANGES):
-            st.session_state.phase = 2
+    elif phase == 3: # Next Step
+        core = llm(AGENTS["fast"], [{"role": "system", "content": SENTINEL_PROMPT}] + st.session_state.msgs[-5:], temp=0.1)
+        ans = llm(AGENTS["logic"], [{"role": "system", "content": "Encourage gently."}, {"role": "user", "content": core}])
+
+    st.session_state.msgs.append({"role": "assistant", "content": ans})
+
+    # --- 4. ADVANCEMENT CHECK ---
+    if check_advance(phase, sentiment, closure, resonance, insight, st.session_state.exchange_count[phase]):
+        if phase < 3:
+            st.session_state.phase += 1
+        else:
+            st.success("Round Complete. The Dojo is sealed.")
+            
+    st.rerun()
+
+# --- THE SEALING BUTTON (Phase 2 Special) ---
+if phase == 2 and st.session_state._pending:
+    if st.button("Confirm Seal"):
+        save(st.session_state._pending, rank, phase_name)
+        st.session_state.phase = 3
+        st.session_state._pending = None
         st.rerun()
 
-    # Phase 2 - Seal
-    elif phase == 2:
-        last = next((m["content"] for m in reversed(st.session_state.msgs) if m["role"]=="assistant"), "")
-        if last:
-            st.write("**Reflection:**", last)
+# --- THE SOVEREIGN MAP (The Landscape) ---
+if st.sidebar.button("Generate Sovereign Map"):
+    st.session_state._clusters = cluster_records()
 
-        if closure == "strong_closure" or insight or (sentiment == "positive" and st.session_state.exchange_count[phase] >= MIN_EXCHANGES):
-            if len(last) > 10:
-                save(last, rank, phase_name)
-                d = semantic_density(last)
-                st.caption(f"Semantic density: {d:.2f}")
-                st.session_state.msgs.append({"role":"assistant","content":"Good job working through this. I'm proud of you for showing up and staying with it."})
-                st.session_state.phase = 3
-                st.rerun()
-            else:
-                st.warning("Insight too thin.")
-        st.rerun()
-
-    # Phase 3 - Cool Down
-    elif phase == 3:
-        core = llm(AGENTS["fast"], [{"role":"system","content":SENTINEL_PROMPT}] + st.session_state.msgs[-5:], temp=0.1)
-        soft = llm(AGENTS["logic"], [{"role":"system","content":"Encourage gently."}, {"role":"user","content":core}])
-        st.session_state.msgs.append({"role":"assistant","content":soft})
-
-        if closure == "strong_closure" or (sentiment == "positive" and st.session_state.exchange_count[phase] >= MIN_EXCHANGES):
-            st.session_state.msgs.append({"role":"assistant","content":"You've done great work today. Is there anything else we can work on before we close the round?"})
-            st.session_state.phase = 0
-            reset()
-        st.rerun()
-
-# ==================================================
-# MAP
-# ==================================================
-if "_clusters" in st.session_state:
+if st.session_state._clusters:
     st.divider()
     st.subheader("Sovereign Map")
-    clusters = st.session_state._clusters
-    if not clusters:
-        st.info("No clusters yet — seal more distinct insights.")
+    if not st.session_state._clusters:
+        st.info("No clusters yet")
     else:
         labeled = []
-        for i, c in enumerate(clusters):
+        for i, c in enumerate(st.session_state._clusters):
             texts = [t for _, t, _ in c["i"][:5]]
-            label = llm(AGENTS["fast"], [
-                {"role":"system","content":CLUSTER_NAMER_ROLE},
-                {"role":"user","content":"\n".join(texts)}
-            ], temp=0.2)
-            label = label.strip() or f"C{i+1}"
+            label = llm(AGENTS["fast"], [{"role":"system","content":CLUSTER_NAMER_ROLE}, {"role":"user","content":"\n".join(texts)}], temp=0.2).strip() or f"C{i+1}"
             labeled.append((label, c))
-        data = [
-            {"Time": pd.to_datetime(ts, unit="s"), "Pattern": label, "Truth": content}
-            for label, c in labeled
-            for ts, content, _ in c["i"]
-        ]
-        df = pd.DataFrame(data)
-        st.altair_chart(
-            alt.Chart(df).mark_circle(size=120, opacity=0.8).encode(
-                x="Time:T", y="Pattern:N", color="Pattern:N", tooltip=["Time","Pattern","Truth"]
-            ).interactive().properties(height=350),
-            use_container_width=True
-        )
-else:
-    st.caption("Generate Sovereign Map to visualize pattern landscape.")
+        data = [{"Time": pd.to_datetime(ts, unit="s"), "Pattern": label, "Truth": content} for label, c in labeled for ts, content, _ in c["i"]]
+        st.altair_chart(alt.Chart(pd.DataFrame(data)).mark_circle(size=120, opacity=0.8).encode(x="Time:T", y="Pattern:N", color="Pattern:N", tooltip=["Time","Pattern","Truth"]).interactive().properties(height=350), use_container_width=True)
+
+st.markdown("---")
+st.caption("**Important:** This is supportive conversation, not therapy or professional mental health care. If you're in crisis: 988 / Text HOME to 741741")
