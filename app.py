@@ -35,17 +35,25 @@ RANK_CAPTION = {
     "Sovereign": "Sovereign field"
 }
 
-MASTER_PROMPT = "ROLE: Communicator. Gentle Warrior."
+MASTER_PROMPT = """
+ROLE: Communicator. Gentle Warrior.
+Be fully present with whatever is here.
+Name the feeling gently, hold space without rushing.
+No advice, no fixing — just witness and reflect.
+Warm, human, grounding. Max 3 lines.
+"""
+
 MIRROR_PROMPT = """
 ROLE: Dojo Mirror
 TASK:
 1. Name the felt state or shield in simple, grounded words.
-2. Gently point to any echo from past entries if close.
-3. Offer one quiet insight — no advice, no fixing.
-STYLE: Warm, minimal, human. Max 3 lines.
+2. Gently reflect any echo from past if close.
+3. Offer quiet, warm insight — no fixing, no pushing forward.
+STYLE: Warm, present, human. Max 3 lines. Stay with the feeling.
 """
-SENTINEL_PROMPT = "ROLE: Sentinel. Validate the next step briefly and clearly."
-CRISIS_PROMPT = "ROLE: Sensei. Ground the user. Short, calming lines only."
+
+SENTINEL_PROMPT = "ROLE: Sentinel. Validate the next small step clearly and gently."
+CRISIS_PROMPT = "ROLE: Sensei. Ground the user. Short, calming, breathing-focused lines only."
 CLUSTER_NAMER_ROLE = "Name the shared theme in 1–3 archetypal words."
 
 DB_PATH = "dojo_records.db"
@@ -249,7 +257,7 @@ st.subheader(phase_name)
 # ==================================================
 # PHASE ENGINE (multi-exchange + sentiment-based progression)
 # ==================================================
-MIN_EXCHANGES = 3  # require at least 3 exchanges per phase
+MIN_EXCHANGES = 4  # require at least 4 exchanges per phase
 
 if p := st.chat_input("Speak..."):
     st.session_state.msgs.append({"role":"user","content":p})
@@ -257,7 +265,7 @@ if p := st.chat_input("Speak..."):
     sentiment = detect_sentiment(p)
     st.session_state.exchange_count[phase] += 1
 
-    # Phase 0 - Arrival
+    # Phase 0 - Arrival (nurture until positive shift)
     if phase == 0:
         role = CRISIS_PROMPT if detect_crisis(p) else MASTER_PROMPT + "\n" + tone
         ans = llm(AGENTS["logic"], [{"role":"system","content":role}] + st.session_state.msgs[-10:])
@@ -266,7 +274,7 @@ if p := st.chat_input("Speak..."):
             st.session_state.phase = 1
             reset()
 
-    # Phase 1 - Mirror
+    # Phase 1 - Mirror (stay if stuck, advance only on positive)
     elif phase == 1:
         matches = semantic_matches(p)
         sys = MIRROR_PROMPT + "\n" + tone + "\n" + "\n".join(matches)
@@ -277,7 +285,7 @@ if p := st.chat_input("Speak..."):
             st.session_state.phase = 2
             reset()
 
-    # Phase 2 - Seal
+    # Phase 2 - Seal (explicit button required, but auto-advance if positive after min exchanges)
     elif phase == 2:
         last = next((m["content"] for m in reversed(st.session_state.msgs) if m["role"]=="assistant"), "")
         if last:
@@ -296,7 +304,7 @@ if p := st.chat_input("Speak..."):
             st.session_state.phase = 3
             reset()
 
-    # Phase 3 - Action
+    # Phase 3 - Action (nurture action, reset with "anything else?" on positive close)
     elif phase == 3:
         core = llm(AGENTS["fast"], [{"role":"system","content":SENTINEL_PROMPT}] + st.session_state.msgs[-5:], temp=0.1)
         soft = llm(AGENTS["logic"], [{"role":"system","content":"Encourage gently."}, {"role":"user","content":core}])
