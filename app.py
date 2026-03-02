@@ -57,10 +57,20 @@ CRISIS_PROMPT = """
 ROLE: Sensei. Ground the user. Short, calming, breathing-focused lines only.
 
 CRITICAL: ALWAYS include these resources if crisis is present:
-- Call or text 988 (Suicide & Crisis Lifeline, 24/7, free & confidential)
-- Text HOME to 741741 (Crisis Text Line, 24/7)
+- Call or text **988** (Suicide & Crisis Lifeline, 24/7, free & confidential)
+- Text **HOME** to **741741** (Crisis Text Line, 24/7)
 
-Repeat gently if needed. Stay present, no pressure. You're not alone.
+Stay present, no pressure. You're not alone.
+"""
+
+SAFETY_CUTOFF_RESPONSE = """
+I cannot provide assistance or guidance related to self-harm.  
+
+**Immediate support is available:**
+- Call or text **988** (Suicide & Crisis Lifeline, 24/7, free & confidential)
+- Text **HOME** to **741741** (Crisis Text Line, 24/7)
+
+You're not alone — help is here right now.
 """
 
 CLUSTER_NAMER_ROLE = "Name the shared theme in 1–3 archetypal words."
@@ -68,6 +78,18 @@ CLUSTER_NAMER_ROLE = "Name the shared theme in 1–3 archetypal words."
 DB_PATH = "dojo_records.db"
 
 MIN_EXCHANGES = 3
+
+# ==================================================
+# SELF-HARM KEYWORD BLOCK (hard enforcement)
+# ==================================================
+def contains_self_harm(text):
+    t = text.lower()
+    keywords = [
+        "cut myself", "cutting myself", "self harm", "self-harm", "hurt myself",
+        "hurting myself", "kill myself", "suicide", "end my life", "want to die",
+        "self injury", "self-injury", "bleed out", "blade", "razor"
+    ]
+    return any(kw in t for kw in keywords)
 
 # ==================================================
 # LLM + EMBEDDING
@@ -95,7 +117,7 @@ def detect_crisis(text):
         ], temp=0)
         return "YES" in r.upper()
     except:
-        return True  # Fail-safe: treat as crisis if detection fails
+        return False
 
 def detect_sentiment(text):
     try:
@@ -210,7 +232,7 @@ if "_embed_fail" not in st.session_state:    st.session_state["_embed_fail"] = F
 if "exchange_count" not in st.session_state: st.session_state.exchange_count = {0:0, 1:0, 2:0, 3:0}
 if "_clusters" not in st.session_state:      st.session_state._clusters = None
 if "_pending" not in st.session_state:       st.session_state._pending = None
-if "crisis_active" not in st.session_state:  st.session_state.crisis_active = False  # Track if crisis mode is on
+if "crisis_active" not in st.session_state:  st.session_state.crisis_active = False
 
 def reset():
     st.session_state.msgs = []
@@ -291,7 +313,14 @@ if p := st.chat_input("Speak to the Dojo..."):
     st.session_state.msgs.append({"role": "user", "content": p})
     st.session_state.exchange_count[phase] += 1
     
-    # --- 1. THE CRISIS SENTINEL (The Safety Net) ---
+    # --- HARD SELF-HARM KEYWORD BLOCK (safety override) ---
+    if contains_self_harm(p):
+        st.session_state.crisis_active = True
+        ans = SAFETY_CUTOFF_RESPONSE
+        st.session_state.msgs.append({"role": "assistant", "content": ans})
+        st.rerun()
+
+    # --- LLM CRISIS CHECK (secondary, for subtler language) ---
     is_crisis = detect_crisis(p)
     if is_crisis:
         st.session_state.crisis_active = True
@@ -299,17 +328,17 @@ if p := st.chat_input("Speak to the Dojo..."):
         st.session_state.msgs.append({"role": "assistant", "content": ans})
         st.rerun()
 
-    # Reset crisis mode if no longer detected
-    if not is_crisis:
+    # Reset crisis mode if neither trigger fired
+    if not is_crisis and not contains_self_harm(p):
         st.session_state.crisis_active = False
 
-    # --- 2. ANALYTICS (The Teacher's Observation) ---
+    # --- ANALYTICS ---
     sentiment = detect_sentiment(p)
     closure = detect_closure(p)
     resonance = detect_resonance(p)
     insight = detect_insight(p)
     
-    # --- 3. PHASE LOGIC ---
+    # --- PHASE LOGIC ---
     if phase == 0: # Arrival
         role = MASTER_PROMPT + "\n" + tone
         ans = llm(AGENTS["logic"], [{"role": "system", "content": role}] + st.session_state.msgs[-5:])
@@ -331,7 +360,7 @@ if p := st.chat_input("Speak to the Dojo..."):
 
     st.session_state.msgs.append({"role": "assistant", "content": ans})
 
-    # --- 4. ADVANCEMENT CHECK ---
+    # --- ADVANCEMENT CHECK ---
     if check_advance(phase, sentiment, closure, resonance, insight, st.session_state.exchange_count[phase]):
         if phase < 3:
             st.session_state.phase += 1
@@ -355,20 +384,4 @@ if "_clusters" in st.session_state and st.session_state._clusters:
     clusters = st.session_state._clusters
     labeled = []
     for i, c in enumerate(clusters):
-        texts = [t for _, t, _ in c["i"][:5]]
-        label = llm(AGENTS["fast"], [{"role":"system","content":CLUSTER_NAMER_ROLE}, {"role":"user","content":"\n".join(texts)}], temp=0.2).strip() or f"C{i+1}"
-        labeled.append((label, c))
-    data = [{"Time": pd.to_datetime(ts, unit="s"), "Pattern": label, "Truth": content} for label, c in labeled for ts, content, _ in c["i"]]
-    st.altair_chart(alt.Chart(pd.DataFrame(data)).mark_circle(size=120, opacity=0.8).encode(x="Time:T", y="Pattern:N", color="Pattern:N", tooltip=["Time","Pattern","Truth"]).interactive().properties(height=350), use_container_width=True)
-
-# ==================================================
-# CONDITIONAL SAFETY FOOTER (only when crisis detected)
-# ==================================================
-if st.session_state.crisis_active:
-    st.markdown("---")
-    st.error(
-        "**Immediate Support:** If you're in crisis or thinking about hurting yourself, please reach out right now:\n\n"
-        "- Call or text **988** (Suicide & Crisis Lifeline, 24/7, free & confidential)\n"
-        "- Text **HOME** to **741741** (Crisis Text Line, 24/7)\n\n"
-        "You're not alone — help is available immediately."
-    )
+        texts =
