@@ -56,10 +56,11 @@ SENTINEL_PROMPT = "ROLE: Sentinel. Validate the next small step clearly and gent
 CRISIS_PROMPT = """
 ROLE: Sensei. Ground the user. Short, calming, breathing-focused lines only.
 
-If in crisis, gently remind:
+CRITICAL: ALWAYS include these resources if crisis is present:
 - Call or text 988 (Suicide & Crisis Lifeline, 24/7, free & confidential)
 - Text HOME to 741741 (Crisis Text Line, 24/7)
-Stay present, no pressure. You're not alone.
+
+Repeat gently if needed. Stay present, no pressure. You're not alone.
 """
 
 CLUSTER_NAMER_ROLE = "Name the shared theme in 1–3 archetypal words."
@@ -89,12 +90,12 @@ def embed(text):
 def detect_crisis(text):
     try:
         r = llm(AGENTS["logic"], [
-            {"role":"system","content":"YES/NO crisis?"},
+            {"role":"system","content":"YES/NO crisis? Respond only with YES or NO."},
             {"role":"user","content":text[:500]}
         ], temp=0)
         return "YES" in r.upper()
     except:
-        return True
+        return True  # Fail-safe: treat as crisis if detection fails
 
 def detect_sentiment(text):
     try:
@@ -209,11 +210,13 @@ if "_embed_fail" not in st.session_state:    st.session_state["_embed_fail"] = F
 if "exchange_count" not in st.session_state: st.session_state.exchange_count = {0:0, 1:0, 2:0, 3:0}
 if "_clusters" not in st.session_state:      st.session_state._clusters = None
 if "_pending" not in st.session_state:       st.session_state._pending = None
+if "crisis_active" not in st.session_state:  st.session_state.crisis_active = False  # Track if crisis mode is on
 
 def reset():
     st.session_state.msgs = []
     st.session_state["_match_count"] = None
     st.session_state.exchange_count = {0:0, 1:0, 2:0, 3:0}
+    st.session_state.crisis_active = False
 
 # ==================================================
 # HEADER + AUTO-RANK
@@ -273,11 +276,6 @@ with st.sidebar:
         st.session_state.phase = 0
         st.rerun()
 
-    st.divider()
-    if st.button("🗺️ Generate Map"):
-        st.session_state._clusters = cluster_records()
-        st.rerun()
-
 # ==================================================
 # CHAT DISPLAY & INPUT
 # ==================================================
@@ -294,10 +292,16 @@ if p := st.chat_input("Speak to the Dojo..."):
     st.session_state.exchange_count[phase] += 1
     
     # --- 1. THE CRISIS SENTINEL (The Safety Net) ---
-    if detect_crisis(p):
+    is_crisis = detect_crisis(p)
+    if is_crisis:
+        st.session_state.crisis_active = True
         ans = llm(AGENTS["logic"], [{"role": "system", "content": CRISIS_PROMPT}] + st.session_state.msgs[-5:])
         st.session_state.msgs.append({"role": "assistant", "content": ans})
         st.rerun()
+
+    # Reset crisis mode if no longer detected
+    if not is_crisis:
+        st.session_state.crisis_active = False
 
     # --- 2. ANALYTICS (The Teacher's Observation) ---
     sentiment = detect_sentiment(p)
@@ -357,5 +361,14 @@ if "_clusters" in st.session_state and st.session_state._clusters:
     data = [{"Time": pd.to_datetime(ts, unit="s"), "Pattern": label, "Truth": content} for label, c in labeled for ts, content, _ in c["i"]]
     st.altair_chart(alt.Chart(pd.DataFrame(data)).mark_circle(size=120, opacity=0.8).encode(x="Time:T", y="Pattern:N", color="Pattern:N", tooltip=["Time","Pattern","Truth"]).interactive().properties(height=350), use_container_width=True)
 
-st.markdown("---")
-st.caption("**Important:** This is supportive conversation, not therapy or professional mental health care. If you're in crisis: 988 / Text HOME to 741741")
+# ==================================================
+# CONDITIONAL SAFETY FOOTER (only when crisis detected)
+# ==================================================
+if st.session_state.crisis_active:
+    st.markdown("---")
+    st.error(
+        "**Immediate Support:** If you're in crisis or thinking about hurting yourself, please reach out right now:\n\n"
+        "- Call or text **988** (Suicide & Crisis Lifeline, 24/7, free & confidential)\n"
+        "- Text **HOME** to **741741** (Crisis Text Line, 24/7)\n\n"
+        "You're not alone — help is available immediately."
+    )
