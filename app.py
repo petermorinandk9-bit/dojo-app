@@ -1,5 +1,5 @@
 import streamlit as st
-import sqlite3, time, json
+import sqlite3, time, json, os
 import numpy as np, pandas as pd, altair as alt
 from litellm import completion, embedding
 
@@ -61,7 +61,13 @@ DB_PATH = "dojo_records.db"
 # ==================================================
 # LLM + EMBEDDING
 # ==================================================
-@st.cache_data(ttl=3600)
+def llm(model, messages, temp=0.3):
+    try:
+        r = completion(model=model, messages=messages, temperature=temp, timeout=25, num_retries=2)
+        return r.choices[0].message.content
+    except Exception as e:
+        return f"Flicker — {str(e)[:60]}"
+
 def embed(text):
     try:
         r = embedding(model="text-embedding-3-small", input=[text[:1000]])
@@ -69,13 +75,6 @@ def embed(text):
     except:
         st.session_state["_embed_fail"] = True
         return None
-
-def llm(model, messages, temp=0.3):
-    try:
-        r = completion(model=model, messages=messages, temperature=temp, timeout=25, num_retries=2)
-        return r.choices[0].message.content
-    except Exception as e:
-        return f"Flicker — {str(e)[:60]}"
 
 def detect_crisis(text):
     try:
@@ -99,6 +98,14 @@ def detect_sentiment(text):
         return "neutral"
     except:
         return "neutral"
+
+def detect_closure(text):
+    t = text.lower()
+    if any(phrase in t for phrase in ["thank you", "thanks", "feeling better", "feel better", "much better", "spirits lifted"]):
+        return "light_closure"
+    if any(phrase in t for phrase in ["great help", "a lot better", "you've been a great help", "thank you so much"]):
+        return "strong_closure"
+    return None
 
 # ==================================================
 # DB
@@ -250,14 +257,15 @@ phase_name = PHASE_SETS[rank][st.session_state.phase]
 st.subheader(phase_name)
 
 # ==================================================
-# PHASE ENGINE (multi-exchange + sentiment-based)
+# PHASE ENGINE (3+ exchanges + closure detection)
 # ==================================================
-MIN_EXCHANGES = 4
+MIN_EXCHANGES = 3
 
 if p := st.chat_input("Speak..."):
     st.session_state.msgs.append({"role":"user","content":p})
     phase = st.session_state.phase
     sentiment = detect_sentiment(p)
+    closure = detect_closure(p)
     st.session_state.exchange_count[phase] += 1
 
     # Phase 0 - Arrival
@@ -265,9 +273,10 @@ if p := st.chat_input("Speak..."):
         role = CRISIS_PROMPT if detect_crisis(p) else MASTER_PROMPT + "\n" + tone
         ans = llm(AGENTS["logic"], [{"role":"system","content":role}] + st.session_state.msgs[-10:])
         st.session_state.msgs.append({"role":"assistant","content":ans})
-        if sentiment == "positive" and st.session_state.exchange_count[phase] >= MIN_EXCHANGES:
+
+        if closure == "light_closure" or (sentiment == "positive" and st.session_state.exchange_count[phase] >= MIN_EXCHANGES):
             st.session_state.phase = 1
-            # No reset — keep messages
+        st.rerun()
 
     # Phase 1 - Mirror
     elif phase == 1:
@@ -276,39 +285,41 @@ if p := st.chat_input("Speak..."):
         core = llm(AGENTS["logic"], [{"role":"system","content":sys}] + st.session_state.msgs[-10:], temp=0.4)
         soft = llm(AGENTS["fast"], [{"role":"system","content":"Refine tone, keep insight."}, {"role":"user","content":core}])
         st.session_state.msgs.append({"role":"assistant","content":soft})
-        if sentiment == "positive" and st.session_state.exchange_count[phase] >= MIN_EXCHANGES:
+
+        if closure == "light_closure" or (sentiment == "positive" and st.session_state.exchange_count[phase] >= MIN_EXCHANGES):
             st.session_state.phase = 2
-            # Keep messages
+        st.rerun()
 
     # Phase 2 - Seal
     elif phase == 2:
         last = next((m["content"] for m in reversed(st.session_state.msgs) if m["role"]=="assistant"), "")
         if last:
             st.write("**Reflection:**", last)
-        if st.button("Seal"):
+        if st.button("Seal") or closure == "strong_closure":
             if len(last) > 10:
                 save(last, rank, phase_name)
                 d = semantic_density(last)
                 st.caption(f"Semantic density: {d:.2f}")
+                st.session_state.msgs.append({"role":"assistant","content":"Good job working through this. I'm proud of you for showing up and staying with it."})
                 st.session_state.phase = 3
                 st.rerun()
             else:
                 st.warning("Insight too thin.")
         if sentiment == "positive" and st.session_state.exchange_count[phase] >= MIN_EXCHANGES:
             st.session_state.phase = 3
-            # Keep messages
+            st.rerun()
 
-    # Phase 3 - Action
+    # Phase 3 - Action / Cool Down
     elif phase == 3:
         core = llm(AGENTS["fast"], [{"role":"system","content":SENTINEL_PROMPT}] + st.session_state.msgs[-5:], temp=0.1)
         soft = llm(AGENTS["logic"], [{"role":"system","content":"Encourage gently."}, {"role":"user","content":core}])
         st.session_state.msgs.append({"role":"assistant","content":soft})
-        if sentiment == "positive" and st.session_state.exchange_count[phase] >= MIN_EXCHANGES:
-            st.session_state.msgs.append({"role":"assistant","content":"Is there anything else we can work on today?"})
-            st.session_state.phase = 0
-            reset()  # full reset only at end
 
-    st.rerun()
+        if closure == "strong_closure" or (sentiment == "positive" and st.session_state.exchange_count[phase] >= MIN_EXCHANGES):
+            st.session_state.msgs.append({"role":"assistant","content":"You've done great work today. Is there anything else we can work on before we close the round?"})
+            st.session_state.phase = 0
+            reset()
+        st.rerun()
 
 # ==================================================
 # MAP
