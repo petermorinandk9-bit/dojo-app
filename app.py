@@ -1,5 +1,5 @@
 import streamlit as st
-import sqlite3, time, json, os
+import sqlite3, time
 import numpy as np, pandas as pd, altair as alt
 from litellm import completion, embedding
 
@@ -8,7 +8,7 @@ from litellm import completion, embedding
 # ==================================================
 AGENTS = {
     "logic": "groq/llama-3.3-70b-versatile",
-    "fast": "groq/llama-3.1-8b-instant"
+    "fast":  "groq/llama-3.1-8b-instant"
 }
 
 # ==================================================
@@ -35,39 +35,25 @@ RANK_CAPTION = {
     "Sovereign": "Sovereign field"
 }
 
-MASTER_PROMPT = """
-ROLE: Communicator. Gentle Warrior.
-Be fully present with whatever is here.
-Name the feeling gently, hold space without rushing.
-No advice, no fixing — just witness and reflect.
-Warm, human, grounding. Max 3 lines.
-"""
-
+MASTER_PROMPT = "ROLE: Communicator. Gentle Warrior."
 MIRROR_PROMPT = """
 ROLE: Dojo Mirror
 TASK:
 1. Name the felt state or shield in simple, grounded words.
-2. Gently reflect any echo from past if close.
-3. Offer quiet, warm insight — no fixing, no pushing forward.
-STYLE: Warm, present, human. Max 3 lines. Stay with the feeling.
+2. Gently point to any echo from past entries if close.
+3. Offer one quiet insight — no advice, no fixing.
+STYLE: Warm, minimal, human. Max 3 lines.
 """
-
-SENTINEL_PROMPT = "ROLE: Sentinel. Validate the next small step clearly and gently."
-CRISIS_PROMPT = "ROLE: Sensei. Ground the user. Short, calming, breathing-focused lines only."
+SENTINEL_PROMPT = "ROLE: Sentinel. Validate the next step briefly and clearly."
+CRISIS_PROMPT = "ROLE: Sensei. Ground the user. Short, calming lines only."
 CLUSTER_NAMER_ROLE = "Name the shared theme in 1–3 archetypal words."
 
 DB_PATH = "dojo_records.db"
 
 # ==================================================
-# LLM + EMBEDDING
+# LLM + EMBEDDING (cached where possible)
 # ==================================================
-def llm(model, messages, temp=0.3):
-    try:
-        r = completion(model=model, messages=messages, temperature=temp, timeout=25, num_retries=2)
-        return r.choices[0].message.content
-    except Exception as e:
-        return f"Flicker — {str(e)[:60]}"
-
+@st.cache_data(ttl=3600)  # cache embeddings 1 hour
 def embed(text):
     try:
         r = embedding(model="text-embedding-3-small", input=[text[:1000]])
@@ -76,33 +62,33 @@ def embed(text):
         st.session_state["_embed_fail"] = True
         return None
 
+def llm(model, messages, temp=0.3):
+    try:
+        r = completion(model=model, messages=messages, temperature=temp, timeout=25, num_retries=2)
+        return r.choices[0].message.content
+    except Exception as e:
+        return f"Flicker — {str(e)[:60]}"
+
 def detect_crisis(text):
     try:
-        r = completion(
-            model=AGENTS["logic"],
-            messages=[{"role":"system","content":"YES/NO crisis?"},{"role":"user","content":text[:500]}],
-            max_tokens=5,
-            temperature=0
-        )
-        return "YES" in r.choices[0].message.content.upper()
+        r = llm(AGENTS["logic"], [
+            {"role":"system","content":"YES/NO crisis?"},
+            {"role":"user","content":text[:500]}
+        ], temp=0)
+        return "YES" in r.upper()
     except:
         return True
 
 def detect_sentiment(text):
     try:
-        r = completion(
-            model=AGENTS["fast"],
-            messages=[{"role":"system","content":"POSITIVE/NEUTRAL/NEGATIVE/STUCK sentiment?"},{"role":"user","content":text[:500]}],
-            max_tokens=5,
-            temperature=0
-        )
-        sentiment = r.choices[0].message.content.upper()
-        if "POSITIVE" in sentiment:
-            return "positive"
-        elif "NEGATIVE" in sentiment or "STUCK" in sentiment:
-            return "negative"
-        else:
-            return "neutral"
+        r = llm(AGENTS["fast"], [
+            {"role":"system","content":"POSITIVE/NEUTRAL/NEGATIVE/STUCK sentiment?"},
+            {"role":"user","content":text[:500]}
+        ], temp=0)
+        sentiment = r.upper()
+        if "POSITIVE" in sentiment: return "positive"
+        if "NEGATIVE" in sentiment or "STUCK" in sentiment: return "negative"
+        return "neutral"
     except:
         return "neutral"
 
@@ -140,45 +126,49 @@ def semantic_matches(text, k=5):
     q = np.array(q)
     rows = db().execute("SELECT content, vector FROM records WHERE vector IS NOT NULL").fetchall()
     sims = []
-    for c,v in rows:
+    for c, v_json in rows:
         try:
-            v = np.array(json.loads(v))
-            s = np.dot(q,v)/(np.linalg.norm(q)*np.linalg.norm(v))
-            sims.append((s,c))
-        except: pass
+            v = np.array(json.loads(v_json))
+            s = np.dot(q, v) / (np.linalg.norm(q) * np.linalg.norm(v))
+            sims.append((s, c))
+        except:
+            pass
     sims.sort(reverse=True)
-    return [x[1] for x in sims[:k]]
+    return [c for _, c in sims[:k]]
 
 def semantic_density(text):
-    words = len(text.split())
-    unique = len(set(text.lower().split()))
-    return unique/words if words else 0
+    words = text.split()
+    return len(set(w.lower() for w in words)) / len(words) if words else 0
 
 def cluster_records(th=0.85):
     rows = db().execute("SELECT timestamp,content,vector FROM records WHERE vector IS NOT NULL").fetchall()
     clusters = []
-    for ts,c,v in rows:
-        try: v = np.array(json.loads(v))
-        except: continue
+    for ts, c, v_json in rows:
+        try:
+            v = np.array(json.loads(v_json))
+        except:
+            continue
         placed = False
         for cl in clusters:
-            s = np.dot(v,cl["c"])/(np.linalg.norm(v)*np.linalg.norm(cl["c"]))
+            s = np.dot(v, cl["c"]) / (np.linalg.norm(v) * np.linalg.norm(cl["c"]))
             if s > th:
-                cl["i"].append((ts,c,v))
+                cl["i"].append((ts, c, v))
                 cl["c"] = np.mean([x[2] for x in cl["i"]], axis=0)
-                placed = True; break
+                placed = True
+                break
         if not placed:
-            clusters.append({"c":v, "i":[(ts,c,v)]})
+            clusters.append({"c": v, "i": [(ts, c, v)]})
     return clusters
 
 # ==================================================
 # STATE
 # ==================================================
 st.set_page_config(page_title="The Dojo", layout="wide")
-if "phase" not in st.session_state: st.session_state.phase = 0
-if "msgs" not in st.session_state: st.session_state.msgs = []
-if "_match_count" not in st.session_state: st.session_state["_match_count"] = None
-if "_embed_fail" not in st.session_state: st.session_state["_embed_fail"] = False
+
+if "phase" not in st.session_state:          st.session_state.phase = 0
+if "msgs" not in st.session_state:           st.session_state.msgs = []
+if "_match_count" not in st.session_state:   st.session_state["_match_count"] = None
+if "_embed_fail" not in st.session_state:    st.session_state["_embed_fail"] = False
 if "exchange_count" not in st.session_state: st.session_state.exchange_count = {0:0, 1:0, 2:0, 3:0}
 
 def reset():
@@ -199,21 +189,21 @@ if st.session_state["_embed_fail"]:
 
 count = db().execute("SELECT COUNT(*) FROM records").fetchone()[0]
 
-def compute_rank(count):
-    if count < 10: return "Student"
-    elif count < 25: return "Practitioner"
-    elif count < 50: return "Sentinel"
-    else: return "Sovereign"
+def compute_rank(c):
+    if c < 10: return "Student"
+    if c < 25: return "Practitioner"
+    if c < 50: return "Sentinel"
+    return "Sovereign"
 
 rank = compute_rank(count)
 tone = RANK_TONE[rank]
 
-st.progress(min(count/50, 1.0))
+st.progress(min(count / 50, 1.0))
 st.markdown(f"**Rank:** {rank} • **Ledger:** {count} sealed • **{min(int(count/50*100),100)}% claimed**")
 st.caption(RANK_CAPTION[rank])
 
 # ==================================================
-# SIDEBAR PATH (read-only, greyed future ranks)
+# SIDEBAR PATH (read-only)
 # ==================================================
 with st.sidebar:
     st.markdown("### Rank Path")
@@ -257,7 +247,7 @@ st.subheader(phase_name)
 # ==================================================
 # PHASE ENGINE (multi-exchange + sentiment-based progression)
 # ==================================================
-MIN_EXCHANGES = 4  # require at least 4 exchanges per phase
+MIN_EXCHANGES = 4
 
 if p := st.chat_input("Speak..."):
     st.session_state.msgs.append({"role":"user","content":p})
@@ -265,7 +255,7 @@ if p := st.chat_input("Speak..."):
     sentiment = detect_sentiment(p)
     st.session_state.exchange_count[phase] += 1
 
-    # Phase 0 - Arrival (nurture until positive shift)
+    # Phase 0 - Arrival
     if phase == 0:
         role = CRISIS_PROMPT if detect_crisis(p) else MASTER_PROMPT + "\n" + tone
         ans = llm(AGENTS["logic"], [{"role":"system","content":role}] + st.session_state.msgs[-10:])
@@ -274,7 +264,7 @@ if p := st.chat_input("Speak..."):
             st.session_state.phase = 1
             reset()
 
-    # Phase 1 - Mirror (stay if stuck, advance only on positive)
+    # Phase 1 - Mirror
     elif phase == 1:
         matches = semantic_matches(p)
         sys = MIRROR_PROMPT + "\n" + tone + "\n" + "\n".join(matches)
@@ -285,7 +275,7 @@ if p := st.chat_input("Speak..."):
             st.session_state.phase = 2
             reset()
 
-    # Phase 2 - Seal (explicit button required, but auto-advance if positive after min exchanges)
+    # Phase 2 - Seal
     elif phase == 2:
         last = next((m["content"] for m in reversed(st.session_state.msgs) if m["role"]=="assistant"), "")
         if last:
@@ -304,7 +294,7 @@ if p := st.chat_input("Speak..."):
             st.session_state.phase = 3
             reset()
 
-    # Phase 3 - Action (nurture action, reset with "anything else?" on positive close)
+    # Phase 3 - Action
     elif phase == 3:
         core = llm(AGENTS["fast"], [{"role":"system","content":SENTINEL_PROMPT}] + st.session_state.msgs[-5:], temp=0.1)
         soft = llm(AGENTS["logic"], [{"role":"system","content":"Encourage gently."}, {"role":"user","content":core}])
@@ -333,7 +323,7 @@ if "_clusters" in st.session_state:
                 {"role":"system","content":CLUSTER_NAMER_ROLE},
                 {"role":"user","content":"\n".join(texts)}
             ], temp=0.2)
-            label = label.strip() if label and label.strip() else f"C{i+1}"
+            label = label.strip() or f"C{i+1}"
             labeled.append((label, c))
         data = [
             {"Time": pd.to_datetime(ts, unit="s"), "Pattern": label, "Truth": content}
