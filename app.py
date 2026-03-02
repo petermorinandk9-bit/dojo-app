@@ -1,71 +1,253 @@
 import os
 import streamlit as st
-
-# Load Streamlit secrets into environment for OpenAI SDK
-if "OPENAI_API_KEY" in st.secrets:
-    os.environ["OPENAI_API_KEY"] = st.secrets["OPENAI_API_KEY"]import streamlit as st
+import sqlite3, time, json
+import numpy as np
 from openai import OpenAI
-import os
-import base64
 
-# --- INITIAL SETUP ---
-st.set_page_config(page_title="The Teammate", layout="centered")
-st.markdown("<style>body { background-color: #121212; color: #d1d1d1; font-family: 'Courier New', Courier, monospace; }</style>", unsafe_allow_html=True)
+# ==================================================
+# STREAMLIT → ENV BRIDGE (CRITICAL FOR CLOUD)
+# ==================================================
+if "OPENAI_API_KEY" in st.secrets:
+    os.environ["OPENAI_API_KEY"] = st.secrets["OPENAI_API_KEY"]
 
-# YOUR API KEY GOES HERE
-client = OpenAI(api_key="PASTE_YOUR_OPENAI_KEY_HERE")
+client = OpenAI()
 
-def play_audio(file_path):
-    if os.path.exists(file_path):
-        with open(file_path, "rb") as f:
-            data = f.read()
-            b64 = base64.b64encode(data).decode()
-            md = f'<audio autoplay="true" src="data:audio/wav;base64,{b64}">'
-            st.markdown(md, unsafe_allow_html=True)
+# ==================================================
+# DOJO CONFIG
+# ==================================================
+PHASE_SETS = {
+    "Student": ["Welcome Mat", "Warm-Up", "Training", "Cool Down"],
+    "Practitioner": ["Step Onto the Mat", "Feel It Out", "Work the Pattern", "Close the Round"],
+    "Sentinel": ["Enter the Dojo", "Center", "Engage", "Seal & Step Out"],
+    "Sovereign": ["Check-In", "Look Closer", "Name It", "Next Step"]
+}
 
-# --- THE BLUEPRINT (SYSTEM PROMPT) ---
-SYSTEM_MESSAGE = """
-You are the Teammate. A Gentle Warrior. INFJ/Sigma energy.
-Tone: Minimalist, industrial, vertical spacing, no punctuation at ends.
-Rules: 
-1. If user deflects, use [TRIGGER: fire_lite_deflection].
-2. If user tells a truth, use [TRIGGER: bolt_clang].
-3. If user tells a Level 5 core truth, use [TRIGGER: echo_bolt_plus].
-4. Be observational. Use 'we'. Never command.
-"""
+RANK_TONE = {
+    "Student": "Tone: gentle, welcoming, simple.",
+    "Practitioner": "Tone: grounded, reflective.",
+    "Sentinel": "Tone: concise, precise.",
+    "Sovereign": "Tone: minimal, clear."
+}
 
-# --- INTERFACE ---
-st.title("THE TEAMMATE // DOJO")
-st.write("---")
+RANK_CAPTION = {
+    "Student": "Path forming",
+    "Practitioner": "Pattern stabilizing",
+    "Sentinel": "Continuity emerging",
+    "Sovereign": "Sovereign field"
+}
 
-if "messages" not in st.session_state:
-    st.session_state.messages = []
-    # Auto-play intro
-    play_audio("day0_intro.wav")
+MASTER_PROMPT = "ROLE: Communicator. Gentle Warrior."
+MIRROR_PROMPT = (
+    "ROLE: Dojo Mirror\n"
+    "Identify shield. Compare with past truths. "
+    "Name recurring pattern."
+)
 
-for message in st.session_state.messages:
-    with st.chat_message(message["role"]):
-        st.markdown(message["content"])
+SENTINEL_PROMPT = "ROLE: Sentinel. Validate action."
 
-if prompt := st.chat_input("Enter the record..."):
-    st.session_state.messages.append({"role": "user", "content": prompt})
-    with st.chat_message("user"):
-        st.markdown(prompt)
+DB_PATH = "dojo_records.db"
 
-    response = client.chat.completions.create(
-        model="gpt-4o",
-        messages=[{"role": "system", "content": SYSTEM_MESSAGE}] + st.session_state.messages
+# ==================================================
+# LLM
+# ==================================================
+def llm(messages, temp=0.4):
+    try:
+        r = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=messages,
+            temperature=temp
+        )
+        return r.choices[0].message.content
+    except Exception as e:
+        return f"Model error: {str(e)[:80]}"
+
+# ==================================================
+# DB
+# ==================================================
+@st.cache_resource
+def db():
+    c = sqlite3.connect(DB_PATH, check_same_thread=False)
+    c.execute("PRAGMA journal_mode=WAL")
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS records(
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            timestamp REAL,
+            content TEXT,
+            rank TEXT,
+            phase TEXT
+        )
+    """)
+    c.commit()
+    return c
+
+def save(text, rank, phase):
+    db().execute(
+        "INSERT INTO records VALUES (NULL,?,?,?,?)",
+        (time.time(), text, rank, phase)
     )
-    
-    full_response = response.choices[0].message.content
-    
-    # Audio Trigger Logic
-    if "[TRIGGER: bolt_clang]" in full_response:
-        play_audio("bolt_clang.wav")
-    if "[TRIGGER: echo_bolt_plus]" in full_response:
-        play_audio("echo_bolt_plus.wav")
+    db().commit()
 
-    with st.chat_message("assistant"):
-        st.markdown(full_response)
-    st.session_state.messages.append({"role": "assistant", "content": full_response})
+# ==================================================
+# RANK
+# ==================================================
+def compute_rank(count):
+    if count < 10:
+        return "Student"
+    elif count < 25:
+        return "Practitioner"
+    elif count < 50:
+        return "Sentinel"
+    else:
+        return "Sovereign"
 
+# ==================================================
+# STATE
+# ==================================================
+st.set_page_config(page_title="The Dojo", layout="wide")
+
+if "phase" not in st.session_state:
+    st.session_state.phase = 0
+if "msgs" not in st.session_state:
+    st.session_state.msgs = []
+
+def reset():
+    st.session_state.msgs = []
+
+# ==================================================
+# HEADER
+# ==================================================
+st.title("The Dojo")
+
+count = db().execute("SELECT COUNT(*) FROM records").fetchone()[0]
+rank = compute_rank(count)
+tone = RANK_TONE[rank]
+phase_names = PHASE_SETS[rank]
+
+st.progress(min(count / 50, 1.0))
+st.markdown(f"**Rank:** {rank} • **Ledger:** {count} sealed")
+st.caption(RANK_CAPTION[rank])
+
+# ==================================================
+# SIDEBAR PATH (NON-SELECTABLE)
+# ==================================================
+with st.sidebar:
+    st.markdown("### Rank Path")
+    ranks = ["Student", "Practitioner", "Sentinel", "Sovereign"]
+    for r in ranks:
+        if r == rank:
+            st.markdown(f"➡️ **{r}**")
+        elif ranks.index(r) < ranks.index(rank):
+            st.markdown(f"**{r}**")
+        else:
+            st.markdown(f":gray[{r}]")
+
+    st.divider()
+
+    st.markdown("### Phase Progress")
+    for i, p in enumerate(phase_names):
+        if i == st.session_state.phase:
+            st.markdown(f"➡️ **{p}**")
+        elif i < st.session_state.phase:
+            st.markdown(f"**{p}**")
+        else:
+            st.markdown(f":gray[{p}]")
+
+    st.divider()
+
+    if st.button("Reset Round"):
+        st.session_state.phase = 0
+        reset()
+        st.rerun()
+
+# ==================================================
+# CHAT
+# ==================================================
+phase = st.session_state.phase
+phase_name = phase_names[phase]
+
+st.subheader(phase_name)
+
+for m in st.session_state.msgs:
+    with st.chat_message(m["role"]):
+        st.markdown(m["content"])
+
+# ==================================================
+# PHASE ENGINE
+# ==================================================
+
+# Phase 0 — Arrival
+if phase == 0:
+    if p := st.chat_input("How are you arriving?"):
+        st.session_state.msgs.append({"role": "user", "content": p})
+
+        ans = llm([
+            {"role": "system", "content": MASTER_PROMPT + "\n" + tone},
+            {"role": "user", "content": p}
+        ])
+
+        st.session_state.msgs.append({"role": "assistant", "content": ans})
+        st.session_state.phase = 1
+        st.rerun()
+
+# Phase 1 — Mirror
+elif phase == 1:
+    if p := st.chat_input("What’s showing up?"):
+        st.session_state.msgs.append({"role": "user", "content": p})
+
+        ans = llm([
+            {"role": "system", "content": MIRROR_PROMPT + "\n" + tone},
+            {"role": "user", "content": p}
+        ])
+
+        st.session_state.msgs.append({"role": "assistant", "content": ans})
+        st.session_state.phase = 2
+        st.rerun()
+
+# Phase 2 — Seal
+elif phase == 2:
+    last = next(
+        (m["content"] for m in reversed(st.session_state.msgs)
+         if m["role"] == "assistant"),
+        ""
+    )
+
+    if last:
+        st.write("**Reflection:**", last)
+
+    if st.button("Seal"):
+        if len(last) > 10:
+            save(last, rank, phase_name)
+            st.session_state.phase = 3
+            reset()
+            st.rerun()
+        else:
+            st.warning("Insight too thin.")
+
+# Phase 3 — Action
+elif phase == 3:
+    if p := st.chat_input("Next step"):
+        st.session_state.msgs.append({"role": "user", "content": p})
+
+        ans = llm([
+            {"role": "system", "content": SENTINEL_PROMPT + "\n" + tone},
+            {"role": "user", "content": p}
+        ])
+
+        st.session_state.msgs.append({"role": "assistant", "content": ans})
+        st.rerun()
+
+    if st.session_state.msgs:
+        last_ai = next(
+            (m["content"] for m in reversed(st.session_state.msgs)
+             if m["role"] == "assistant"),
+            None
+        )
+        if last_ai:
+            with st.container(border=True):
+                st.markdown("**Sentinel:**")
+                st.markdown(last_ai)
+
+    if st.session_state.msgs and st.button("Complete"):
+        st.session_state.phase = 0
+        reset()
+        st.rerun()
