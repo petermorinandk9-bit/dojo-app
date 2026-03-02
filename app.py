@@ -80,10 +80,23 @@ def detect_crisis(text):
     except:
         return True
 
-def detect_action(text):
-    verbs = ["will", "going to", "start", "build", "write", "do", "make", "create"]
-    t = text.lower()
-    return any(v in t for v in verbs)
+def detect_sentiment(text):
+    try:
+        r = completion(
+            model=AGENTS["fast"],
+            messages=[{"role":"system","content":"POSITIVE/NEUTRAL/NEGATIVE/STUCK sentiment?"},{"role":"user","content":text[:500]}],
+            max_tokens=5,
+            temperature=0
+        )
+        sentiment = r.choices[0].message.content.upper()
+        if "POSITIVE" in sentiment:
+            return "positive"
+        elif "NEGATIVE" in sentiment or "STUCK" in sentiment:
+            return "negative"
+        else:
+            return "neutral"
+    except:
+        return "neutral"
 
 # ==================================================
 # DB
@@ -158,15 +171,17 @@ if "phase" not in st.session_state: st.session_state.phase = 0
 if "msgs" not in st.session_state: st.session_state.msgs = []
 if "_match_count" not in st.session_state: st.session_state["_match_count"] = None
 if "_embed_fail" not in st.session_state: st.session_state["_embed_fail"] = False
+if "exchange_count" not in st.session_state: st.session_state.exchange_count = {0:0, 1:0, 2:0, 3:0}
 
 def reset():
     st.session_state.msgs = []
     st.session_state["_match_count"] = None
+    st.session_state.exchange_count[st.session_state.phase] = 0
 
 # ==================================================
 # HEADER + AUTO-RANK
 # ==================================================
-st.title(" ; ∞ Semicolon-Infinity")
+st.title("The Dojo")
 
 if st.session_state["_embed_fail"]:
     st.warning("Embeddings unavailable — Mirror & Map limited.")
@@ -218,6 +233,7 @@ with st.sidebar:
 
     if st.button("Reset Round"):
         reset()
+        st.session_state.phase = 0
         st.rerun()
 
 # ==================================================
@@ -231,68 +247,66 @@ phase_name = PHASE_SETS[rank][st.session_state.phase]
 st.subheader(phase_name)
 
 # ==================================================
-# PHASE ENGINE
+# PHASE ENGINE (multi-exchange + sentiment-based progression)
 # ==================================================
-if st.session_state.phase == 0:
-    if p := st.chat_input("How are you arriving?"):
-        st.session_state.msgs.append({"role":"user","content":p})
-        role = MASTER_PROMPT + "\n" + tone
-        if detect_crisis(p):
-            role += "\nStabilize gently."
+MIN_EXCHANGES = 3  # require at least 3 exchanges per phase
+
+if p := st.chat_input("Speak..."):
+    st.session_state.msgs.append({"role":"user","content":p})
+    phase = st.session_state.phase
+    sentiment = detect_sentiment(p)
+    st.session_state.exchange_count[phase] += 1
+
+    # Phase 0 - Arrival
+    if phase == 0:
+        role = CRISIS_PROMPT if detect_crisis(p) else MASTER_PROMPT + "\n" + tone
         ans = llm(AGENTS["logic"], [{"role":"system","content":role}] + st.session_state.msgs[-10:])
         st.session_state.msgs.append({"role":"assistant","content":ans})
-        st.session_state.phase = 1
-        st.rerun()
+        if sentiment == "positive" and st.session_state.exchange_count[phase] >= MIN_EXCHANGES:
+            st.session_state.phase = 1
+            reset()
 
-elif st.session_state.phase == 1:
-    if st.session_state.get("_match_count") is not None:
-        cnt = st.session_state["_match_count"]
-        st.caption(f"Last search: {cnt} related patterns")
-        if cnt >= 3:
-            st.caption("Recurring structure detected")
-    if p := st.chat_input("What’s showing up?"):
-        st.session_state.msgs.append({"role":"user","content":p})
+    # Phase 1 - Mirror
+    elif phase == 1:
         matches = semantic_matches(p)
-        st.session_state["_match_count"] = len(matches)
         sys = MIRROR_PROMPT + "\n" + tone + "\n" + "\n".join(matches)
         core = llm(AGENTS["logic"], [{"role":"system","content":sys}] + st.session_state.msgs[-10:], temp=0.4)
         soft = llm(AGENTS["fast"], [{"role":"system","content":"Refine tone, keep insight."}, {"role":"user","content":core}])
         st.session_state.msgs.append({"role":"assistant","content":soft})
-        st.session_state.phase = 2
-        st.rerun()
+        if sentiment == "positive" and st.session_state.exchange_count[phase] >= MIN_EXCHANGES:
+            st.session_state.phase = 2
+            reset()
 
-elif st.session_state.phase == 2:
-    last = next((m["content"] for m in reversed(st.session_state.msgs) if m["role"]=="assistant"), "")
-    if last:
-        st.write("**Reflection:**", last)
-    if st.button("Seal"):
-        if len(last) > 10:
-            save(last, rank, phase_name)
-            d = semantic_density(last)
-            st.caption(f"Semantic density: {d:.2f}")
+    # Phase 2 - Seal
+    elif phase == 2:
+        last = next((m["content"] for m in reversed(st.session_state.msgs) if m["role"]=="assistant"), "")
+        if last:
+            st.write("**Reflection:**", last)
+        if st.button("Seal"):
+            if len(last) > 10:
+                save(last, rank, phase_name)
+                d = semantic_density(last)
+                st.caption(f"Semantic density: {d:.2f}")
+                st.session_state.phase = 3
+                reset()
+                st.rerun()
+            else:
+                st.warning("Insight too thin.")
+        if sentiment == "positive" and st.session_state.exchange_count[phase] >= MIN_EXCHANGES:
             st.session_state.phase = 3
             reset()
-            st.rerun()
-        else:
-            st.warning("Insight too thin.")
 
-elif st.session_state.phase == 3:
-    if p := st.chat_input("Next step"):
-        st.session_state.msgs.append({"role":"user","content":p})
+    # Phase 3 - Action
+    elif phase == 3:
         core = llm(AGENTS["fast"], [{"role":"system","content":SENTINEL_PROMPT}] + st.session_state.msgs[-5:], temp=0.1)
         soft = llm(AGENTS["logic"], [{"role":"system","content":"Encourage gently."}, {"role":"user","content":core}])
         st.session_state.msgs.append({"role":"assistant","content":soft})
-        st.rerun()
-    if st.session_state.msgs:
-        last_ai = next((m["content"] for m in reversed(st.session_state.msgs) if m["role"]=="assistant"), None)
-        if last_ai:
-            with st.container(border=True):
-                st.markdown("**Sentinel:**")
-                st.markdown(last_ai)
-    if st.session_state.msgs and st.button("Complete"):
-        st.session_state.phase = 0
-        reset()
-        st.rerun()
+        if sentiment == "positive" and st.session_state.exchange_count[phase] >= MIN_EXCHANGES:
+            st.session_state.msgs.append({"role":"assistant","content":"Is there anything else we can work on today?"})
+            st.session_state.phase = 0
+            reset()
+
+    st.rerun()
 
 # ==================================================
 # MAP
