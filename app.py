@@ -4,7 +4,7 @@ import numpy as np
 from litellm import completion, embedding
 
 # ==================================================
-# 0. BOOTSTRAP (Secrets → Env)
+# 0. SECRETS BOOTSTRAP
 # ==================================================
 for key in ["OPENAI_API_KEY", "GROQ_API_KEY"]:
     if key in st.secrets:
@@ -42,43 +42,50 @@ RANK_CAPTION = {
     "Sovereign": "Sovereign field"
 }
 
-MASTER_PROMPT = "ROLE: Communicator. Gentle Warrior."
-CRISIS_PROMPT = "ROLE: Sensei. Stabilize gently."
-SENTINEL_PROMPT = "ROLE: Sentinel. Validate action."
+MASTER_PROMPT = """ROLE: Dojo Communicator
 
-# 🔧 REFINED MIRROR
+Respond calm, grounded, minimal.
+No therapy language.
+No sympathy phrases.
+No questions unless necessary.
+
+Style:
+short lines
+present-focused
+steady
+contained
+"""
+
 MIRROR_PROMPT = """ROLE: Dojo Mirror
 
-Return ONLY compressed pattern insight.
+Return only compressed pattern reflection.
 
 Rules:
-- max 3 short lines
-- no advice
-- no encouragement
-- no metaphor
-- no explanation
-- no questions
+max 2 lines
+no labels
+no scaffolding words
+no explanation
+no advice
+no questions
+no duplication
 
-If user already names pattern → compress it.
-Name shield + pattern if present.
+If user expresses state → name pattern.
+If user expresses intent → name direction.
 """
+
+SENTINEL_PROMPT = "ROLE: Sentinel. Validate action."
 
 DB_PATH = "dojo_records.db"
 
 # ==================================================
-# 3. LLM + EMBEDDING
+# 3. LLM & EMBEDDING
 # ==================================================
 def llm(model, messages, temp=0.3):
     try:
-        r = completion(
-            model=model,
-            messages=messages,
-            temperature=temp,
-            timeout=25
-        )
-        return r.choices[0].message.content.strip()
+        r = completion(model=model, messages=messages, temperature=temp, timeout=25)
+        return r.choices[0].message.content
     except Exception as e:
-        return f"Flicker — {str(e)[:50]}"
+        return f"Flicker — {str(e)[:60]}"
 
 def embed(text):
     try:
@@ -138,7 +145,6 @@ def semantic_matches(text, k=5):
     rows = db().execute(
         "SELECT content, vector FROM records WHERE vector IS NOT NULL"
     ).fetchall()
-
     sims = []
     for c, v in rows:
         try:
@@ -147,7 +153,6 @@ def semantic_matches(text, k=5):
             sims.append((s, c))
         except:
             pass
-
     sims.sort(reverse=True)
     return [x[1] for x in sims[:k]]
 
@@ -165,24 +170,18 @@ def reset():
     st.session_state.msgs = []
 
 # ==================================================
-# 6. RANK COMPUTE
-# ==================================================
-def compute_rank(count):
-    if count < 10:
-        return "Student"
-    elif count < 25:
-        return "Practitioner"
-    elif count < 50:
-        return "Sentinel"
-    else:
-        return "Sovereign"
-
-# ==================================================
-# 7. HEADER
+# 6. HEADER + AUTO RANK
 # ==================================================
 st.title("The Dojo")
 
 count = db().execute("SELECT COUNT(*) FROM records").fetchone()[0]
+
+def compute_rank(c):
+    if c < 10: return "Student"
+    elif c < 25: return "Practitioner"
+    elif c < 50: return "Sentinel"
+    else: return "Sovereign"
+
 rank = compute_rank(count)
 tone = RANK_TONE[rank]
 phase_names = PHASE_SETS[rank]
@@ -192,16 +191,16 @@ st.markdown(f"**Rank:** {rank} • **Ledger:** {count} sealed")
 st.caption(RANK_CAPTION[rank])
 
 # ==================================================
-# 8. SIDEBAR PATH DISPLAY
+# 7. SIDEBAR — PATH DISPLAY
 # ==================================================
 with st.sidebar:
     st.markdown("### Rank Path")
     ranks = ["Student", "Practitioner", "Sentinel", "Sovereign"]
     for r in ranks:
-        if r == rank:
-            st.markdown(f"➡️ **{r}**")
-        elif ranks.index(r) < ranks.index(rank):
+        if ranks.index(r) < ranks.index(rank):
             st.markdown(f"**{r}**")
+        elif r == rank:
+            st.markdown(f"➡️ **{r}**")
         else:
             st.markdown(f":gray[{r}]")
 
@@ -209,10 +208,10 @@ with st.sidebar:
 
     st.markdown("### Phase Progress")
     for i, p in enumerate(phase_names):
-        if i == st.session_state.phase:
-            st.markdown(f"➡️ **{p}**")
-        elif i < st.session_state.phase:
+        if i < st.session_state.phase:
             st.markdown(f"**{p}**")
+        elif i == st.session_state.phase:
+            st.markdown(f"➡️ **{p}**")
         else:
             st.markdown(f":gray[{p}]")
 
@@ -224,28 +223,26 @@ with st.sidebar:
         st.rerun()
 
 # ==================================================
-# 9. CHAMBER
+# 8. CHAT DISPLAY
 # ==================================================
 phase = st.session_state.phase
-phase_name = phase_names[phase]
-
-st.subheader(phase_name)
+st.subheader(phase_names[phase])
 
 for m in st.session_state.msgs:
     with st.chat_message(m["role"]):
         st.markdown(m["content"])
 
 # ==================================================
-# 10. PHASE FLOW
+# 9. PHASE ENGINE
 # ==================================================
-# Phase 0 — Arrival
+# --- Phase 0: Arrival ---
 if phase == 0:
     if p := st.chat_input("How are you arriving?"):
         st.session_state.msgs.append({"role": "user", "content": p})
 
         role = MASTER_PROMPT + "\n" + tone
         if detect_crisis(p):
-            role = CRISIS_PROMPT
+            role += "\nStabilize gently."
 
         ans = llm(
             AGENTS["logic"],
@@ -256,30 +253,36 @@ if phase == 0:
         st.session_state.phase = 1
         st.rerun()
 
-# Phase 1 — Mirror
+# --- Phase 1: Mirror ---
 elif phase == 1:
     if p := st.chat_input("What’s showing up?"):
         st.session_state.msgs.append({"role": "user", "content": p})
 
         matches = semantic_matches(p)
-        sys = MIRROR_PROMPT + "\n" + "\n".join(matches)
+        sys = MIRROR_PROMPT + "\n" + tone + "\n" + "\n".join(matches)
 
         ans = llm(
             AGENTS["logic"],
-            [{"role": "system", "content": sys},
-             {"role": "user", "content": p}],
-            temp=0.2
+            [{"role": "system", "content": sys}] + st.session_state.msgs[-10:],
+            temp=0.4
         )
+
+        # remove duplicates + compress to max 2 lines
+        lines = [l.strip() for l in ans.split("\n") if l.strip()]
+        unique = []
+        for l in lines:
+            if l not in unique:
+                unique.append(l)
+        ans = "\n".join(unique[:2])
 
         st.session_state.msgs.append({"role": "assistant", "content": ans})
         st.session_state.phase = 2
         st.rerun()
 
-# Phase 2 — Seal
+# --- Phase 2: Seal ---
 elif phase == 2:
     last = next(
-        (m["content"] for m in reversed(st.session_state.msgs)
-         if m["role"] == "assistant"),
+        (m["content"] for m in reversed(st.session_state.msgs) if m["role"] == "assistant"),
         ""
     )
 
@@ -287,27 +290,26 @@ elif phase == 2:
         st.write("**Reflection:**", last)
 
     if st.button("Seal"):
-        if len(last) > 5:
-            save(last, rank, phase_name)
+        if len(last) > 10:
+            save(last, rank, phase_names[phase])
             st.session_state.phase = 3
             reset()
             st.rerun()
         else:
             st.warning("Insight too thin.")
 
-# Phase 3 — Action
+# --- Phase 3: Action ---
 elif phase == 3:
     if p := st.chat_input("Next step"):
         st.session_state.msgs.append({"role": "user", "content": p})
 
-        ans = llm(
+        core = llm(
             AGENTS["fast"],
-            [{"role": "system", "content": SENTINEL_PROMPT},
-             {"role": "user", "content": p}],
+            [{"role": "system", "content": SENTINEL_PROMPT}] + st.session_state.msgs[-5:],
             temp=0.1
         )
 
-        st.session_state.msgs.append({"role": "assistant", "content": ans})
+        st.session_state.msgs.append({"role": "assistant", "content": core})
         st.rerun()
 
     if st.session_state.msgs and st.button("Complete"):
