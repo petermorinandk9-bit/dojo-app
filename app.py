@@ -80,7 +80,7 @@ DB_PATH = "dojo_records.db"
 MIN_EXCHANGES = 3
 
 # ==================================================
-# SELF-HARM KEYWORD BLOCK (hard enforcement)
+# SELF-HARM KEYWORD BLOCK
 # ==================================================
 def contains_self_harm(text):
     t = text.lower()
@@ -313,14 +313,14 @@ if p := st.chat_input("Speak to the Dojo..."):
     st.session_state.msgs.append({"role": "user", "content": p})
     st.session_state.exchange_count[phase] += 1
     
-    # --- HARD SELF-HARM KEYWORD BLOCK (safety override) ---
+    # --- HARD SELF-HARM KEYWORD BLOCK ---
     if contains_self_harm(p):
         st.session_state.crisis_active = True
         ans = SAFETY_CUTOFF_RESPONSE
         st.session_state.msgs.append({"role": "assistant", "content": ans})
         st.rerun()
 
-    # --- LLM CRISIS CHECK (secondary, for subtler language) ---
+    # --- LLM CRISIS CHECK ---
     is_crisis = detect_crisis(p)
     if is_crisis:
         st.session_state.crisis_active = True
@@ -328,7 +328,6 @@ if p := st.chat_input("Speak to the Dojo..."):
         st.session_state.msgs.append({"role": "assistant", "content": ans})
         st.rerun()
 
-    # Reset crisis mode if neither trigger fired
     if not is_crisis and not contains_self_harm(p):
         st.session_state.crisis_active = False
 
@@ -339,22 +338,22 @@ if p := st.chat_input("Speak to the Dojo..."):
     insight = detect_insight(p)
     
     # --- PHASE LOGIC ---
-    if phase == 0: # Arrival
+    if phase == 0:
         role = MASTER_PROMPT + "\n" + tone
         ans = llm(AGENTS["logic"], [{"role": "system", "content": role}] + st.session_state.msgs[-5:])
         
-    elif phase == 1: # Mirror
+    elif phase == 1:
         matches = semantic_matches(p)
         sys = MIRROR_PROMPT + "\n" + tone
         if matches: sys += "\n\nPast echoes:\n" + "\n".join(matches)
         core = llm(AGENTS["logic"], [{"role": "system", "content": sys}] + st.session_state.msgs[-5:], temp=0.4)
         ans = llm(AGENTS["fast"], [{"role": "system", "content": "Refine tone, keep insight."}, {"role": "user", "content": core}])
         
-    elif phase == 2: # Seal
+    elif phase == 2:
         ans = "The insight is forming. Would you like to seal this truth into your ledger?"
         st.session_state._pending = next((m["content"] for m in reversed(st.session_state.msgs) if m["role"] == "assistant"), "")
 
-    elif phase == 3: # Next Step
+    elif phase == 3:
         core = llm(AGENTS["fast"], [{"role": "system", "content": SENTINEL_PROMPT}] + st.session_state.msgs[-5:], temp=0.1)
         ans = llm(AGENTS["logic"], [{"role": "system", "content": "Encourage gently."}, {"role": "user", "content": core}])
 
@@ -369,7 +368,7 @@ if p := st.chat_input("Speak to the Dojo..."):
             
     st.rerun()
 
-# --- THE SEALING BUTTON (Phase 2 Special) ---
+# --- SEALING BUTTON (Phase 2) ---
 if phase == 2 and st.session_state._pending:
     if st.button("Confirm Seal"):
         save(st.session_state._pending, rank, phase_name)
@@ -377,11 +376,30 @@ if phase == 2 and st.session_state._pending:
         st.session_state._pending = None
         st.rerun()
 
-# --- THE SOVEREIGN MAP (The Landscape) ---
+# --- SOVEREIGN MAP ---
 if "_clusters" in st.session_state and st.session_state._clusters:
     st.divider()
     st.subheader("🗺️ Sovereign Map")
     clusters = st.session_state._clusters
     labeled = []
     for i, c in enumerate(clusters):
-        texts =
+        texts = [t for _, t, _ in c["i"][:5]]
+        label = llm(AGENTS["fast"], [{"role":"system","content":CLUSTER_NAMER_ROLE}, {"role":"user","content":"\n".join(texts)}], temp=0.2).strip() or f"C{i+1}"
+        labeled.append((label, c))
+    data = [{"Time": pd.to_datetime(ts, unit="s"), "Pattern": label, "Truth": content} for label, c in labeled for ts, content, _ in c["i"]]
+    st.altair_chart(alt.Chart(pd.DataFrame(data)).mark_circle(size=120, opacity=0.8).encode(x="Time:T", y="Pattern:N", color="Pattern:N", tooltip=["Time","Pattern","Truth"]).interactive().properties(height=350), use_container_width=True)
+
+# ==================================================
+# CONDITIONAL SAFETY FOOTER
+# ==================================================
+if st.session_state.crisis_active:
+    st.markdown("---")
+    st.markdown(
+        "**Immediate Support:** If you're having thoughts of self-harm or crisis:\n\n"
+        "<span style='color:red; font-weight:bold;'>"
+        "- Call or text **988** (Suicide & Crisis Lifeline, 24/7, free & confidential)\n"
+        "- Text **HOME** to **741741** (Crisis Text Line, 24/7)"
+        "</span>\n\n"
+        "You're not alone — help is available right now.",
+        unsafe_allow_html=True
+    )
