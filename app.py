@@ -2,15 +2,22 @@ import os
 import streamlit as st
 import sqlite3, time, json
 import numpy as np
-from openai import OpenAI
+from litellm import completion, embedding
 
 # ==================================================
-# STREAMLIT → ENV BRIDGE (CRITICAL FOR CLOUD)
+# LOAD SECRETS (Streamlit Cloud → env)
 # ==================================================
-if "OPENAI_API_KEY" in st.secrets:
-    os.environ["OPENAI_API_KEY"] = st.secrets["OPENAI_API_KEY"]
+for key in ["GROQ_API_KEY", "OPENAI_API_KEY"]:
+    if key in st.secrets:
+        os.environ[key] = st.secrets[key]
 
-client = OpenAI()
+# ==================================================
+# AGENTS (FREE GROQ)
+# ==================================================
+AGENTS = {
+    "logic": "groq/llama-3.3-70b-versatile",
+    "fast": "groq/llama-3.1-8b-instant"
+}
 
 # ==================================================
 # DOJO CONFIG
@@ -37,32 +44,45 @@ RANK_CAPTION = {
 }
 
 MASTER_PROMPT = "ROLE: Communicator. Gentle Warrior."
-MIRROR_PROMPT = (
-    "ROLE: Dojo Mirror\n"
-    "Identify shield. Compare with past truths. "
-    "Name recurring pattern."
-)
-
+MIRROR_PROMPT = "ROLE: Dojo Mirror. Identify shield. Compare past truths. Name pattern."
 SENTINEL_PROMPT = "ROLE: Sentinel. Validate action."
 
 DB_PATH = "dojo_records.db"
 
 # ==================================================
-# LLM
+# LLM + EMBEDDING
 # ==================================================
-def llm(messages, temp=0.4):
+def llm(model, messages, temp=0.3):
     try:
-        r = client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=messages,
-            temperature=temp
-        )
+        r = completion(model=model, messages=messages, temperature=temp, timeout=20)
         return r.choices[0].message.content
     except Exception as e:
         return f"Model error: {str(e)[:80]}"
 
+def embed(text):
+    try:
+        r = embedding(model="text-embedding-3-small", input=[text[:800]])
+        return r.data[0].embedding
+    except:
+        return None
+
+def detect_crisis(text):
+    try:
+        r = completion(
+            model=AGENTS["fast"],
+            messages=[
+                {"role": "system", "content": "YES or NO: crisis?"},
+                {"role": "user", "content": text[:300]},
+            ],
+            max_tokens=3,
+            temperature=0,
+        )
+        return "YES" in r.choices[0].message.content.upper()
+    except:
+        return False
+
 # ==================================================
-# DB
+# DATABASE
 # ==================================================
 @st.cache_resource
 def db():
@@ -74,31 +94,39 @@ def db():
             timestamp REAL,
             content TEXT,
             rank TEXT,
-            phase TEXT
+            phase TEXT,
+            vector TEXT
         )
     """)
     c.commit()
     return c
 
 def save(text, rank, phase):
+    v = embed(text)
     db().execute(
-        "INSERT INTO records VALUES (NULL,?,?,?,?)",
-        (time.time(), text, rank, phase)
+        "INSERT INTO records VALUES (NULL,?,?,?,?,?)",
+        (time.time(), text, rank, phase, json.dumps(v) if v else None),
     )
     db().commit()
 
-# ==================================================
-# RANK
-# ==================================================
-def compute_rank(count):
-    if count < 10:
-        return "Student"
-    elif count < 25:
-        return "Practitioner"
-    elif count < 50:
-        return "Sentinel"
-    else:
-        return "Sovereign"
+def semantic_matches(text, k=5):
+    q = embed(text)
+    if q is None:
+        return []
+    q = np.array(q)
+    rows = db().execute(
+        "SELECT content, vector FROM records WHERE vector IS NOT NULL"
+    ).fetchall()
+    sims = []
+    for c, v in rows:
+        try:
+            v = np.array(json.loads(v))
+            s = np.dot(q, v) / (np.linalg.norm(q) * np.linalg.norm(v))
+            sims.append((s, c))
+        except:
+            pass
+    sims.sort(reverse=True)
+    return [x[1] for x in sims[:k]]
 
 # ==================================================
 # STATE
@@ -114,11 +142,18 @@ def reset():
     st.session_state.msgs = []
 
 # ==================================================
-# HEADER
+# HEADER + RANK
 # ==================================================
 st.title("The Dojo")
 
 count = db().execute("SELECT COUNT(*) FROM records").fetchone()[0]
+
+def compute_rank(c):
+    if c < 10: return "Student"
+    elif c < 25: return "Practitioner"
+    elif c < 50: return "Sentinel"
+    else: return "Sovereign"
+
 rank = compute_rank(count)
 tone = RANK_TONE[rank]
 phase_names = PHASE_SETS[rank]
@@ -128,7 +163,7 @@ st.markdown(f"**Rank:** {rank} • **Ledger:** {count} sealed")
 st.caption(RANK_CAPTION[rank])
 
 # ==================================================
-# SIDEBAR PATH (NON-SELECTABLE)
+# SIDEBAR PATH
 # ==================================================
 with st.sidebar:
     st.markdown("### Rank Path")
@@ -142,7 +177,6 @@ with st.sidebar:
             st.markdown(f":gray[{r}]")
 
     st.divider()
-
     st.markdown("### Phase Progress")
     for i, p in enumerate(phase_names):
         if i == st.session_state.phase:
@@ -152,101 +186,59 @@ with st.sidebar:
         else:
             st.markdown(f":gray[{p}]")
 
-    st.divider()
-
     if st.button("Reset Round"):
         st.session_state.phase = 0
         reset()
         st.rerun()
 
 # ==================================================
-# CHAT
+# PHASE ENGINE
 # ==================================================
 phase = st.session_state.phase
-phase_name = phase_names[phase]
-
-st.subheader(phase_name)
+st.subheader(phase_names[phase])
 
 for m in st.session_state.msgs:
     with st.chat_message(m["role"]):
         st.markdown(m["content"])
 
-# ==================================================
-# PHASE ENGINE
-# ==================================================
-
-# Phase 0 — Arrival
 if phase == 0:
     if p := st.chat_input("How are you arriving?"):
         st.session_state.msgs.append({"role": "user", "content": p})
-
-        ans = llm([
-            {"role": "system", "content": MASTER_PROMPT + "\n" + tone},
-            {"role": "user", "content": p}
-        ])
-
+        role = MASTER_PROMPT + "\n" + tone
+        if detect_crisis(p):
+            role += "\nStabilize gently."
+        ans = llm(AGENTS["logic"], [{"role": "system", "content": role}, {"role": "user", "content": p}])
         st.session_state.msgs.append({"role": "assistant", "content": ans})
         st.session_state.phase = 1
         st.rerun()
 
-# Phase 1 — Mirror
 elif phase == 1:
     if p := st.chat_input("What’s showing up?"):
         st.session_state.msgs.append({"role": "user", "content": p})
-
-        ans = llm([
-            {"role": "system", "content": MIRROR_PROMPT + "\n" + tone},
-            {"role": "user", "content": p}
-        ])
-
+        matches = semantic_matches(p)
+        sys = MIRROR_PROMPT + "\n" + tone + "\n" + "\n".join(matches)
+        ans = llm(AGENTS["logic"], [{"role": "system", "content": sys}, {"role": "user", "content": p}])
         st.session_state.msgs.append({"role": "assistant", "content": ans})
         st.session_state.phase = 2
         st.rerun()
 
-# Phase 2 — Seal
 elif phase == 2:
-    last = next(
-        (m["content"] for m in reversed(st.session_state.msgs)
-         if m["role"] == "assistant"),
-        ""
-    )
-
+    last = next((m["content"] for m in reversed(st.session_state.msgs) if m["role"]=="assistant"), "")
     if last:
         st.write("**Reflection:**", last)
-
     if st.button("Seal"):
         if len(last) > 10:
-            save(last, rank, phase_name)
+            save(last, rank, phase_names[2])
             st.session_state.phase = 3
             reset()
             st.rerun()
-        else:
-            st.warning("Insight too thin.")
 
-# Phase 3 — Action
 elif phase == 3:
     if p := st.chat_input("Next step"):
         st.session_state.msgs.append({"role": "user", "content": p})
-
-        ans = llm([
-            {"role": "system", "content": SENTINEL_PROMPT + "\n" + tone},
-            {"role": "user", "content": p}
-        ])
-
+        ans = llm(AGENTS["fast"], [{"role": "system", "content": SENTINEL_PROMPT}, {"role": "user", "content": p}])
         st.session_state.msgs.append({"role": "assistant", "content": ans})
         st.rerun()
-
-    if st.session_state.msgs:
-        last_ai = next(
-            (m["content"] for m in reversed(st.session_state.msgs)
-             if m["role"] == "assistant"),
-            None
-        )
-        if last_ai:
-            with st.container(border=True):
-                st.markdown("**Sentinel:**")
-                st.markdown(last_ai)
-
     if st.session_state.msgs and st.button("Complete"):
         st.session_state.phase = 0
         reset()
