@@ -1,5 +1,5 @@
 import streamlit as st
-import sqlite3, time, json, os
+import sqlite3, time, json
 import numpy as np, pandas as pd, altair as alt
 from litellm import completion, embedding
 
@@ -35,17 +35,25 @@ RANK_CAPTION = {
     "Sovereign": "Sovereign field"
 }
 
-MASTER_PROMPT = "ROLE: Communicator. Gentle Warrior."
+MASTER_PROMPT = """
+ROLE: Communicator. Gentle Warrior.
+Be fully present with whatever is here.
+Name the feeling gently, hold space without rushing.
+No advice, no fixing — just witness and reflect.
+Warm, human, grounding. Max 3 lines.
+"""
+
 MIRROR_PROMPT = """
 ROLE: Dojo Mirror
 TASK:
 1. Name the felt state or shield in simple, grounded words.
-2. Gently point to any echo from past entries if close.
-3. Offer one quiet insight — no advice, no fixing.
-STYLE: Warm, minimal, human. Max 3 lines.
+2. Gently reflect any echo from past if close.
+3. Offer quiet, warm insight — no fixing, no pushing forward.
+STYLE: Warm, present, human. Max 3 lines. Stay with the feeling.
 """
-SENTINEL_PROMPT = "ROLE: Sentinel. Validate the next step briefly and clearly."
-CRISIS_PROMPT = "ROLE: Sensei. Ground the user. Short, calming lines only."
+
+SENTINEL_PROMPT = "ROLE: Sentinel. Validate the next small step clearly and gently."
+CRISIS_PROMPT = "ROLE: Sensei. Ground the user. Short, calming, breathing-focused lines only."
 CLUSTER_NAMER_ROLE = "Name the shared theme in 1–3 archetypal words."
 
 DB_PATH = "dojo_records.db"
@@ -53,13 +61,7 @@ DB_PATH = "dojo_records.db"
 # ==================================================
 # LLM + EMBEDDING
 # ==================================================
-def llm(model, messages, temp=0.3):
-    try:
-        r = completion(model=model, messages=messages, temperature=temp, timeout=25, num_retries=2)
-        return r.choices[0].message.content
-    except Exception as e:
-        return f"Flicker — {str(e)[:60]}"
-
+@st.cache_data(ttl=3600)
 def embed(text):
     try:
         r = embedding(model="text-embedding-3-small", input=[text[:1000]])
@@ -67,6 +69,13 @@ def embed(text):
     except:
         st.session_state["_embed_fail"] = True
         return None
+
+def llm(model, messages, temp=0.3):
+    try:
+        r = completion(model=model, messages=messages, temperature=temp, timeout=25, num_retries=2)
+        return r.choices[0].message.content
+    except Exception as e:
+        return f"Flicker — {str(e)[:60]}"
 
 def detect_crisis(text):
     try:
@@ -258,7 +267,7 @@ if p := st.chat_input("Speak..."):
         st.session_state.msgs.append({"role":"assistant","content":ans})
         if sentiment == "positive" and st.session_state.exchange_count[phase] >= MIN_EXCHANGES:
             st.session_state.phase = 1
-            # Do NOT reset messages here — keep history
+            # No reset — keep messages
 
     # Phase 1 - Mirror
     elif phase == 1:
@@ -282,7 +291,6 @@ if p := st.chat_input("Speak..."):
                 d = semantic_density(last)
                 st.caption(f"Semantic density: {d:.2f}")
                 st.session_state.phase = 3
-                # Keep messages for now
                 st.rerun()
             else:
                 st.warning("Insight too thin.")
@@ -298,7 +306,7 @@ if p := st.chat_input("Speak..."):
         if sentiment == "positive" and st.session_state.exchange_count[phase] >= MIN_EXCHANGES:
             st.session_state.msgs.append({"role":"assistant","content":"Is there anything else we can work on today?"})
             st.session_state.phase = 0
-            reset()  # full reset only at very end
+            reset()  # full reset only at end
 
     st.rerun()
 
