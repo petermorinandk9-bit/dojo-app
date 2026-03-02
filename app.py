@@ -1,4 +1,9 @@
+import os
 import streamlit as st
+
+# Load Streamlit secrets into environment for OpenAI SDK
+if "OPENAI_API_KEY" in st.secrets:
+    os.environ["OPENAI_API_KEY"] = st.secrets["OPENAI_API_KEY"]import streamlit as st
 from openai import OpenAI
 import os
 import base64
@@ -63,3 +68,4 @@ if prompt := st.chat_input("Enter the record..."):
     with st.chat_message("assistant"):
         st.markdown(full_response)
     st.session_state.messages.append({"role": "assistant", "content": full_response})
+
