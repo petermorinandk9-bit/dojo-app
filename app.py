@@ -13,20 +13,22 @@ PHASE_SETS = {
     "Sovereign": ["Check-In", "Look Closer", "Name It", "Next Step"]
 }
 
-# UPDATED: We told the AI it HAS memory so it stops lying to you.
+# ENHANCED: Merged your "Descriptive" requests with the Legal & Logic Shields
 MASTER_PROMPT = (
     "ROLE: Dojo Mentor. \n"
-    "CONTEXT: You are connected to a Persistent Ledger. You have access to the user's past 30 exchanges.\n"
+    "CONTEXT: You are a structural Life Coach, NOT a therapist. You are connected to a Persistent Ledger with the user's past 30 exchanges.\n"
+    "STYLE: Speak with the grounded, supportive authority of a Sensei. Use descriptive observations but avoid clinical 'therapy fluff'.\n"
     "CRITICAL RULES:\n"
-    "1. ACKNOWLEDGE HISTORY: If the user asks what you remember, look at the 'User Recent History' provided in the messages and summarize the patterns you see.\n"
-    "2. CONVERSATIONAL LENGTH: 1 to 2 paragraphs. Match user input depth.\n"
-    "3. GROUNDED EMPATHY: Acknowledge reality without clinical therapy fluff.\n"
-    "4. FORWARD MOVEMENT: End with ONE sharp, tactical, growth-oriented question."
+    "1. ACKNOWLEDGE HISTORY: You must synthesize past patterns. If they ask what you remember, summarize their progress from the Ledger.\n"
+    "2. LEGAL BOUNDARY: Do not diagnose. Do not 'process trauma.' Focus on structural habits and behavioral patterns.\n"
+    "3. CONVERSATIONAL DEPTH: Write 1 to 2 paragraphs. If the user is being descriptive, match their depth and offer a practical perspective.\n"
+    "4. FORWARD MOVEMENT: End with ONE sharp, tactical, growth-oriented question that demands an honest answer."
 )
 
 MIRROR_PROMPT = (
-    "ROLE: Dojo Mirror. You have access to the user's long-term pattern ledger. "
-    "Concise paragraph. Light on the therapy fluff. Heavier on the grounded sensai vibe. One probing tactical question."
+    "ROLE: Dojo Mirror. You have access to the user's long-term pattern ledger.\n"
+    "STYLE: High-level discipline. Minimalist and sharp. \n"
+    "RULES: No therapy padding. Point out one underlying structural pattern from their history, then pivot to a tactical question that forces a perspective shift."
 )
 
 # ==================================================
@@ -145,7 +147,7 @@ for msg in st.session_state.msgs:
 # ==================================================
 # 6. ENGINE ROUTING
 # ==================================================
-if prompt := st.chat_input("Whats on your mind?..."):
+if prompt := st.chat_input("Speak from center..."):
     st.session_state.msgs.append({"role": "user", "content": prompt})
     save_to_ledger("user", prompt, st.session_state.rank, str(st.session_state.phase))
     st.session_state.exchange_count += 1
@@ -170,9 +172,6 @@ if prompt := st.chat_input("Whats on your mind?..."):
             save_to_ledger("assistant", safety_box, st.session_state.rank, str(st.session_state.phase))
         else:
             sys_msg = MIRROR_PROMPT if st.session_state.phase >= 2 else MASTER_PROMPT
-            
-            # --- THE MEMORY BRIDGE ---
-            # We take the system prompt and merge it with the history.
             messages = [{"role": "system", "content": sys_msg}] + st.session_state.msgs[-30:]
             
             headers = {"Authorization": f"Bearer {st.secrets['GROQ_API_KEY']}"}
@@ -195,4 +194,3 @@ if prompt := st.chat_input("Whats on your mind?..."):
                         try: st.session_state.rank = ranks[ranks.index(st.session_state.rank) + 1]
                         except: pass
     st.rerun()
-
