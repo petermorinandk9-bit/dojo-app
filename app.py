@@ -38,17 +38,26 @@ st.markdown("""
     .stApp { background-color: #ffffff; color: #1a1a1a; }
     [data-testid="stSidebar"] { background-color: #f8f9fa; border-right: 1px solid #e0e0e0; }
     .stChatMessage { background-color: #f8f9fa; border: 1px solid #e0e0e0; }
+    
+    /* Sidebar Text Scaling */
+    .sidebar-dojo { 
+        font-size: 1.7rem; /* 25% larger than rank font */
+        font-weight: 800; 
+        color: #1a1a1a; 
+        font-style: italic; 
+        margin-bottom: 0px; 
+    }
     .active-rank { color: #000000; font-weight: 700; font-size: 1.35em; margin-bottom: 4px; }
     .inactive-rank { color: #666666; font-size: 1.1em; margin-bottom: 4px; }
     .active-phase { color: #000000; font-weight: 600; font-size: 1.15em; margin-bottom: 2px; padding-left: 10px; }
     .inactive-phase { color: #888888; font-size: 1.0em; margin-bottom: 2px; padding-left: 10px; }
+    
     .watermark { position: fixed; bottom: 40%; left: 50%; transform: translateX(-50%); font-size: 11rem; opacity: 0.04; color: #111111; pointer-events: none; z-index: -1; user-select: none; }
     .crisis-box { background-color: #ffe6e6; border-left: 5px solid #ff0000; padding: 15px; margin-top: 10px; border-radius: 5px; }
     .crisis-text { color: #cc0000; font-weight: bold; font-size: 1.1em; margin-bottom: 5px; }
     
     /* Branding Header */
     .dojo-header { font-size: 2.5rem; font-weight: 800; text-align: center; margin-bottom: 0px; margin-top: 10px; color: #1a1a1a; font-style: italic; }
-    .sidebar-dojo { font-size: 1.8rem; font-weight: 800; color: #1a1a1a; font-style: italic; margin-bottom: 0px; }
     .slogan-stack { 
         font-size: 1.65em; 
         text-align: center; 
