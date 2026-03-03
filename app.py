@@ -111,4 +111,127 @@ with st.sidebar:
     
     st.markdown("<br>", unsafe_allow_html=True)
     if st.button("Bow-Out"):
-        for key in list(st.session
+        for key in list(st.session_state.keys()): del st.session_state[key]
+        st.rerun()
+
+# ==================================================
+# 5. MAIN INTERFACE
+# ==================================================
+st.markdown('<div style="text-align:center; font-size:2.1rem; font-weight:700; margin:1.5rem 0;">Warriors Don\'t Always Win — Warriors Always Fight</div>', unsafe_allow_html=True)
+st.markdown('<div class="watermark">;∞</div>', unsafe_allow_html=True)
+
+for msg in st.session_state.msgs:
+    with st.chat_message(msg["role"]):
+        st.markdown(msg["content"], unsafe_allow_html=True)
+
+# ==================================================
+# 6. ENGINE ROUTING & QUALITATIVE ADVANCEMENT
+# ==================================================
+if prompt := st.chat_input("Enter the Dojo..."):
+    st.session_state.msgs.append({"role": "user", "content": prompt})
+    save_to_ledger("user", prompt, st.session_state.rank, str(st.session_state.phase))
+    st.session_state.exchange_count += 1
+    
+    with st.chat_message("user"):
+        st.markdown(prompt)
+
+    # --- THE CRISIS GATEKEEPER ---
+    def contains_self_harm(text):
+        t = text.lower()
+        keywords = ["cut myself", "self harm", "hurt myself", "kill myself", "suicide", "end my life", "blade", "razor"]
+        return any(kw in t for kw in keywords)
+
+    is_crisis = contains_self_harm(prompt)
+
+    # --- THE QUALITATIVE GATEKEEPER (Fast 8B Model) ---
+    def check_readiness(user_text):
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {st.secrets.get('GROQ_API_KEY', '')}"
+        }
+        eval_prompt = (
+            "Analyze this message. Is the user showing signs of forward growth, "
+            "realization, closure, or readiness to move on? If they are still asking "
+            "for guidance, venting, or stuck, reply NO. If they show a shift in "
+            "perspective or readiness, reply YES. Reply ONLY with YES or NO."
+        )
+        
+        # Vertically stacked to prevent syntax cutoff errors
+        payload = {
+            "model": "llama-3.1-8b-instant",
+            "messages": [
+                {"role": "system", "content": eval_prompt}, 
+                {"role": "user", "content": user_text}
+            ],
+            "temperature": 0.0,
+            "max_tokens": 5
+        }
+        try:
+            res = requests.post("https://api.groq.com/openai/v1/chat/completions", headers=headers, json=payload, timeout=5)
+            return "YES" in res.json()['choices'][0]['message']['content'].upper()
+        except:
+            return False
+
+    with st.chat_message("assistant"):
+        if is_crisis:
+            safety_box = (
+                "I am here with you, but I cannot provide guidance or assistance related to self-harm."
+                "<div class='crisis-box'>"
+                "<p class='crisis-text'>Immediate support is available right now. You are not alone.</p>"
+                "<ul>"
+                "<li>Call or text <strong>988</strong> (Suicide & Crisis Lifeline, 24/7, free & confidential)</li>"
+                "<li>Text <strong>HOME</strong> to <strong>741741</strong> (Crisis Text Line, 24/7)</li>"
+                "</ul>"
+                "</div>"
+            )
+            st.markdown(safety_box, unsafe_allow_html=True)
+            st.session_state.msgs.append({"role": "assistant", "content": safety_box})
+
+        else:
+            # --- DOJO RESPONSE GENERATION ---
+            sys_msg = MIRROR_PROMPT if st.session_state.phase >= 2 else MASTER_PROMPT
+            recent_history = get_recent_history(30)
+            sys_msg += f"\n\n--- USER'S RECENT HISTORY ---\n{recent_history}\n-----------------------------"
+
+            messages = [{"role": "system", "content": sys_msg}]
+            for m in st.session_state.msgs:
+                messages.append({"role": m["role"], "content": m["content"]})
+
+            headers = {
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {st.secrets.get('GROQ_API_KEY', '')}"
+            }
+            
+            payload = {
+                "model": "llama-3.3-70b-versatile",
+                "messages": messages,
+                "temperature": 0.45,
+                "max_tokens": 512
+            }
+            
+            try:
+                res = requests.post("https://api.groq.com/openai/v1/chat/completions", headers=headers, json=payload, timeout=25)
+                res.raise_for_status()
+                final_response = res.json()['choices'][0]['message']['content']
+            except Exception as e:
+                final_response = f"**System Alert:** Transmission issue. Groq returned: {str(e)[:120]}"
+
+            st.markdown(final_response)
+            st.session_state.msgs.append({"role": "assistant", "content": final_response})
+            save_to_ledger("assistant", final_response, st.session_state.rank, str(st.session_state.phase))
+            
+            # --- ADVANCEMENT EVALUATION ---
+            if st.session_state.exchange_count >= 2:
+                is_ready = check_readiness(prompt)
+                if is_ready or st.session_state.exchange_count >= 6:
+                    st.session_state.exchange_count = 0
+                    if st.session_state.phase < 3:
+                        st.session_state.phase += 1
+                    else:
+                        st.session_state.phase = 0
+                        ranks = ["Student", "Practitioner", "Sentinel", "Sovereign"]
+                        try:
+                            st.session_state.rank = ranks[ranks.index(st.session_state.rank) + 1]
+                        except: pass
+
+    st.rerun()
