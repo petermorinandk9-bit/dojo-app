@@ -3,7 +3,7 @@ import sqlite3
 import requests
 
 # ==================================================
-# 1. CORE CONFIG & WARMER PROMPTS
+# 1. CORE CONFIG & "QUIET STRENGTH" PROMPTS
 # ==================================================
 PHASE_SETS = {
     "Student": ["Welcome Mat", "Warm-Up", "Training", "Cool Down"],
@@ -13,17 +13,22 @@ PHASE_SETS = {
 }
 
 MASTER_PROMPT = """ROLE: Dojo Mentor. 
-You are a grounded, supportive, and empathetic listener. 
-Validate the user's state warmly. Speak naturally and kindly, offering a conversational reflection. 
-Avoid clinical, cold, or robotic phrasing. Be a warm human presence."""
+You are a grounded, supportive presence with quiet strength. 
+CRITICAL RULES:
+1. CONCISENESS: Keep responses to 2 short paragraphs maximum. 
+2. NO PARROTING: Do not summarize or repeat the user's story back to them. 
+3. TONE: Empathetic but disciplined. Show quiet respect. No overly enthusiastic "cheerleading" (avoid words like "Wow!", "Amazing!").
+Acknowledge their reality with firm, warm support, then ask a single, precise question to guide them forward."""
 
 MIRROR_PROMPT = """ROLE: Dojo Mirror.
-Reflect on the user's words with warm, empathetic insight. 
-Speak like a wise, caring mentor offering perspective. 
-Acknowledge their journey and offer supportive conversation. Hold space for them."""
+Reflect the core truth of the user's words with warm, concise insight.
+CRITICAL RULES:
+1. CONCISENESS: Absolute maximum of 3 to 4 sentences.
+2. NO ECHOING: Identify the underlying pattern or emotion without summarizing what they just told you.
+3. TONE: Speak like a wise, grounded mentor. Hold space without filling it with unnecessary words. Offer quiet validation."""
 
 CRISIS_PROMPT = """ROLE: Sensei (Emergency).
-Ground the user gently and safely in the present moment.
+Ground the user gently and safely in the present moment. Short, factual, calming sentences.
 ALWAYS include: Call/Text 988 or Text HOME to 741741."""
 
 # ==================================================
@@ -59,7 +64,7 @@ st.markdown("""
         margin-bottom: 4px;
     }
 
-    /* Phase Path (Slightly smaller for visual hierarchy) */
+    /* Phase Path */
     .active-phase { 
         color: #000000; 
         font-weight: 600; 
@@ -120,7 +125,6 @@ with st.sidebar:
     st.markdown("## **The Dojo**")
     st.divider()
     
-    # --- RANK LOGIC ---
     ranks = ["Student", "Practitioner", "Sentinel", "Sovereign"]
     for r in ranks:
         if r == st.session_state.rank:
@@ -130,7 +134,6 @@ with st.sidebar:
     
     st.divider()
     
-    # --- PHASE LOGIC ---
     current_phases = PHASE_SETS.get(st.session_state.rank, PHASE_SETS["Student"])
     st.markdown("**Current Phase:**")
     for idx, phase_name in enumerate(current_phases):
@@ -139,12 +142,10 @@ with st.sidebar:
         else:
             st.markdown(f"<p class='inactive-phase'>{phase_name}</p>", unsafe_allow_html=True)
     
-    # Minor stat display to keep UI clean
     st.markdown(f"<br><span style='color: #666; font-size: 0.9em;'>Exchanges: {st.session_state.exchange_count}/3</span>", unsafe_allow_html=True)
     
     st.divider()
 
-    # --- BOW-OUT ---
     if st.button("Bow-Out"):
         for key in list(st.session_state.keys()):
             del st.session_state[key]
@@ -192,7 +193,7 @@ if prompt := st.chat_input("Enter the Dojo..."):
     payload = {
         "model": "llama-3.3-70b-versatile",
         "messages": messages,
-        "temperature": 0.4,
+        "temperature": 0.35, # Dropped slightly to harden the logic
         "max_tokens": 512
     }
     
