@@ -96,7 +96,7 @@ with st.sidebar:
         st.rerun()
 
 # ==================================================
-# 5. MAIN INTERFACE & LIVE API LOGIC
+# 5. MAIN INTERFACE & GROQ API LOGIC
 # ==================================================
 st.title("Warriors Don't Always Win — Warriors Always Fight")
 
@@ -116,7 +116,7 @@ if prompt := st.chat_input("Enter the Dojo..."):
         keywords = ["cut myself", "self harm", "suicide", "end my life", "blade", "razor"]
         return any(kw in text.lower() for kw in keywords)
 
-    # --- LIVE GROK CALL ---
+    # --- LIVE GROQ CALL ---
     with st.chat_message("assistant"):
         # Dynamic Prompting
         sys_msg = MASTER_PROMPT if st.session_state.phase < 2 else MIRROR_PROMPT
@@ -125,11 +125,11 @@ if prompt := st.chat_input("Enter the Dojo..."):
         
         headers = {
             "Content-Type": "application/json",
-            "Authorization": f"Bearer {st.secrets['XAI_API_KEY']}"
+            "Authorization": f"Bearer {st.secrets['GROQ_API_KEY']}"
         }
         
         payload = {
-            "model": "grok-beta", 
+            "model": "llama3-70b-8192", 
             "messages": [
                 {"role": "system", "content": sys_msg},
                 *st.session_state.msgs
@@ -138,7 +138,7 @@ if prompt := st.chat_input("Enter the Dojo..."):
         }
         
         try:
-            res = requests.post("https://api.xai.com/v1/chat/completions", headers=headers, json=payload)
+            res = requests.post("https://api.groq.com/openai/v1/chat/completions", headers=headers, json=payload)
             res.raise_for_status()
             response = res.json()['choices'][0]['message']['content']
         except Exception as e:
@@ -161,11 +161,4 @@ if st.session_state.get('_advance_ready'):
         if st.session_state.phase < 3:
             st.session_state.phase += 1
         else:
-            st.session_state.phase = 0
-            # Logic for Rank advancement would trigger here
-        st.session_state.exchange_count = 0
-        st.session_state._advance_ready = False
-        st.rerun()
-
-st.divider()
-st.caption("We Never Quit | Sovereign v10.8.3")
+            st.session
