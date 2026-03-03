@@ -4,7 +4,7 @@ import requests
 import time
 
 # ==================================================
-# 1. CORE CONFIG & PROMPTS
+# 1. CORE CONFIG & "AWARE" MENTOR PROMPTS
 # ==================================================
 PHASE_SETS = {
     "Student": ["Welcome Mat", "Warm-Up", "Training", "Cool Down"],
@@ -13,18 +13,19 @@ PHASE_SETS = {
     "Sovereign": ["Check-In", "Look Closer", "Name It", "Next Step"]
 }
 
+# UPDATED: We told the AI it HAS memory so it stops lying to you.
 MASTER_PROMPT = (
     "ROLE: Dojo Mentor. \n"
-    "You are a grounded, supportive guide. You are a mentor—not a soft therapist.\n"
+    "CONTEXT: You are connected to a Persistent Ledger. You have access to the user's past 30 exchanges.\n"
     "CRITICAL RULES:\n"
-    "1. CONVERSATIONAL LENGTH: Write 1 to 2 paragraphs. Match user input depth.\n"
-    "2. GROUNDED EMPATHY: Acknowledge reality without clinical fluff.\n"
-    "3. PATTERNS: Offer practical observations based on 'User Recent History'.\n"
+    "1. ACKNOWLEDGE HISTORY: If the user asks what you remember, look at the 'User Recent History' provided in the messages and summarize the patterns you see.\n"
+    "2. CONVERSATIONAL LENGTH: 1 to 2 paragraphs. Match user input depth.\n"
+    "3. GROUNDED EMPATHY: Acknowledge reality without clinical therapy fluff.\n"
     "4. FORWARD MOVEMENT: End with ONE sharp, tactical, growth-oriented question."
 )
 
 MIRROR_PROMPT = (
-    "ROLE: Dojo Mirror. Reflect truth with absolute discipline. "
+    "ROLE: Dojo Mirror. You have access to the user's long-term pattern ledger. "
     "Concise paragraph. No therapy fluff. One probing tactical question."
 )
 
@@ -39,7 +40,6 @@ st.markdown("""
     [data-testid="stSidebar"] { background-color: #f8f9fa; border-right: 1px solid #e0e0e0; }
     .stChatMessage { background-color: #f8f9fa; border: 1px solid #e0e0e0; }
     
-    /* Sidebar Text Scaling */
     .sidebar-dojo { 
         font-size: 2.2rem !important; 
         font-weight: 800; 
@@ -57,7 +57,6 @@ st.markdown("""
     .crisis-box { background-color: #ffe6e6; border-left: 5px solid #ff0000; padding: 15px; margin-top: 10px; border-radius: 5px; }
     .crisis-text { color: #cc0000; font-weight: bold; font-size: 1.1em; margin-bottom: 5px; }
     
-    /* Refined Slogan Stack (Dialed Back) */
     .slogan-stack-refined { 
         font-size: 1.65em; 
         text-align: center; 
@@ -132,7 +131,7 @@ with st.sidebar:
         st.rerun()
 
 # ==================================================
-# 5. MAIN INTERFACE: THE PHILOSOPHY STACK
+# 5. MAIN INTERFACE
 # ==================================================
 st.markdown('<div class="slogan-stack-refined">Warriors Don\'t Always Win — Warriors Always Fight</div>', unsafe_allow_html=True)
 st.markdown('<div class="slogan-stack-refined">We. Never. Quit.</div>', unsafe_allow_html=True)
@@ -171,7 +170,11 @@ if prompt := st.chat_input("Speak from center..."):
             save_to_ledger("assistant", safety_box, st.session_state.rank, str(st.session_state.phase))
         else:
             sys_msg = MIRROR_PROMPT if st.session_state.phase >= 2 else MASTER_PROMPT
+            
+            # --- THE MEMORY BRIDGE ---
+            # We take the system prompt and merge it with the history.
             messages = [{"role": "system", "content": sys_msg}] + st.session_state.msgs[-30:]
+            
             headers = {"Authorization": f"Bearer {st.secrets['GROQ_API_KEY']}"}
             payload = {"model": "llama-3.3-70b-versatile", "messages": messages, "temperature": 0.45, "max_tokens": 512}
             try:
@@ -181,6 +184,7 @@ if prompt := st.chat_input("Speak from center..."):
             st.markdown(final_response)
             st.session_state.msgs.append({"role": "assistant", "content": final_response})
             save_to_ledger("assistant", final_response, st.session_state.rank, str(st.session_state.phase))
+            
             if st.session_state.exchange_count >= 2:
                 if check_readiness(prompt) or st.session_state.exchange_count >= 6:
                     st.session_state.exchange_count = 0
