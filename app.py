@@ -15,11 +15,11 @@ PHASE_SETS = {
 
 MASTER_PROMPT = (
     "ROLE: Dojo Mentor. \n"
-    "CONTEXT: You are a structural Life Coach, NOT a therapist. You have access to the user's past 30 exchanges from a Persistent Ledger.\n"
+    "CONTEXT: You are a structural Life Coach, NOT a therapist. You have access to the user's past 30 exchanges.\n"
     "STYLE: Speak with the grounded authority of a Sensei. Match user intensity.\n"
     "CRITICAL RULES:\n"
-    "1. ACKNOWLEDGE HISTORY: Synthesize past patterns from the Ledger. If they ask what you remember, summarize the session progress.\n"
-    "2. LEGAL BOUNDARY: Focus on structural habits and strategy, not clinical diagnosis.\n"
+    "1. ACKNOWLEDGE HISTORY: Synthesize past patterns from the Ledger.\n"
+    "2. LEGAL BOUNDARY: Focus on structural habits, not clinical diagnosis.\n"
     "3. CONVERSATIONAL DEPTH: 1 to 2 paragraphs.\n"
     "4. FORWARD MOVEMENT: End with ONE sharp, tactical question."
 )
@@ -27,7 +27,7 @@ MASTER_PROMPT = (
 MIRROR_PROMPT = (
     "ROLE: Dojo Mirror (The Wisdom Phase). \n"
     "CONTEXT: This is the Reflection/Cool Down phase. \n"
-    "GOAL: Synthesis. Look at the ledger and point out a deep structural pattern from the conversation. "
+    "GOAL: Synthesis. Look at the ledger and point out a deep structural pattern. "
     "Be minimalist and sharp. End with one probing tactical question."
 )
 
@@ -129,11 +129,11 @@ with st.sidebar:
     
     st.markdown("<br>", unsafe_allow_html=True)
     
-    # REVISED: Resets the round, but keeps the memory and the rank.
-    if st.button("Reset Phase Round", use_container_width=True):
+    # Bow-Out: Name Restored, Logic Protected
+    if st.button("Bow-Out", use_container_width=True):
         st.session_state.phase = 0
         st.session_state.exchange_count = 0
-        st.toast("Mat Cleared. Back to the Welcome Mat.", icon="🥋")
+        st.toast("Mat Cleared. Resetting to Welcome Mat.", icon="🥋")
         st.rerun()
 
 # ==================================================
@@ -175,7 +175,6 @@ if prompt := st.chat_input("Speak from center..."):
             st.session_state.msgs.append({"role": "assistant", "content": safety_box})
             save_to_ledger("assistant", safety_box, st.session_state.rank, str(st.session_state.phase))
         else:
-            # Reflection/Cool Down phase triggers the Wisdom/Mirror prompt
             sys_msg = MIRROR_PROMPT if st.session_state.phase == 3 else MASTER_PROMPT
             messages = [{"role": "system", "content": sys_msg}] + st.session_state.msgs[-30:]
             
