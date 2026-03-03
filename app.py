@@ -18,14 +18,14 @@ You are a supportive, conversational mentor and a caring listener.
 CRITICAL RULES:
 1. BALANCE: Write 1 to 2 conversational paragraphs. Let the response breathe.
 2. AUTHENTIC EMPATHY: Validate their feelings naturally. Be warm and human.
-3. PATTERN RECOGNITION: Review the 'User's Recent History' provided below. If you notice a recurring theme, strength, or struggle, gently point it out to show you are paying attention.
-4. NO PARROTING: Do not just summarize what they said."""
+3. PATTERN RECOGNITION: Review the 'User's Recent History' provided below. If you notice a recurring theme, strength, or struggle across these past interactions, gently point it out to show you are tracking their journey.
+4. NO PARROTING: Do not just summarize what they just said."""
 
 MIRROR_PROMPT = """ROLE: Dojo Mirror.
 Reflect on the user's words with conversational, genuine warmth.
 CRITICAL RULES:
 1. BALANCE: Write about 3 to 5 sentences. Keep it focused but human.
-2. PATTERN TRACKING: Review the 'User's Recent History'. Point out a strength or underlying pattern they might be missing.
+2. PATTERN TRACKING: Review the 'User's Recent History'. Point out a strength or underlying pattern they might be missing based on their past entries.
 3. TONE: Speak like a wise, caring friend."""
 
 # ==================================================
@@ -49,7 +49,7 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 # ==================================================
-# 3. DATABASE: THE ROLLING LEDGER (Free Version)
+# 3. DATABASE: THE ROLLING LEDGER (Expanded to 30)
 # ==================================================
 def init_db():
     conn = sqlite3.connect('sovereign.db', check_same_thread=False)
@@ -67,7 +67,8 @@ def save_to_ledger(role, text, rank, phase):
               (time.time(), role, text, rank, phase))
     conn.commit()
 
-def get_recent_history(limit=12):
+# Expanded limit to 30 for deeper pattern recognition
+def get_recent_history(limit=30):
     c = conn.cursor()
     c.execute("SELECT role, content FROM records ORDER BY timestamp DESC LIMIT ?", (limit,))
     rows = c.fetchall()
@@ -162,8 +163,8 @@ if prompt := st.chat_input("Enter the Dojo..."):
             # --- NORMAL DOJO ROUTING ---
             sys_msg = MIRROR_PROMPT if st.session_state.phase >= 2 else MASTER_PROMPT
             
-            # Fetch Rolling Ledger
-            recent_history = get_recent_history(12)
+            # Fetch Expanded Rolling Ledger
+            recent_history = get_recent_history(30)
             sys_msg += f"\n\n--- USER'S RECENT HISTORY ---\n{recent_history}\n-----------------------------"
 
             messages = [{"role": "system", "content": sys_msg}]
