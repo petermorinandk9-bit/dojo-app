@@ -151,4 +151,8 @@ def main():
             response = "Hold your position. Let this thought stabilize before we advance."
 
         with st.chat_message("assistant"):
-            st.
+            st.markdown(response)
+        st.session_state.messages.append({"role": "assistant", "content": response})
+
+if __name__ == "__main__":
+    main()
