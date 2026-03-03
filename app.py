@@ -4,7 +4,7 @@ import requests
 import time
 
 # ==================================================
-# 1. CORE CONFIG & "GROUNDED MENTOR" PROMPTS
+# 1. CORE CONFIG & PROMPTS
 # ==================================================
 PHASE_SETS = {
     "Student": ["Welcome Mat", "Warm-Up", "Training", "Cool Down"],
@@ -13,24 +13,19 @@ PHASE_SETS = {
     "Sovereign": ["Check-In", "Look Closer", "Name It", "Next Step"]
 }
 
-# The specific psychological engine we refined
 MASTER_PROMPT = (
     "ROLE: Dojo Mentor. \n"
-    "You are a grounded, supportive guide. You are a mentor—not a soft therapist, and NOT a harsh sensei barking orders.\n"
+    "You are a grounded, supportive guide. You are a mentor—not a soft therapist, and NOT a harsh sensei.\n"
     "CRITICAL RULES:\n"
-    "1. CONVERSATIONAL LENGTH: Write 1 to 2 paragraphs. Adapt naturally to the depth of the user's input.\n"
-    "2. GROUNDED EMPATHY: Acknowledge their state, but do not be overly agreeable (avoid 'I totally understand', 'process your emotions').\n"
-    "3. PATTERNS & SOLUTIONS: Offer practical, grounded solutions or structural observations based on the 'User Recent History' provided.\n"
-    "4. FORWARD MOVEMENT: End by asking a thoughtful question to prompt growth—ask 'why', or if they want to explore a tactical step."
+    "1. CONVERSATIONAL LENGTH: 1 to 2 paragraphs.\n"
+    "2. GROUNDED EMPATHY: Acknowledge reality without clinical fluff.\n"
+    "3. PATTERNS: Offer practical observations based on 'User Recent History'.\n"
+    "4. FORWARD MOVEMENT: End with a thoughtful question to prompt growth."
 )
 
 MIRROR_PROMPT = (
-    "ROLE: Dojo Mirror.\n"
-    "Reflect the user's truth with supportive, grounded wisdom.\n"
-    "CRITICAL RULES:\n"
-    "1. CONCISE BUT HUMAN: Write about 1 short paragraph.\n"
-    "2. TONE: Act as a wise mentor. Acknowledge the weight of their words without therapy fluff.\n"
-    "3. INQUIRY: Point out an underlying pattern, then ask ONE probing question."
+    "ROLE: Dojo Mirror. Reflect truth with supportive, grounded wisdom. "
+    "Concise paragraph. No therapy fluff. One probing question."
 )
 
 # ==================================================
@@ -56,29 +51,34 @@ st.markdown("""
 # ==================================================
 # 3. DATABASE & PERSISTENT MEMORY
 # ==================================================
+@st.cache_resource
+def get_db_connection():
+    return sqlite3.connect('sovereign.db', check_same_thread=False)
+
 def init_db():
-    conn = sqlite3.connect('sovereign.db', check_same_thread=False)
+    conn = get_db_connection()
     c = conn.cursor()
     c.execute('''CREATE TABLE IF NOT EXISTS records
                  (id INTEGER PRIMARY KEY AUTOINCREMENT, timestamp REAL, role TEXT, content TEXT, rank TEXT, phase TEXT)''')
     conn.commit()
-    return conn
 
-conn = init_db()
+init_db()
 
 def save_to_ledger(role, text, rank, phase):
+    conn = get_db_connection()
     c = conn.cursor()
     c.execute("INSERT INTO records (timestamp, role, content, rank, phase) VALUES (?, ?, ?, ?, ?)",
               (time.time(), role, text, rank, phase))
     conn.commit()
 
-# --- STATE RECOVERY: REBUILDS UI FROM DATABASE ---
+# --- STATE RECOVERY ---
 if 'msgs' not in st.session_state:
     st.session_state.msgs = []
     st.session_state.exchange_count = 0
     st.session_state.rank = "Student"
     st.session_state.phase = 0
     
+    conn = get_db_connection()
     c = conn.cursor()
     c.execute("SELECT role, content, rank, phase FROM records ORDER BY timestamp ASC")
     rows = c.fetchall()
@@ -93,13 +93,12 @@ if 'msgs' not in st.session_state:
             st.session_state.phase = 0
 
 # ==================================================
-# 4. SIDEBAR LOGIC
+# 4. SIDEBAR LOGIC (Cleaned Up)
 # ==================================================
 with st.sidebar:
     st.markdown("## **Sovereign UI**")
     st.divider()
     
-    # 1. Rank Hierarchy
     ranks = ["Student", "Practitioner", "Sentinel", "Sovereign"]
     for r in ranks:
         if r == st.session_state.rank:
@@ -109,9 +108,8 @@ with st.sidebar:
     
     st.divider()
     
-    # 2. Phase Ritual
+    # "Current Phase" Label Removed per instruction
     current_phases = PHASE_SETS.get(st.session_state.rank, PHASE_SETS["Student"])
-    st.markdown("**Current Phase:**")
     for idx, phase_name in enumerate(current_phases):
         if idx == st.session_state.phase:
             st.markdown(f"<p class='active-phase'>➤ {phase_name}</p>", unsafe_allow_html=True)
@@ -120,6 +118,7 @@ with st.sidebar:
     
     st.markdown("<br>", unsafe_allow_html=True)
     if st.button("Bow-Out", use_container_width=True):
+        conn = get_db_connection()
         c = conn.cursor()
         c.execute("DELETE FROM records")
         conn.commit()
@@ -138,7 +137,7 @@ for msg in st.session_state.msgs:
         st.markdown(msg["content"], unsafe_allow_html=True)
 
 # ==================================================
-# 6. ENGINE ROUTING & QUALITATIVE ADVANCEMENT
+# 6. ENGINE ROUTING
 # ==================================================
 if prompt := st.chat_input("Speak from center..."):
     st.session_state.msgs.append({"role": "user", "content": prompt})
@@ -148,20 +147,14 @@ if prompt := st.chat_input("Speak from center..."):
     with st.chat_message("user"):
         st.markdown(prompt)
 
-    # --- THE CRISIS GATEKEEPER ---
-    crisis_keywords = ["kill myself", "suicide", "hurt myself", "end my life", "blade", "razor"]
+    crisis_keywords = ["kill myself", "suicide", "hurt myself", "end my life"]
     is_crisis = any(k in prompt.lower() for k in crisis_keywords)
 
-    # --- THE QUALITATIVE GATEKEEPER (Fast 8B Model) ---
     def check_readiness(user_text):
-        headers = {
-            "Content-Type": "application/json",
-            "Authorization": f"Bearer {st.secrets.get('GROQ_API_KEY', '')}"
-        }
-        eval_prompt = "Analyze if the user shows forward growth or readiness to move to the next phase. Reply ONLY YES or NO."
+        headers = {"Authorization": f"Bearer {st.secrets['GROQ_API_KEY']}"}
         payload = {
             "model": "llama-3.1-8b-instant",
-            "messages": [{"role": "system", "content": eval_prompt}, {"role": "user", "content": user_text}],
+            "messages": [{"role": "system", "content": "Analyze if user shows forward growth. Reply ONLY YES or NO."}, {"role": "user", "content": user_text}],
             "temperature": 0.0, "max_tokens": 5
         }
         try:
@@ -172,47 +165,28 @@ if prompt := st.chat_input("Speak from center..."):
     with st.chat_message("assistant"):
         if is_crisis:
             safety_box = (
-                "I am here with you, but I cannot provide guidance or assistance related to self-harm. \n\n"
-                "<div class='crisis-box'>"
-                "<p class='crisis-text'>Immediate support is available right now. You are not alone.</p>"
-                "<ul><li>Call or text <strong>988</strong></li><li>Text <strong>HOME</strong> to <strong>741741</strong></li></ul>"
-                "</div>"
+                "I am here with you, but I cannot provide guidance or assistance related to self-harm.\n\n"
+                "<div class='crisis-box'><p class='crisis-text'>Support is available: <strong>988</strong> or text <strong>741741</strong></p></div>"
             )
             st.markdown(safety_box, unsafe_allow_html=True)
             st.session_state.msgs.append({"role": "assistant", "content": safety_box})
             save_to_ledger("assistant", safety_box, st.session_state.rank, str(st.session_state.phase))
-
         else:
-            # --- DOJO RESPONSE GENERATION ---
             sys_msg = MIRROR_PROMPT if st.session_state.phase >= 2 else MASTER_PROMPT
-            
-            # Load last 30 messages for memory
-            messages = [{"role": "system", "content": sys_msg}]
-            for m in st.session_state.msgs[-30:]:
-                messages.append({"role": m["role"], "content": m["content"]})
-
-            headers = {
-                "Content-Type": "application/json",
-                "Authorization": f"Bearer {st.secrets.get('GROQ_API_KEY', '')}"
-            }
-            
-            payload = {
-                "model": "llama-3.3-70b-versatile",
-                "messages": messages,
-                "temperature": 0.45, "max_tokens": 512
-            }
+            messages = [{"role": "system", "content": sys_msg}] + st.session_state.msgs[-30:]
+            headers = {"Authorization": f"Bearer {st.secrets['GROQ_API_KEY']}"}
+            payload = {"model": "llama-3.3-70b-versatile", "messages": messages, "temperature": 0.45, "max_tokens": 512}
             
             try:
                 res = requests.post("https://api.groq.com/openai/v1/chat/completions", headers=headers, json=payload, timeout=25)
                 final_response = res.json()['choices'][0]['message']['content']
-            except Exception as e:
-                final_response = f"**System Alert:** Transmission issue. {str(e)[:100]}"
+            except:
+                final_response = "**System Alert:** Transmission issue."
 
             st.markdown(final_response)
             st.session_state.msgs.append({"role": "assistant", "content": final_response})
             save_to_ledger("assistant", final_response, st.session_state.rank, str(st.session_state.phase))
             
-            # --- ADVANCEMENT EVALUATION ---
             if st.session_state.exchange_count >= 2:
                 if check_readiness(prompt) or st.session_state.exchange_count >= 6:
                     st.session_state.exchange_count = 0
@@ -224,5 +198,4 @@ if prompt := st.chat_input("Speak from center..."):
                         try:
                             st.session_state.rank = ranks[ranks.index(st.session_state.rank) + 1]
                         except: pass
-
     st.rerun()
