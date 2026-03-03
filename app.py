@@ -6,29 +6,30 @@ import time
 # ==================================================
 # 1. CORE CONFIG & "AWARE" MENTOR PROMPTS
 # ==================================================
+# CORRECTED: Phases now reflect the 'Wisdom' progression
 PHASE_SETS = {
-    "Student": ["Welcome Mat", "Warm-Up", "Training", "Cool Down"],
-    "Practitioner": ["Step Onto the Mat", "Feel It Out", "Work the Pattern", "Close the Round"],
-    "Sentinel": ["Enter the Dojo", "Center", "Engage", "Seal & Step Out"],
-    "Sovereign": ["Check-In", "Look Closer", "Name It", "Next Step"]
+    "Student": ["Welcome Mat", "Warm Up", "Training", "Reflection/Cool Down"],
+    "Practitioner": ["Step Onto the Mat", "Warm Up", "Work the Pattern", "Wisdom/Cool Down"],
+    "Sentinel": ["Enter the Dojo", "Center", "Engage", "Seal/Reflection"],
+    "Sovereign": ["Check-In", "Look Closer", "Name It", "The Wisdom Step"]
 }
 
-# ENHANCED: Merged your "Descriptive" requests with the Legal & Logic Shields
 MASTER_PROMPT = (
     "ROLE: Dojo Mentor. \n"
-    "CONTEXT: You are a structural Life Coach, NOT a therapist. You are connected to a Persistent Ledger with the user's past 30 exchanges.\n"
-    "STYLE: Speak with the grounded, supportive authority of a Sensei. Use descriptive observations but avoid clinical 'therapy fluff'.\n"
+    "CONTEXT: You are a structural Life Coach, NOT a therapist. You have access to the user's past 30 exchanges.\n"
+    "STYLE: Speak with the grounded authority of a Sensei. Use descriptive observations.\n"
     "CRITICAL RULES:\n"
-    "1. ACKNOWLEDGE HISTORY: You must synthesize past patterns. If they ask what you remember, summarize their progress from the Ledger.\n"
-    "2. LEGAL BOUNDARY: Do not diagnose. Do not 'process trauma.' Focus on structural habits and behavioral patterns.\n"
-    "3. CONVERSATIONAL DEPTH: Write 1 to 2 paragraphs. If the user is being descriptive, match their depth and offer a practical perspective.\n"
-    "4. FORWARD MOVEMENT: End with ONE sharp, tactical, growth-oriented question that demands an honest answer."
+    "1. ACKNOWLEDGE HISTORY: Synthesize past patterns from the Ledger.\n"
+    "2. LEGAL BOUNDARY: Focus on structural habits, not clinical 'processing'.\n"
+    "3. CONVERSATIONAL DEPTH: 1 to 2 paragraphs. Match user intensity.\n"
+    "4. FORWARD MOVEMENT: End with ONE sharp, tactical question."
 )
 
 MIRROR_PROMPT = (
-    "ROLE: Dojo Mirror. You have access to the user's long-term pattern ledger.\n"
-    "STYLE: High-level discipline. Minimalist and sharp. \n"
-    "RULES: No therapy padding. Point out one underlying structural pattern from their history, then pivot to a tactical question that forces a perspective shift."
+    "ROLE: Dojo Mirror (The Wisdom Phase). \n"
+    "CONTEXT: This is the Reflection/Cool Down phase. \n"
+    "GOAL: Synthesis. Look at the ledger and point out a deep structural pattern. "
+    "Be minimalist, sharp, and focused on the 'Wisdom' of the session. End with one probing question."
 )
 
 # ==================================================
@@ -171,26 +172,11 @@ if prompt := st.chat_input("Speak from center..."):
             st.session_state.msgs.append({"role": "assistant", "content": safety_box})
             save_to_ledger("assistant", safety_box, st.session_state.rank, str(st.session_state.phase))
         else:
-            sys_msg = MIRROR_PROMPT if st.session_state.phase >= 2 else MASTER_PROMPT
+            # SWITCH: Reflection phase triggers the Wisdom/Mirror prompt
+            sys_msg = MIRROR_PROMPT if st.session_state.phase == 3 else MASTER_PROMPT
             messages = [{"role": "system", "content": sys_msg}] + st.session_state.msgs[-30:]
             
             headers = {"Authorization": f"Bearer {st.secrets['GROQ_API_KEY']}"}
             payload = {"model": "llama-3.3-70b-versatile", "messages": messages, "temperature": 0.45, "max_tokens": 512}
             try:
-                res = requests.post("https://api.groq.com/openai/v1/chat/completions", headers=headers, json=payload, timeout=25)
-                final_response = res.json()['choices'][0]['message']['content']
-            except: final_response = "**System Alert:** Transmission issue."
-            st.markdown(final_response)
-            st.session_state.msgs.append({"role": "assistant", "content": final_response})
-            save_to_ledger("assistant", final_response, st.session_state.rank, str(st.session_state.phase))
-            
-            if st.session_state.exchange_count >= 2:
-                if check_readiness(prompt) or st.session_state.exchange_count >= 6:
-                    st.session_state.exchange_count = 0
-                    if st.session_state.phase < 3: st.session_state.phase += 1
-                    else:
-                        st.session_state.phase = 0
-                        ranks = ["Student", "Practitioner", "Sentinel", "Sovereign"]
-                        try: st.session_state.rank = ranks[ranks.index(st.session_state.rank) + 1]
-                        except: pass
-    st.rerun()
+                res =
