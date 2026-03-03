@@ -4,7 +4,7 @@ import requests
 import time
 
 # ==================================================
-# 1. CORE CONFIG & "THE BALANCE" PROMPTS
+# 1. CORE CONFIG & "HARDENED MIRROR" PROMPTS
 # ==================================================
 PHASE_SETS = {
     "Student": ["Welcome Mat", "Warm-Up", "Training", "Cool Down"],
@@ -13,20 +13,19 @@ PHASE_SETS = {
     "Sovereign": ["Check-In", "Look Closer", "Name It", "Next Step"]
 }
 
-MASTER_PROMPT = """ROLE: Dojo Mentor. 
-You are a supportive, conversational mentor and a caring listener.
+MASTER_PROMPT = """ROLE: Dojo Mentor. You possess quiet strength and discipline.
 CRITICAL RULES:
-1. BALANCE: Write 1 to 2 conversational paragraphs. Let the response breathe.
-2. AUTHENTIC EMPATHY: Validate their feelings naturally. Be warm and human.
-3. PATTERN RECOGNITION: Review the 'User's Recent History' provided below. If you notice a recurring theme, strength, or struggle, gently point it out.
-4. NO PARROTING: Do not just summarize what they just said."""
+1. NO THERAPY SPEAK: Never use phrases like "I can totally understand," "It sounds like you're feeling," or "Sometimes we just need." Be direct, grounded, and human. 
+2. EXTREME BREVITY: Maximum 2 to 3 short sentences. Do not write paragraphs.
+3. PATTERNS: Review the 'User's Recent History'. If you see a pattern, state it plainly as an observation, not a diagnosis.
+4. ONE QUESTION LIMIT: If you ask a question, ask exactly ONE brief, grounded question to move them forward. Do not ask multiple questions."""
 
 MIRROR_PROMPT = """ROLE: Dojo Mirror.
-Reflect on the user's words with conversational, genuine warmth.
+Reflect the truth with absolute minimal words.
 CRITICAL RULES:
-1. BALANCE: Write about 3 to 5 sentences. Keep it focused but human.
-2. PATTERN TRACKING: Review the 'User's Recent History'. Point out a strength or underlying pattern they might be missing.
-3. TONE: Speak like a wise, caring friend."""
+1. BREVITY: Maximum 2 sentences.
+2. NO FLUFF: Do not psychoanalyze. State the pattern you see in the 'User's Recent History' simply and quietly.
+3. ONE QUESTION: Ask a maximum of one sharp, reflective question. Hold the space."""
 
 # ==================================================
 # 2. ARCHWAY UI - LIGHT MODE
@@ -82,7 +81,7 @@ if 'msgs' not in st.session_state: st.session_state.msgs = []
 if 'exchange_count' not in st.session_state: st.session_state.exchange_count = 0
 
 # ==================================================
-# 4. SIDEBAR LOGIC (Exchanges removed, Bow-Out moved)
+# 4. SIDEBAR LOGIC
 # ==================================================
 with st.sidebar:
     st.markdown("## **The Dojo**")
@@ -188,10 +187,11 @@ if prompt := st.chat_input("Enter the Dojo..."):
                 "Authorization": f"Bearer {st.secrets.get('GROQ_API_KEY', '')}"
             }
             
+            # Dropped temperature slightly to enforce the rigid structure
             payload = {
                 "model": "llama-3.3-70b-versatile",
                 "messages": messages,
-                "temperature": 0.45,
+                "temperature": 0.35, 
                 "max_tokens": 512
             }
             
@@ -207,7 +207,6 @@ if prompt := st.chat_input("Enter the Dojo..."):
             save_to_ledger("assistant", final_response, st.session_state.rank, str(st.session_state.phase))
             
             # --- ADVANCEMENT EVALUATION ---
-            # Requires at least 2 exchanges to prevent accidental skipping, OR hits hard cap at 6 to prevent permanent stalling.
             if st.session_state.exchange_count >= 2:
                 is_ready = check_readiness(prompt)
                 if is_ready or st.session_state.exchange_count >= 6:
