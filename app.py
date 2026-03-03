@@ -26,7 +26,7 @@ MASTER_PROMPT = (
 
 MIRROR_PROMPT = (
     "ROLE: Dojo Mirror. You have access to the user's long-term pattern ledger. "
-    "Concise paragraph. No therapy fluff. One probing tactical question."
+    "Concise paragraph. Light on the therapy fluff. Heavier on the grounded sensai vibe. One probing tactical question."
 )
 
 # ==================================================
@@ -145,7 +145,7 @@ for msg in st.session_state.msgs:
 # ==================================================
 # 6. ENGINE ROUTING
 # ==================================================
-if prompt := st.chat_input("Speak from center..."):
+if prompt := st.chat_input("Whats on your mind?..."):
     st.session_state.msgs.append({"role": "user", "content": prompt})
     save_to_ledger("user", prompt, st.session_state.rank, str(st.session_state.phase))
     st.session_state.exchange_count += 1
@@ -195,3 +195,4 @@ if prompt := st.chat_input("Speak from center..."):
                         try: st.session_state.rank = ranks[ranks.index(st.session_state.rank) + 1]
                         except: pass
     st.rerun()
+
