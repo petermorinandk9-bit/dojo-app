@@ -39,13 +39,14 @@ st.markdown("""
     [data-testid="stSidebar"] { background-color: #f8f9fa; border-right: 1px solid #e0e0e0; }
     .stChatMessage { background-color: #f8f9fa; border: 1px solid #e0e0e0; }
     
-    /* Sidebar Text Scaling */
+    /* Sidebar Text Scaling - RECALIBRATED */
     .sidebar-dojo { 
-        font-size: 1.7rem; /* 25% larger than rank font */
+        font-size: 2.2rem !important; /* Pushed higher for 25% dominance */
         font-weight: 800; 
         color: #1a1a1a; 
         font-style: italic; 
-        margin-bottom: 0px; 
+        margin-bottom: -10px; 
+        line-height: 1.1;
     }
     .active-rank { color: #000000; font-weight: 700; font-size: 1.35em; margin-bottom: 4px; }
     .inactive-rank { color: #666666; font-size: 1.1em; margin-bottom: 4px; }
