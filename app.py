@@ -39,9 +39,9 @@ st.markdown("""
     [data-testid="stSidebar"] { background-color: #f8f9fa; border-right: 1px solid #e0e0e0; }
     .stChatMessage { background-color: #f8f9fa; border: 1px solid #e0e0e0; }
     
-    /* Sidebar Text Scaling - RECALIBRATED */
+    /* Sidebar Text Scaling */
     .sidebar-dojo { 
-        font-size: 2.2rem !important; /* Pushed higher for 25% dominance */
+        font-size: 2.2rem !important; 
         font-weight: 800; 
         color: #1a1a1a; 
         font-style: italic; 
@@ -57,17 +57,17 @@ st.markdown("""
     .crisis-box { background-color: #ffe6e6; border-left: 5px solid #ff0000; padding: 15px; margin-top: 10px; border-radius: 5px; }
     .crisis-text { color: #cc0000; font-weight: bold; font-size: 1.1em; margin-bottom: 5px; }
     
-    /* Branding Header */
-    .dojo-header { font-size: 2.5rem; font-weight: 800; text-align: center; margin-bottom: 0px; margin-top: 10px; color: #1a1a1a; font-style: italic; }
-    .slogan-stack { 
-        font-size: 1.65em; 
+    /* Massive Branding Header Stack */
+    .slogan-stack-main { 
+        font-size: 2.5rem; 
+        font-weight: 800;
         text-align: center; 
-        color: #666666; 
+        color: #1a1a1a; 
         font-style: italic; 
-        margin-top: 0px; 
+        margin-top: 10px; 
         line-height: 1.2;
     }
-    .spacer { margin-bottom: 30px; }
+    .spacer { margin-bottom: 40px; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -133,11 +133,10 @@ with st.sidebar:
         st.rerun()
 
 # ==================================================
-# 5. MAIN INTERFACE: THE SUMMIT STACK
+# 5. MAIN INTERFACE: THE PHILOSOPHY STACK
 # ==================================================
-st.markdown('<div class="dojo-header">The-Dojo</div>', unsafe_allow_html=True)
-st.markdown('<div class="slogan-stack">Warriors Don\'t Always Win — Warriors Always Fight</div>', unsafe_allow_html=True)
-st.markdown('<div class="slogan-stack">We. Never. Quit.</div>', unsafe_allow_html=True)
+st.markdown('<div class="slogan-stack-main">Warriors Don\'t Always Win — Warriors Always Fight</div>', unsafe_allow_html=True)
+st.markdown('<div class="slogan-stack-main">We. Never. Quit.</div>', unsafe_allow_html=True)
 st.markdown('<div class="spacer"></div>', unsafe_allow_html=True)
 st.markdown('<div class="watermark">;∞</div>', unsafe_allow_html=True)
 
