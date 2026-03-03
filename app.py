@@ -47,9 +47,10 @@ st.markdown("""
     .crisis-text { color: #cc0000; font-weight: bold; font-size: 1.1em; margin-bottom: 5px; }
     
     /* Branding Header */
-    .dojo-header { font-size: 2.5rem; font-weight: 800; text-align: center; margin-bottom: 0px; margin-top: 10px; color: #1a1a1a; }
+    .dojo-header { font-size: 2.5rem; font-weight: 800; text-align: center; margin-bottom: 0px; margin-top: 10px; color: #1a1a1a; font-style: italic; }
+    .sidebar-dojo { font-size: 1.8rem; font-weight: 800; color: #1a1a1a; font-style: italic; margin-bottom: 0px; }
     .slogan-stack { 
-        font-size: 1.65em; /* 25% smaller than previous 2.2em */
+        font-size: 1.65em; 
         text-align: center; 
         color: #666666; 
         font-style: italic; 
@@ -103,7 +104,7 @@ if 'msgs' not in st.session_state:
 # 4. SIDEBAR
 # ==================================================
 with st.sidebar:
-    st.markdown("## **The-Dojo**")
+    st.markdown('<p class="sidebar-dojo">The-Dojo</p>', unsafe_allow_html=True)
     st.divider()
     ranks = ["Student", "Practitioner", "Sentinel", "Sovereign"]
     for r in ranks:
