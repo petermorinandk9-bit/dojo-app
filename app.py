@@ -27,7 +27,7 @@ Ground the user gently and safely in the present moment.
 ALWAYS include: Call/Text 988 or Text HOME to 741741."""
 
 # ==================================================
-# 2. ARCHWAY UI - LIGHT MODE
+# 2. ARCHWAY UI - LIGHT MODE & HIERARCHY
 # ==================================================
 st.set_page_config(page_title="Sovereign Dojo", layout="wide")
 
@@ -46,7 +46,7 @@ st.markdown("""
         border: 1px solid #e0e0e0;
     }
     
-    /* Rank Path - active bold black with arrow, inactive light grey */
+    /* Rank Path */
     .active-rank { 
         color: #000000; 
         font-weight: 700; 
@@ -57,6 +57,21 @@ st.markdown("""
         color: #666666; 
         font-size: 1.1em; 
         margin-bottom: 4px;
+    }
+
+    /* Phase Path (Slightly smaller for visual hierarchy) */
+    .active-phase { 
+        color: #000000; 
+        font-weight: 600; 
+        font-size: 1.15em; 
+        margin-bottom: 2px;
+        padding-left: 10px;
+    }
+    .inactive-phase { 
+        color: #888888; 
+        font-size: 1.0em; 
+        margin-bottom: 2px;
+        padding-left: 10px;
     }
     
     /* Semicolon-Infinity Watermark */
@@ -99,12 +114,13 @@ if 'exchange_count' not in st.session_state:
     st.session_state.exchange_count = 0
 
 # ==================================================
-# 4. SIDEBAR: THE RANK PATH (No Progress Bar)
+# 4. SIDEBAR: THE RANK & PHASE PATH
 # ==================================================
 with st.sidebar:
     st.markdown("## **The Dojo**")
     st.divider()
     
+    # --- RANK LOGIC ---
     ranks = ["Student", "Practitioner", "Sentinel", "Sovereign"]
     for r in ranks:
         if r == st.session_state.rank:
@@ -114,13 +130,22 @@ with st.sidebar:
     
     st.divider()
     
+    # --- PHASE LOGIC ---
     current_phases = PHASE_SETS.get(st.session_state.rank, PHASE_SETS["Student"])
-    active_phase_name = current_phases[st.session_state.phase]
+    st.markdown("**Current Phase:**")
+    for idx, phase_name in enumerate(current_phases):
+        if idx == st.session_state.phase:
+            st.markdown(f"<p class='active-phase'>➤ {phase_name}</p>", unsafe_allow_html=True)
+        else:
+            st.markdown(f"<p class='inactive-phase'>{phase_name}</p>", unsafe_allow_html=True)
     
-    st.markdown(f"**Current State:** {active_phase_name}")
-    st.markdown(f"**Exchanges:** {st.session_state.exchange_count}/3")
+    # Minor stat display to keep UI clean
+    st.markdown(f"<br><span style='color: #666; font-size: 0.9em;'>Exchanges: {st.session_state.exchange_count}/3</span>", unsafe_allow_html=True)
     
-    if st.button("Reset Session"):
+    st.divider()
+
+    # --- BOW-OUT ---
+    if st.button("Bow-Out"):
         for key in list(st.session_state.keys()):
             del st.session_state[key]
         st.rerun()
