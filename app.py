@@ -183,4 +183,48 @@ Mat's here when you need it again."""
         return "Moving forward. Stay with me."
 
 # ==================================================
-# HOLDING STAT
+# HOLDING STATEMENTS (When Advancement Criteria Not Met)
+# ==================================================
+
+HOLDING_STATEMENTS = {
+    "welcome_mat": [
+        "Stay here for a moment. Let the ground settle.",
+        "Not yet. Take another breath. What else is here?",
+        "Hold position. There's more under this.",
+    ],
+    
+    "studio": [
+        "We're not done with this pattern yet. What else do you see?",
+        "Stay in the work. This is where it shifts.",
+        "Keep going. You're close to something.",
+    ],
+    
+    "seal": [
+        "Not locked in yet. What's the core of it?",
+        "Almost there. Name it one more time, clearer.",
+        "Close. Tighten the insight — what's essential?",
+    ]
+}
+
+# ==================================================
+# USAGE NOTES
+# ==================================================
+
+"""
+TONE CALIBRATION:
+- Gentle Warrior = firm + warm, never soft + vague
+- Zanshin = present but not attached, alert but not tense
+- Kenpo-grounded = physical/embodied language, technical precision
+
+AVOID:
+- "I hear you" (therapy-speak)
+- "That must be difficult" (sympathy padding)
+- "How does that make you feel?" (unless genuinely needed for pattern ID)
+- Over-explaining or teaching moments
+
+EMBRACE:
+- Short sentences
+- Physical metaphors (weight, stance, guard, center)
+- Pattern language (loop, reflex, defense, strike)
+- Direct acknowledgment without decoration
+"""
