@@ -1,7 +1,6 @@
 import streamlit as st
 import sqlite3
 import requests
-import time
 
 # ==================================================
 # 1. CORE CONFIG & WARMER PROMPTS
@@ -100,7 +99,7 @@ if 'exchange_count' not in st.session_state:
     st.session_state.exchange_count = 0
 
 # ==================================================
-# 4. SIDEBAR: THE RANK PATH (Progress Bar Removed)
+# 4. SIDEBAR: THE RANK PATH (No Progress Bar)
 # ==================================================
 with st.sidebar:
     st.markdown("## **The Dojo**")
@@ -132,13 +131,12 @@ with st.sidebar:
 st.markdown('<div style="text-align:center; font-size:2.1rem; font-weight:700; margin:1.5rem 0;">Warriors Don\'t Always Win — Warriors Always Fight</div>', unsafe_allow_html=True)
 st.markdown('<div class="watermark">;∞</div>', unsafe_allow_html=True)
 
-# Display Chat History
 for msg in st.session_state.msgs:
     with st.chat_message(msg["role"]):
         st.markdown(msg["content"])
 
 # ==================================================
-# 6. USER INPUT, GROQ API & AUTO-ADVANCE LOGIC
+# 6. USER INPUT, GROQ API & AUTO-ADVANCE
 # ==================================================
 if prompt := st.chat_input("Enter the Dojo..."):
     st.session_state.msgs.append({"role": "user", "content": prompt})
@@ -146,12 +144,10 @@ if prompt := st.chat_input("Enter the Dojo..."):
     with st.chat_message("user"):
         st.markdown(prompt)
 
-    # Safety Check
     def is_crisis(text):
         keywords = ["cut myself", "self harm", "kill myself", "suicide", "end my life", "blade", "razor"]
         return any(kw in text.lower() for kw in keywords)
 
-    # Dynamic System Prompt
     if is_crisis(prompt):
         sys_msg = CRISIS_PROMPT
     elif st.session_state.phase >= 2:
@@ -170,4 +166,43 @@ if prompt := st.chat_input("Enter the Dojo..."):
     
     payload = {
         "model": "llama-3.3-70b-versatile",
-        "messages": messages
+        "messages": messages,
+        "temperature": 0.4,
+        "max_tokens": 512
+    }
+    
+    with st.chat_message("assistant"):
+        try:
+            res = requests.post(
+                "https://api.groq.com/openai/v1/chat/completions", 
+                headers=headers, 
+                json=payload,
+                timeout=25
+            )
+            res.raise_for_status()
+            response = res.json()['choices'][0]['message']['content']
+        except Exception as e:
+            response = f"**System Alert:** Transmission issue. Groq returned: {str(e)[:120]}"
+
+        st.markdown(response)
+        
+        st.session_state.msgs.append({"role": "assistant", "content": response})
+        st.session_state.exchange_count += 1
+        
+        # --- THE AUTO-ADVANCE WELD ---
+        if st.session_state.exchange_count >= 3:
+            st.session_state.exchange_count = 0
+            
+            if st.session_state.phase < 3:
+                st.session_state.phase += 1
+            else:
+                st.session_state.phase = 0
+                ranks = ["Student", "Practitioner", "Sentinel", "Sovereign"]
+                try:
+                    current_idx = ranks.index(st.session_state.rank)
+                    if current_idx < len(ranks) - 1:
+                        st.session_state.rank = ranks[current_idx + 1]
+                except ValueError:
+                    pass
+
+    st.rerun()
