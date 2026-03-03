@@ -4,7 +4,7 @@ import requests
 import time
 
 # ==================================================
-# 1. CORE CONFIG & "ELASTIC MIRROR" PROMPTS
+# 1. CORE CONFIG & "SUPPORTIVE MENTOR" PROMPTS
 # ==================================================
 PHASE_SETS = {
     "Student": [
@@ -23,21 +23,21 @@ PHASE_SETS = {
 
 MASTER_PROMPT = (
     "ROLE: Dojo Mentor. \n"
-    "You are a grounded, observant guide with quiet strength.\n"
+    "You are a grounded, supportive guide. You are a mentor—not a soft therapist, and NOT a harsh sensei barking orders.\n"
     "CRITICAL RULES:\n"
-    "1. ELASTIC LENGTH (MATCH THE USER): Your response length must dynamically match the user's input length. If they type a single sentence, you reply with a single short statement and a question. If they write a long paragraph, you write a paragraph. Never give a long speech to a short statement.\n"
-    "2. ZERO FILLER: BANNED PHRASES: 'It is clear that', 'I notice that', 'You have found a way', 'I can understand'. Do not validate, judge, or psychoanalyze their methods. Just observe the reality.\n"
-    "3. NO PARROTING: Do not repeat what they just told you. They know what they said. Add value by connecting their statement to their 'Recent History' to reveal a pattern.\n"
-    "4. THE PIVOT: End with exactly ONE sharp, tactical question that targets the root structure of their habits or mindset."
+    "1. CONVERSATIONAL LENGTH: Write 1 to 2 paragraphs. Adapt naturally to the depth of the user's input.\n"
+    "2. GROUNDED TONE: Be supportive but not overly agreeable. Acknowledge their reality without using clinical therapy fluff (avoid 'I totally understand', 'process your emotions', 'valid').\n"
+    "3. PATTERNS & SOLUTIONS: Base your responses on the flow of the conversation. Offer practical, grounded solutions or observations to their statements.\n"
+    "4. FORWARD MOVEMENT: End by asking a thoughtful question to prompt growth—such as asking 'why', asking if they want to talk about it, or offering a tactical step."
 )
 
 MIRROR_PROMPT = (
     "ROLE: Dojo Mirror.\n"
-    "Reflect the user's truth with absolute discipline.\n"
+    "Reflect the user's truth with supportive, grounded wisdom.\n"
     "CRITICAL RULES:\n"
-    "1. ELASTIC LENGTH: Match the user's word count. Short input = short reflection. Long input = deep reflection.\n"
-    "2. NO FLUFF: State the underlying pattern based on their 'Recent History' without emotional padding, psychoanalysis, or filler words.\n"
-    "3. THE PIVOT: Ask exactly ONE tactical question to force a structural shift."
+    "1. CONCISE BUT HUMAN: Write about 1 short paragraph.\n"
+    "2. TONE: Act as a wise mentor. Acknowledge the weight of their words without therapy fluff.\n"
+    "3. INQUIRY: Point out an underlying pattern, then ask ONE probing question to help them look deeper or decide on an action."
 )
 
 # ==================================================
@@ -61,7 +61,7 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 # ==================================================
-# 3. DATABASE: THE ROLLING LEDGER
+# 3. DATABASE & PERSISTENT MEMORY
 # ==================================================
 def init_db():
     conn = sqlite3.connect('sovereign.db', check_same_thread=False)
@@ -79,22 +79,31 @@ def save_to_ledger(role, text, rank, phase):
               (time.time(), role, text, rank, phase))
     conn.commit()
 
-def get_recent_history(limit=30):
+# --- STATE RECOVERY LOGIC ---
+if 'msgs' not in st.session_state:
+    st.session_state.msgs = []
+    st.session_state.exchange_count = 0
+    st.session_state.rank = "Student"
+    st.session_state.phase = 0
+    
+    # Restore chat and exact rank/phase if the browser refreshes
     c = conn.cursor()
-    c.execute("SELECT role, content FROM records ORDER BY timestamp DESC LIMIT ?", (limit,))
+    c.execute("SELECT role, content, rank, phase FROM records ORDER BY timestamp ASC")
     rows = c.fetchall()
-    if not rows: return "No past patterns established yet."
-    history = "\n".join([f"{row[0]}: {row[1]}" for row in reversed(rows)])
-    return history
-
-# Initialize State
-if 'phase' not in st.session_state: st.session_state.phase = 0
-if 'rank' not in st.session_state: st.session_state.rank = "Student"
-if 'msgs' not in st.session_state: st.session_state.msgs = []
-if 'exchange_count' not in st.session_state: st.session_state.exchange_count = 0
+    for r in rows:
+        st.session_state.msgs.append({"role": r[0], "content": r[1]})
+    
+    if rows:
+        last_rank = rows[-1][2]
+        last_phase = rows[-1][3]
+        st.session_state.rank = last_rank
+        try:
+            st.session_state.phase = int(last_phase)
+        except:
+            st.session_state.phase = 0
 
 # ==================================================
-# 4. SIDEBAR LOGIC
+# 4. SIDEBAR LOGIC (True Session Reset)
 # ==================================================
 with st.sidebar:
     st.markdown("## **The Dojo**")
@@ -119,6 +128,10 @@ with st.sidebar:
     
     st.markdown("<br>", unsafe_allow_html=True)
     if st.button("Bow-Out"):
+        # Wipes the DB for a truly clean slate on reset
+        c = conn.cursor()
+        c.execute("DELETE FROM records")
+        conn.commit()
         for key in list(st.session_state.keys()): del st.session_state[key]
         st.rerun()
 
@@ -193,15 +206,15 @@ if prompt := st.chat_input("Enter the Dojo..."):
             )
             st.markdown(safety_box, unsafe_allow_html=True)
             st.session_state.msgs.append({"role": "assistant", "content": safety_box})
+            save_to_ledger("assistant", safety_box, st.session_state.rank, str(st.session_state.phase))
 
         else:
             # --- DOJO RESPONSE GENERATION ---
             sys_msg = MIRROR_PROMPT if st.session_state.phase >= 2 else MASTER_PROMPT
-            recent_history = get_recent_history(30)
-            sys_msg += f"\n\n--- USER'S RECENT HISTORY ---\n{recent_history}\n-----------------------------"
 
+            # Load system prompt, then append only the last 30 messages to keep the AI focused
             messages = [{"role": "system", "content": sys_msg}]
-            for m in st.session_state.msgs:
+            for m in st.session_state.msgs[-30:]:
                 messages.append({"role": m["role"], "content": m["content"]})
 
             headers = {
@@ -224,3 +237,21 @@ if prompt := st.chat_input("Enter the Dojo..."):
                 final_response = f"**System Alert:** Transmission issue. Groq returned: {str(e)[:120]}"
 
             st.markdown(final_response)
+            st.session_state.msgs.append({"role": "assistant", "content": final_response})
+            save_to_ledger("assistant", final_response, st.session_state.rank, str(st.session_state.phase))
+            
+            # --- ADVANCEMENT EVALUATION ---
+            if st.session_state.exchange_count >= 2:
+                is_ready = check_readiness(prompt)
+                if is_ready or st.session_state.exchange_count >= 6:
+                    st.session_state.exchange_count = 0
+                    if st.session_state.phase < 3:
+                        st.session_state.phase += 1
+                    else:
+                        st.session_state.phase = 0
+                        ranks = ["Student", "Practitioner", "Sentinel", "Sovereign"]
+                        try:
+                            st.session_state.rank = ranks[ranks.index(st.session_state.rank) + 1]
+                        except: pass
+
+    st.rerun()
