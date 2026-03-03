@@ -13,20 +13,24 @@ PHASE_SETS = {
     "Sovereign": ["Check-In", "Look Closer", "Name It", "Next Step"]
 }
 
-MASTER_PROMPT = """ROLE: Dojo Mentor. 
-You are a grounded, supportive mentor—not a harsh commander, but not a soft therapist either.
-CRITICAL RULES:
-1. BALANCE & LENGTH: Write 1 to 2 conversational paragraphs. Give the response room to breathe, but avoid long essays.
-2. GROUNDED EMPATHY: Acknowledge their state, but do not be overly agreeable (avoid phrases like "I totally understand exactly how you feel"). Validate quietly, then pivot to growth.
-3. PATTERNS & SOLUTIONS: Review the 'User's Recent History'. Point out recurring themes. Offer a practical perspective, a structural observation, or a grounded solution if applicable.
-4. GROWTH QUESTION: End by asking a thoughtful question aimed at growth—such as asking 'why' a pattern exists, what the next tactical step is, or if they want to explore a specific feeling deeper."""
+MASTER_PROMPT = (
+    "ROLE: Dojo Mentor. \n"
+    "You are a grounded, supportive mentor—not a harsh commander, but not a soft therapist either.\n"
+    "CRITICAL RULES:\n"
+    "1. BALANCE & LENGTH: Write 1 to 2 conversational paragraphs. Give the response room to breathe, but avoid long essays.\n"
+    "2. GROUNDED EMPATHY: Acknowledge their state, but do not be overly agreeable (avoid phrases like 'I totally understand exactly how you feel'). Validate quietly, then pivot to growth.\n"
+    "3. PATTERNS & SOLUTIONS: Review the 'User's Recent History'. Point out recurring themes. Offer a practical perspective, a structural observation, or a grounded solution if applicable.\n"
+    "4. GROWTH QUESTION: End by asking a thoughtful question aimed at growth—such as asking 'why' a pattern exists, what the next tactical step is, or if they want to explore a specific feeling deeper."
+)
 
-MIRROR_PROMPT = """ROLE: Dojo Mirror.
-Reflect the user's truth with supportive, grounded wisdom.
-CRITICAL RULES:
-1. BALANCE: Write about 3 to 5 sentences. 
-2. TONE: Act as a wise mentor. Acknowledge the weight of their words without coddling.
-3. REFLECTION & INQUIRY: Review the 'User's Recent History'. Point out an underlying pattern, then ask a single, probing question to help them look deeper or take action."""
+MIRROR_PROMPT = (
+    "ROLE: Dojo Mirror.\n"
+    "Reflect the user's truth with supportive, grounded wisdom.\n"
+    "CRITICAL RULES:\n"
+    "1. BALANCE: Write about 3 to 5 sentences. \n"
+    "2. TONE: Act as a wise mentor. Acknowledge the weight of their words without coddling.\n"
+    "3. REFLECTION & INQUIRY: Review the 'User's Recent History'. Point out an underlying pattern, then ask a single, probing question to help them look deeper or take action."
+)
 
 # ==================================================
 # 2. ARCHWAY UI - LIGHT MODE
@@ -82,7 +86,7 @@ if 'msgs' not in st.session_state: st.session_state.msgs = []
 if 'exchange_count' not in st.session_state: st.session_state.exchange_count = 0
 
 # ==================================================
-# 4. SIDEBAR LOGIC 
+# 4. SIDEBAR LOGIC
 # ==================================================
 with st.sidebar:
     st.markdown("## **The Dojo**")
@@ -107,45 +111,4 @@ with st.sidebar:
     
     st.markdown("<br>", unsafe_allow_html=True)
     if st.button("Bow-Out"):
-        for key in list(st.session_state.keys()): del st.session_state[key]
-        st.rerun()
-
-# ==================================================
-# 5. MAIN INTERFACE
-# ==================================================
-st.markdown('<div style="text-align:center; font-size:2.1rem; font-weight:700; margin:1.5rem 0;">Warriors Don\'t Always Win — Warriors Always Fight</div>', unsafe_allow_html=True)
-st.markdown('<div class="watermark">;∞</div>', unsafe_allow_html=True)
-
-for msg in st.session_state.msgs:
-    with st.chat_message(msg["role"]):
-        st.markdown(msg["content"], unsafe_allow_html=True)
-
-# ==================================================
-# 6. ENGINE ROUTING & QUALITATIVE ADVANCEMENT
-# ==================================================
-if prompt := st.chat_input("Enter the Dojo..."):
-    st.session_state.msgs.append({"role": "user", "content": prompt})
-    save_to_ledger("user", prompt, st.session_state.rank, str(st.session_state.phase))
-    st.session_state.exchange_count += 1
-    
-    with st.chat_message("user"):
-        st.markdown(prompt)
-
-    # --- THE CRISIS GATEKEEPER ---
-    def contains_self_harm(text):
-        t = text.lower()
-        keywords = ["cut myself", "self harm", "hurt myself", "kill myself", "suicide", "end my life", "blade", "razor"]
-        return any(kw in t for kw in keywords)
-
-    is_crisis = contains_self_harm(prompt)
-
-    # --- THE QUALITATIVE GATEKEEPER (Fast 8B Model) ---
-    def check_readiness(user_text):
-        headers = {
-            "Content-Type": "application/json",
-            "Authorization": f"Bearer {st.secrets.get('GROQ_API_KEY', '')}"
-        }
-        eval_prompt = "Analyze this message. Is the user showing signs of forward growth, realization, closure, or readiness to move on? If they are still asking for guidance, venting, or stuck, reply NO. If they show a shift in perspective or readiness, reply YES. Reply ONLY with YES or NO."
-        payload = {
-            "model": "llama-3.1-8b-instant",
-            "messages": [{"role": "system", "content": eval_prompt}, {"role": "user",
+        for key in list(st.session
