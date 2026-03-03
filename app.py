@@ -4,7 +4,7 @@ import requests
 import time
 
 # ==================================================
-# 1. CORE CONFIG & "HARDENED MIRROR" PROMPTS
+# 1. CORE CONFIG & "GROUNDED MENTOR" PROMPTS
 # ==================================================
 PHASE_SETS = {
     "Student": ["Welcome Mat", "Warm-Up", "Training", "Cool Down"],
@@ -13,19 +13,20 @@ PHASE_SETS = {
     "Sovereign": ["Check-In", "Look Closer", "Name It", "Next Step"]
 }
 
-MASTER_PROMPT = """ROLE: Dojo Mentor. You possess quiet strength and discipline.
+MASTER_PROMPT = """ROLE: Dojo Mentor. 
+You are a grounded, supportive mentor—not a harsh commander, but not a soft therapist either.
 CRITICAL RULES:
-1. NO THERAPY SPEAK: Never use phrases like "I can totally understand," "It sounds like you're feeling," or "Sometimes we just need." Be direct, grounded, and human. 
-2. EXTREME BREVITY: Maximum 2 to 3 short sentences. Do not write paragraphs.
-3. PATTERNS: Review the 'User's Recent History'. If you see a pattern, state it plainly as an observation, not a diagnosis.
-4. ONE QUESTION LIMIT: If you ask a question, ask exactly ONE brief, grounded question to move them forward. Do not ask multiple questions."""
+1. BALANCE & LENGTH: Write 1 to 2 conversational paragraphs. Give the response room to breathe, but avoid long essays.
+2. GROUNDED EMPATHY: Acknowledge their state, but do not be overly agreeable (avoid phrases like "I totally understand exactly how you feel"). Validate quietly, then pivot to growth.
+3. PATTERNS & SOLUTIONS: Review the 'User's Recent History'. Point out recurring themes. Offer a practical perspective, a structural observation, or a grounded solution if applicable.
+4. GROWTH QUESTION: End by asking a thoughtful question aimed at growth—such as asking 'why' a pattern exists, what the next tactical step is, or if they want to explore a specific feeling deeper."""
 
 MIRROR_PROMPT = """ROLE: Dojo Mirror.
-Reflect the truth with absolute minimal words.
+Reflect the user's truth with supportive, grounded wisdom.
 CRITICAL RULES:
-1. BREVITY: Maximum 2 sentences.
-2. NO FLUFF: Do not psychoanalyze. State the pattern you see in the 'User's Recent History' simply and quietly.
-3. ONE QUESTION: Ask a maximum of one sharp, reflective question. Hold the space."""
+1. BALANCE: Write about 3 to 5 sentences. 
+2. TONE: Act as a wise mentor. Acknowledge the weight of their words without coddling.
+3. REFLECTION & INQUIRY: Review the 'User's Recent History'. Point out an underlying pattern, then ask a single, probing question to help them look deeper or take action."""
 
 # ==================================================
 # 2. ARCHWAY UI - LIGHT MODE
@@ -81,7 +82,7 @@ if 'msgs' not in st.session_state: st.session_state.msgs = []
 if 'exchange_count' not in st.session_state: st.session_state.exchange_count = 0
 
 # ==================================================
-# 4. SIDEBAR LOGIC
+# 4. SIDEBAR LOGIC 
 # ==================================================
 with st.sidebar:
     st.markdown("## **The Dojo**")
@@ -147,77 +148,4 @@ if prompt := st.chat_input("Enter the Dojo..."):
         eval_prompt = "Analyze this message. Is the user showing signs of forward growth, realization, closure, or readiness to move on? If they are still asking for guidance, venting, or stuck, reply NO. If they show a shift in perspective or readiness, reply YES. Reply ONLY with YES or NO."
         payload = {
             "model": "llama-3.1-8b-instant",
-            "messages": [{"role": "system", "content": eval_prompt}, {"role": "user", "content": user_text}],
-            "temperature": 0.0,
-            "max_tokens": 5
-        }
-        try:
-            res = requests.post("https://api.groq.com/openai/v1/chat/completions", headers=headers, json=payload, timeout=5)
-            return "YES" in res.json()['choices'][0]['message']['content'].upper()
-        except:
-            return False
-
-    with st.chat_message("assistant"):
-        if is_crisis:
-            safety_box = """
-            I am here with you, but I cannot provide guidance or assistance related to self-harm.
-            <div class='crisis-box'>
-                <p class='crisis-text'>Immediate support is available right now. You are not alone.</p>
-                <ul>
-                    <li>Call or text <strong>988</strong> (Suicide & Crisis Lifeline, 24/7, free & confidential)</li>
-                    <li>Text <strong>HOME</strong> to <strong>741741</strong> (Crisis Text Line, 24/7)</li>
-                </ul>
-            </div>
-            """
-            st.markdown(safety_box, unsafe_allow_html=True)
-            st.session_state.msgs.append({"role": "assistant", "content": safety_box})
-
-        else:
-            # --- DOJO RESPONSE GENERATION ---
-            sys_msg = MIRROR_PROMPT if st.session_state.phase >= 2 else MASTER_PROMPT
-            recent_history = get_recent_history(30)
-            sys_msg += f"\n\n--- USER'S RECENT HISTORY ---\n{recent_history}\n-----------------------------"
-
-            messages = [{"role": "system", "content": sys_msg}]
-            for m in st.session_state.msgs:
-                messages.append({"role": m["role"], "content": m["content"]})
-
-            headers = {
-                "Content-Type": "application/json",
-                "Authorization": f"Bearer {st.secrets.get('GROQ_API_KEY', '')}"
-            }
-            
-            # Dropped temperature slightly to enforce the rigid structure
-            payload = {
-                "model": "llama-3.3-70b-versatile",
-                "messages": messages,
-                "temperature": 0.35, 
-                "max_tokens": 512
-            }
-            
-            try:
-                res = requests.post("https://api.groq.com/openai/v1/chat/completions", headers=headers, json=payload, timeout=25)
-                res.raise_for_status()
-                final_response = res.json()['choices'][0]['message']['content']
-            except Exception as e:
-                final_response = f"**System Alert:** Transmission issue. Groq returned: {str(e)[:120]}"
-
-            st.markdown(final_response)
-            st.session_state.msgs.append({"role": "assistant", "content": final_response})
-            save_to_ledger("assistant", final_response, st.session_state.rank, str(st.session_state.phase))
-            
-            # --- ADVANCEMENT EVALUATION ---
-            if st.session_state.exchange_count >= 2:
-                is_ready = check_readiness(prompt)
-                if is_ready or st.session_state.exchange_count >= 6:
-                    st.session_state.exchange_count = 0
-                    if st.session_state.phase < 3:
-                        st.session_state.phase += 1
-                    else:
-                        st.session_state.phase = 0
-                        ranks = ["Student", "Practitioner", "Sentinel", "Sovereign"]
-                        try:
-                            st.session_state.rank = ranks[ranks.index(st.session_state.rank) + 1]
-                        except: pass
-
-    st.rerun()
+            "messages": [{"role": "system", "content": eval_prompt}, {"role": "user",
