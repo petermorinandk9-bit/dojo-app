@@ -57,17 +57,16 @@ st.markdown("""
     .crisis-box { background-color: #ffe6e6; border-left: 5px solid #ff0000; padding: 15px; margin-top: 10px; border-radius: 5px; }
     .crisis-text { color: #cc0000; font-weight: bold; font-size: 1.1em; margin-bottom: 5px; }
     
-    /* Massive Branding Header Stack */
-    .slogan-stack-main { 
-        font-size: 2.5rem; 
-        font-weight: 800;
+    /* Refined Slogan Stack (Dialed Back) */
+    .slogan-stack-refined { 
+        font-size: 1.65em; 
         text-align: center; 
-        color: #1a1a1a; 
+        color: #666666; 
         font-style: italic; 
-        margin-top: 10px; 
-        line-height: 1.2;
+        margin-top: 5px; 
+        line-height: 1.3;
     }
-    .spacer { margin-bottom: 40px; }
+    .spacer { margin-bottom: 20px; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -135,8 +134,8 @@ with st.sidebar:
 # ==================================================
 # 5. MAIN INTERFACE: THE PHILOSOPHY STACK
 # ==================================================
-st.markdown('<div class="slogan-stack-main">Warriors Don\'t Always Win — Warriors Always Fight</div>', unsafe_allow_html=True)
-st.markdown('<div class="slogan-stack-main">We. Never. Quit.</div>', unsafe_allow_html=True)
+st.markdown('<div class="slogan-stack-refined">Warriors Don\'t Always Win — Warriors Always Fight</div>', unsafe_allow_html=True)
+st.markdown('<div class="slogan-stack-refined">We. Never. Quit.</div>', unsafe_allow_html=True)
 st.markdown('<div class="spacer"></div>', unsafe_allow_html=True)
 st.markdown('<div class="watermark">;∞</div>', unsafe_allow_html=True)
 
