@@ -47,11 +47,27 @@ st.markdown("""
     .crisis-text { color: #cc0000; font-weight: bold; font-size: 1.1em; margin-bottom: 5px; }
     
     /* Branding Header */
-    .dojo-header { font-size: 2.2rem; font-weight: 700; text-align: center; margin-bottom: 0px; margin-top: 10px; }
-    .slogan-top { font-size: 1.1em; text-align: center; color: #666666; font-style: italic; margin-top: 0px; margin-bottom: 20px; }
+    .dojo-header { font-size: 2.5rem; font-weight: 800; text-align: center; margin-bottom: 0px; margin-top: 10px; }
+    .slogan-top { 
+        font-size: 2.2em; 
+        text-align: center; 
+        color: #1a1a1a; 
+        font-style: italic; 
+        text-decoration: underline;
+        margin-top: 0px; 
+        margin-bottom: 30px; 
+    }
     
     /* Bottom Branding */
-    .bottom-quit { font-size: 1.1em; text-align: center; color: #666666; font-style: italic; margin-top: 10px; margin-bottom: 40px; }
+    .bottom-quit { 
+        font-size: 2.2em; 
+        text-align: center; 
+        color: #1a1a1a; 
+        font-style: italic; 
+        font-weight: 600;
+        margin-top: 20px; 
+        margin-bottom: 50px; 
+    }
     </style>
     """, unsafe_allow_html=True)
 
