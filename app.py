@@ -167,4 +167,18 @@ if prompt := st.chat_input("Speak from center..."):
             payload = {"model": "llama-3.3-70b-versatile", "messages": messages, "temperature": 0.45, "max_tokens": 512}
             try:
                 res = requests.post("https://api.groq.com/openai/v1/chat/completions", headers=headers, json=payload, timeout=25)
-                final_response = res.json()['choices'][0]['message']['
+                final_response = res.json()['choices'][0]['message']['content']
+            except: final_response = "**System Alert:** Transmission issue."
+            st.markdown(final_response)
+            st.session_state.msgs.append({"role": "assistant", "content": final_response})
+            save_to_ledger("assistant", final_response, st.session_state.rank, str(st.session_state.phase))
+            if st.session_state.exchange_count >= 2:
+                if check_readiness(prompt) or st.session_state.exchange_count >= 6:
+                    st.session_state.exchange_count = 0
+                    if st.session_state.phase < 3: st.session_state.phase += 1
+                    else:
+                        st.session_state.phase = 0
+                        ranks = ["Student", "Practitioner", "Sentinel", "Sovereign"]
+                        try: st.session_state.rank = ranks[ranks.index(st.session_state.rank) + 1]
+                        except: pass
+    st.rerun()
