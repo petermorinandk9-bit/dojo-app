@@ -1,375 +1,149 @@
 import streamlit as st
-import sqlite3, time, json, os
-import numpy as np, pandas as pd, altair as alt
-from litellm import completion, embedding
+from openai import OpenAI
+import sqlite3
+import time
 
-# ==================================================
-# AGENTS (Groq-only)
-# ==================================================
-AGENTS = {
-    "logic": "groq/llama-3.3-70b-versatile",
-    "fast":  "groq/llama-3.1-8b-instant"
-}
+# === PROMPTS (exact from blueprints) ===
+MASTER_PROMPT = "ROLE: Disciplined Warrior / Dojo Lead. Observe the state without judgment. Name the immediate fact. Minimalist. Strength in reserve. No mindfulness fluff. Max 3 lines."
+MIRROR_PROMPT = "ROLE: Dojo Mirror (Semantic). Identify Shield. Compare with semantically relevant past truths. Name recurring patterns/echoes. No coaching. Just the truth."
+CRISIS_PROMPT = "ROLE: Sensei (Emergency). Ground the user in immediate physical facts. ALWAYS include: Call/Text 988 or Text HOME to 741741."
+SENTINEL_PROMPT = "ROLE: Sentinel. Validate the next tactical step with absolute clarity."
+CLOSURE_PROMPT = "ROLE: Dojo Closure. Confirm the session's structural gains. Ask exactly: \"Is there anything else we can work on today?\""
 
-# ==================================================
-# DOJO CONFIG
-# ==================================================
-PHASE_SETS = {
-    "Student": ["Welcome Mat", "Warm-Up", "Training", "Cool Down"],
-    "Practitioner": ["Step Onto the Mat", "Feel It Out", "Work the Pattern", "Close the Round"],
-    "Sentinel": ["Enter the Dojo", "Center", "Engage", "Seal & Step Out"],
-    "Sovereign": ["Check-In", "Look Closer", "Name It", "Next Step"]
-}
-
-RANK_TONE = {
-    "Student": "Tone: gentle, welcoming, simple.",
-    "Practitioner": "Tone: grounded, reflective.",
-    "Sentinel": "Tone: concise, precise.",
-    "Sovereign": "Tone: minimal, clear."
-}
-
-RANK_CAPTION = {
-    "Student": "Path forming",
-    "Practitioner": "Pattern stabilizing",
-    "Sentinel": "Continuity emerging",
-    "Sovereign": "Sovereign field"
-}
-
-MASTER_PROMPT = """
-ROLE: Communicator. Gentle Warrior.
-Be fully present with whatever is here.
-Name the feeling gently, hold space without rushing.
-Warm, human, grounding. Max 3 lines.
-"""
-
-MIRROR_PROMPT = """
-ROLE: Dojo Mirror
-TASK:
-1. Name the felt state or shield in simple, grounded words.
-2. Gently reflect any echo from past if close.
-3. Offer quiet, warm insight — no fixing, no pushing forward.
-STYLE: Warm, present, human. Max 3 lines. Stay with the feeling.
-"""
-
-SENTINEL_PROMPT = "ROLE: Sentinel. Validate the next small step clearly and gently."
-
-CRISIS_PROMPT = """
-ROLE: Sensei. Ground the user. Short, calming, breathing-focused lines only.
-
-CRITICAL: ALWAYS include these resources if crisis is present:
-- Call or text **988** (Suicide & Crisis Lifeline, 24/7, free & confidential)
-- Text **HOME** to **741741** (Crisis Text Line, 24/7)
-
-Stay present, no pressure. You're not alone.
-"""
-
-SAFETY_CUTOFF_RESPONSE = """
-I cannot provide assistance or guidance related to self-harm.  
-
-**Immediate support is available:**
-- Call or text **988** (Suicide & Crisis Lifeline, 24/7, free & confidential)
-- Text **HOME** to **741741** (Crisis Text Line, 24/7)
-
-You're not alone — help is here right now.
-"""
-
-CLUSTER_NAMER_ROLE = "Name the shared theme in 1–3 archetypal words."
-
-DB_PATH = "dojo_records.db"
-MIN_EXCHANGES = 3
-
-# ==================================================
-# SELF-HARM KEYWORD BLOCK
-# ==================================================
 def contains_self_harm(text):
     t = text.lower()
-    keywords = [
-        "cut myself", "cutting myself", "self harm", "self-harm", "hurt myself",
-        "hurting myself", "kill myself", "suicide", "end my life", "want to die",
-        "self injury", "self-injury", "bleed out", "blade", "razor"
-    ]
+    keywords = ["cut myself", "self harm", "kill myself", "suicide", "end my life", "blade", "razor"]
     return any(kw in t for kw in keywords)
 
-# ==================================================
-# LLM + EMBEDDING
-# ==================================================
-def llm(model, messages, temp=0.3):
-    try:
-        r = completion(model=model, messages=messages, temperature=temp, timeout=25, num_retries=2)
-        return r.choices[0].message.content
-    except Exception as e:
-        return f"Flicker — {str(e)[:60]}"
+# === DB ===
+def init_db():
+    conn = sqlite3.connect('records.db')
+    conn.execute('''CREATE TABLE IF NOT EXISTS records (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        timestamp REAL,
+        content TEXT,
+        rank TEXT,
+        phase TEXT,
+        vector TEXT
+    )''')
+    conn.commit()
+    conn.close()
 
-def embed(text):
-    try:
-        r = embedding(model="text-embedding-3-small", input=[text[:1000]])
-        return r.data[0].embedding
-    except:
-        st.session_state["_embed_fail"] = True
-        return None
+def log_record(content, rank, phase, vector="[]"):
+    conn = sqlite3.connect('records.db')
+    conn.execute("INSERT INTO records (timestamp, content, rank, phase, vector) VALUES (?, ?, ?, ?, ?)",
+                 (time.time(), content, rank, str(phase), vector))
+    conn.commit()
+    conn.close()
 
-def detect_crisis(text):
-    try:
-        r = llm(AGENTS["logic"], [
-            {"role":"system","content":"YES/NO crisis? Respond only with YES or NO."},
-            {"role":"user","content":text[:500]}
-        ], temp=0)
-        return "YES" in r.upper()
-    except:
-        return False
+init_db()
 
-def detect_sentiment(text):
-    try:
-        r = llm(AGENTS["fast"], [
-            {"role":"system","content":"POSITIVE/NEUTRAL/NEGATIVE/STUCK sentiment?"},
-            {"role":"user","content":text[:500]}
-        ], temp=0)
-        sentiment = r.upper()
-        if "POSITIVE" in sentiment: return "positive"
-        if "NEGATIVE" in sentiment or "STUCK" in sentiment: return "negative"
-        return "neutral"
-    except:
-        return "neutral"
+# === UI ===
+st.set_page_config(page_title="Grounded Kenpo", page_icon="⚔️", layout="centered")
+st.markdown("""
+<style>
+.stApp {background-color: #080808; color: #ffffff;}
+.stChatMessage {background-color: #1a1a1a; border: 1px solid #444;}
+.header {text-align: center; font-size: 2.1rem; font-weight: 700; margin: 1rem 0;}
+.footer {text-align: center; color: #666; padding: 1rem; font-size: 0.95rem;}
+.watermark {position: fixed; bottom: 35%; left: 50%; transform: translateX(-50%); font-size: 9rem; opacity: 0.05; color: #fff; pointer-events: none; z-index: -1; user-select: none;}
+</style>
+""", unsafe_allow_html=True)
 
-def detect_closure(text):
-    t = text.lower()
-    if any(p in t for p in ["thank you", "thanks", "feeling better", "feel better", "much better", "spirits lifted", "things are feeling lighter"]):
-        return "light_closure"
-    if any(p in t for p in ["great help", "a lot better", "you've been a great help", "thank you so much", "im feeling alot better"]):
-        return "strong_closure"
-    return None
+st.markdown('<div class="header">Warriors Don\'t Always Win — Warriors Always Fight</div>', unsafe_allow_html=True)
+st.markdown('<div class="watermark">;∞</div>', unsafe_allow_html=True)
 
-def detect_resonance(text):
-    t = text.lower()
-    return any(p in t for p in ["yeah", "yes", "exactly", "that fits", "that's true", "i guess", "right", "i do", "makes sense"])
+# === SESSION STATE ===
+if 'phase' not in st.session_state:
+    st.session_state.update({
+        'phase': 0,
+        'msgs': [],
+        'exchange_count': 0,
+        'crisis_active': False,
+        '_advance_next': False,
+        'client': None
+    })
 
-def detect_insight(text):
-    t = text.lower()
-    return any(p in t for p in ["i realize", "i think", "maybe i", "i've been", "because i", "i see", "i notice"])
-
-def check_advance(phase, sentiment, closure, resonance, insight, exchanges):
-    if phase == 0: return closure in ["light_closure", "strong_closure"] or (sentiment == "positive" and exchanges >= MIN_EXCHANGES)
-    elif phase == 1: return closure in ["light_closure", "strong_closure"] or resonance or insight or (sentiment == "positive" and exchanges >= MIN_EXCHANGES)
-    elif phase == 2: return closure == "strong_closure" or insight or (sentiment == "positive" and exchanges >= MIN_EXCHANGES)
-    elif phase == 3: return closure == "strong_closure" or (sentiment == "positive" and exchanges >= MIN_EXCHANGES)
-    return False
-
-# ==================================================
-# DB
-# ==================================================
-@st.cache_resource
-def db():
-    c = sqlite3.connect(DB_PATH, check_same_thread=False)
-    c.execute("PRAGMA journal_mode=WAL")
-    c.execute("""
-        CREATE TABLE IF NOT EXISTS records (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            timestamp REAL,
-            content TEXT,
-            rank TEXT,
-            phase TEXT,
-            vector TEXT
-        )
-    """)
-    c.commit()
-    return c
-
-def save(text, rank, phase):
-    v = embed(text)
-    db().execute(
-        "INSERT INTO records VALUES (NULL,?,?,?,?,?)",
-        (time.time(), text, rank, phase, json.dumps(v) if v else None)
-    )
-    db().commit()
-
-def semantic_matches(text, k=5):
-    q = embed(text)
-    if q is None: return []
-    q = np.array(q)
-    rows = db().execute("SELECT content, vector FROM records WHERE vector IS NOT NULL").fetchall()
-    sims = []
-    for c, v_json in rows:
-        try:
-            v = np.array(json.loads(v_json))
-            s = np.dot(q, v) / (np.linalg.norm(q) * np.linalg.norm(v))
-            sims.append((s, c))
-        except:
-            pass
-    sims.sort(reverse=True)
-    return [c for _, c in sims[:k]]
-
-def semantic_density(text):
-    words = text.split()
-    return len(set(w.lower() for w in words)) / len(words) if words else 0
-
-def cluster_records(th=0.85):
-    rows = db().execute("SELECT timestamp,content,vector FROM records WHERE vector IS NOT NULL").fetchall()
-    clusters = []
-    for ts, c, v_json in rows:
-        try: v = np.array(json.loads(v_json))
-        except: continue
-        placed = False
-        for cl in clusters:
-            s = np.dot(v, cl["c"]) / (np.linalg.norm(v) * np.linalg.norm(cl["c"]))
-            if s > th:
-                cl["i"].append((ts, c, v))
-                cl["c"] = np.mean([x[2] for x in cl["i"]], axis=0)
-                placed = True; break
-        if not placed:
-            clusters.append({"c": v, "i": [(ts, c, v)]})
-    return clusters
-
-# ==================================================
-# STATE
-# ==================================================
-st.set_page_config(page_title="The Dojo", layout="wide")
-
-if "phase" not in st.session_state:          st.session_state.phase = 0
-if "msgs" not in st.session_state:           st.session_state.msgs = []
-if "_match_count" not in st.session_state:   st.session_state["_match_count"] = None
-if "_embed_fail" not in st.session_state:    st.session_state["_embed_fail"] = False
-if "exchange_count" not in st.session_state: st.session_state.exchange_count = {0:0, 1:0, 2:0, 3:0}
-if "_clusters" not in st.session_state:      st.session_state._clusters = None
-if "_pending" not in st.session_state:       st.session_state._pending = None
-if "crisis_active" not in st.session_state:  st.session_state.crisis_active = False
-if "_advance_next" not in st.session_state:  st.session_state._advance_next = False
-
-def reset():
-    st.session_state.msgs = []
-    st.session_state["_match_count"] = None
-    st.session_state.exchange_count = {0:0, 1:0, 2:0, 3:0}
-    st.session_state.crisis_active = False
-    st.session_state._advance_next = False
-
-# ==================================================
-# HEADER + AUTO-RANK
-# ==================================================
-st.title("The Dojo")
-
-if st.session_state["_embed_fail"]:
-    st.warning("Embeddings unavailable — Mirror & Map limited.")
-    if st.button("Dismiss (temporary)", type="secondary"):
-        st.session_state["_embed_fail"] = False
-        st.rerun()
-
-count = db().execute("SELECT COUNT(*) FROM records").fetchone()[0]
-
-def compute_rank(c):
-    if c < 10: return "Student"
-    if c < 25: return "Practitioner"
-    if c < 50: return "Sentinel"
-    return "Sovereign"
-
-rank = compute_rank(count)
-tone = RANK_TONE[rank]
-
-st.progress(min(count / 50, 1.0))
-st.markdown(f"**Rank:** {rank} • **Ledger:** {count} sealed • **{min(int(count/50*100),100)}% claimed**")
-st.caption(RANK_CAPTION[rank])
-
-# ==================================================
-# SIDEBAR PATH
-# ==================================================
+# === SIDEBAR CONTROLS ===
 with st.sidebar:
-    st.markdown("### Rank Path")
-    ranks = ["Student", "Practitioner", "Sentinel", "Sovereign"]
-    current_idx = ranks.index(rank)
-    for i, r in enumerate(ranks):
-        if i < current_idx:
-            st.markdown(f"● {r}")
-        elif i == current_idx:
-            st.markdown(f"**➤ {r}**")
-        else:
-            st.markdown(f"<span style='color:gray'>● {r}</span>", unsafe_allow_html=True)
-
-    st.divider()
-
-    st.markdown("### Phase Progress")
-    phases = PHASE_SETS[rank]
-    for i, p in enumerate(phases):
-        if i < st.session_state.phase:
-            st.markdown(f"● {p}")
-        elif i == st.session_state.phase:
-            st.markdown(f"**➤ {p}**")
-        else:
-            st.markdown(f"<span style='color:gray'>● {p}</span>", unsafe_allow_html=True)
-
-    if st.button("Reset Round"):
-        reset()
-        st.session_state.phase = 0
-        st.rerun()
-
-# ==================================================
-# CHAT DISPLAY & INPUT
-# ==================================================
-for m in st.session_state.msgs:
-    with st.chat_message(m["role"]):
-        st.markdown(m["content"])
-
-phase = st.session_state.phase
-phase_name = PHASE_SETS[rank][phase]
-st.subheader(f"Phase: {phase_name}")
-
-if p := st.chat_input("Speak to the Dojo..."):
-
-    # ---- APPLY DELAYED ADVANCE HERE ----
-    if st.session_state._advance_next:
-        if st.session_state.phase < 3:
-            st.session_state.phase += 1
-        st.session_state._advance_next = False
-        phase = st.session_state.phase
-
-    st.session_state.msgs.append({"role": "user", "content": p})
-    st.session_state.exchange_count[phase] += 1
+    st.metric("Phase", st.session_state.phase)
+    st.metric("Exchanges", st.session_state.exchange_count)
     
-    # --- HARD SELF-HARM KEYWORD BLOCK ---
-    if contains_self_harm(p):
-        st.session_state.crisis_active = True
-        ans = SAFETY_CUTOFF_RESPONSE
-        st.session_state.msgs.append({"role": "assistant", "content": ans})
-        st.rerun()
-
-    # --- LLM CRISIS CHECK ---
-    is_crisis = detect_crisis(p)
-    if is_crisis:
-        st.session_state.crisis_active = True
-        ans = llm(AGENTS["logic"], [{"role": "system", "content": CRISIS_PROMPT}] + st.session_state.msgs[-5:])
-        st.session_state.msgs.append({"role": "assistant", "content": ans})
-        st.rerun()
-
-    if not is_crisis and not contains_self_harm(p):
-        st.session_state.crisis_active = False
-
-    # --- ANALYTICS ---
-    sentiment = detect_sentiment(p)
-    closure = detect_closure(p)
-    resonance = detect_resonance(p)
-    insight = detect_insight(p)
+    api_key = st.text_input("xAI Grok API Key", type="password", key="xai_key")
+    if api_key and (st.session_state.client is None or not st.session_state.client):
+        st.session_state.client = OpenAI(base_url="https://api.x.ai/v1", api_key=api_key)
+        st.success("Grok link established")
     
-    # --- PHASE LOGIC ---
-    if phase == 0:
-        role = MASTER_PROMPT + "\n" + tone
-        ans = llm(AGENTS["logic"], [{"role": "system", "content": role}] + st.session_state.msgs[-5:])
-        
-    elif phase == 1:
-        matches = semantic_matches(p)
-        sys = MIRROR_PROMPT + "\n" + tone
-        if matches: sys += "\n\nPast echoes:\n" + "\n".join(matches)
-        core = llm(AGENTS["logic"], [{"role": "system", "content": sys}] + st.session_state.msgs[-5:], temp=0.4)
-        ans = llm(AGENTS["fast"], [{"role": "system", "content": "Refine tone, keep insight."}, {"role": "user", "content": core}])
-        
-    elif phase == 2:
-        ans = "The insight is forming. Would you like to seal this truth into your ledger?"
-        st.session_state._pending = next((m["content"] for m in reversed(st.session_state.msgs) if m["role"] == "assistant"), "")
-
-    elif phase == 3:
-        core = llm(AGENTS["fast"], [{"role": "system", "content": SENTINEL_PROMPT}] + st.session_state.msgs[-5:], temp=0.1)
-        ans = llm(AGENTS["logic"], [{"role": "system", "content": "Encourage gently."}, {"role": "user", "content": core}])
-
-    st.session_state.msgs.append({"role": "assistant", "content": ans})
-
-    # --- DELAY ADVANCEMENT FLAG ---
-    if check_advance(phase, sentiment, closure, resonance, insight, st.session_state.exchange_count[phase]):
+    if st.button("Advance Phase", disabled=st.session_state.exchange_count < 3):
         st.session_state._advance_next = True
+        st.rerun()
+    
+    if st.session_state.phase == 3 and st.session_state.exchange_count >= 3:
+        if st.button("**Close Session**"):
+            st.session_state.phase = 0
+            st.session_state.exchange_count = 0
+            st.session_state.msgs = []
+            st.session_state.crisis_active = False
+            st.session_state._advance_next = False
+            st.rerun()
+    
+    if st.button("Full Reset"):
+        for k in list(st.session_state.keys()):
+            if k != "client":
+                del st.session_state[k]
+        st.rerun()
+
+# === CHAT RENDER ===
+for msg in st.session_state.msgs:
+    with st.chat_message(msg["role"]):
+        st.markdown(msg["content"])
+
+# === INPUT & LOGIC ===
+if prompt := st.chat_input("State the immediate fact..."):
+    log_record(prompt, "user", st.session_state.phase)
+    st.session_state.msgs.append({"role": "user", "content": prompt})
+    st.session_state.exchange_count += 1
+
+    # Crisis gate
+    if contains_self_harm(prompt):
+        st.session_state.crisis_active = True
+
+    # Generate response
+    if st.session_state.crisis_active:
+        response = "Feet on ground. You are here. Name one physical object in the room. Call/Text 988 or Text HOME to 741741. I stand ready."
+        st.session_state.crisis_active = False  # single-response ground
+    else:
+        phase_prompts = [MASTER_PROMPT, MIRROR_PROMPT, SENTINEL_PROMPT, CLOSURE_PROMPT]
+        sys_prompt = phase_prompts[st.session_state.phase]
+        
+        client = st.session_state.get('client')
+        if client:
+            try:
+                messages = [{"role": "system", "content": sys_prompt}] + \
+                           [{"role": m["role"], "content": m["content"]} for m in st.session_state.msgs[-6:]]
+                completion = client.chat.completions.create(
+                    model="grok-beta",
+                    messages=messages,
+                    max_tokens=220,
+                    temperature=0.35
+                )
+                response = completion.choices[0].message.content.strip()
+            except Exception as e:
+                response = f"Link stable. Fact: API transmission error - {str(e)[:60]}"
+        else:
+            response = f"Phase {st.session_state.phase} fact: Line acknowledged. {sys_prompt.split('.')[0]}."
+
+    log_record(response, "assistant", st.session_state.phase)
+    st.session_state.msgs.append({"role": "assistant", "content": response})
+
+    # Phase gate
+    if st.session_state.exchange_count >= 3:
+        st.session_state._advance_next = True
+    if st.session_state._advance_next and st.session_state.phase < 3:
+        st.session_state.phase += 1
+        st.session_state.exchange_count = 0
+        st.session_state._advance_next = False
 
     st.rerun()
+
+st.markdown('<div class="footer">We Never Quit</div>', unsafe_allow_html=True)
