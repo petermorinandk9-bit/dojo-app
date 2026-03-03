@@ -4,7 +4,7 @@ import requests
 import time
 
 # ==================================================
-# 1. CORE CONFIG & SOVEREIGN PROMPTS (v10.8)
+# 1. CORE CONFIG & SOVEREIGN PROMPTS
 # ==================================================
 PHASE_SETS = {
     "Student": ["Welcome Mat", "Warm-Up", "Training", "Cool Down"],
@@ -24,8 +24,6 @@ No coaching. Just the truth. Identify the 'Shield' if present."""
 CRISIS_PROMPT = """ROLE: Sensei (Emergency). 
 Ground the user in immediate physical facts. 
 ALWAYS include: Call/Text 988 or Text HOME to 741741."""
-
-SENTINEL_PROMPT = "ROLE: Sentinel. Validate the next tactical step with absolute clarity."
 
 # ==================================================
 # 2. ARCHWAY UI (CSS CUSTOMIZATION)
@@ -63,6 +61,7 @@ def init_db():
     conn.commit()
     return conn
 
+# Initialize State
 if 'phase' not in st.session_state: st.session_state.phase = 0
 if 'rank' not in st.session_state: st.session_state.rank = "Student"
 if 'msgs' not in st.session_state: st.session_state.msgs = []
@@ -94,4 +93,79 @@ with st.sidebar:
     
     if st.button("Reset Session"):
         st.session_state.clear()
-        st.
+        st.rerun()
+
+# ==================================================
+# 5. MAIN INTERFACE & LIVE API LOGIC
+# ==================================================
+st.title("Warriors Don't Always Win — Warriors Always Fight")
+
+# Display Chat History
+for msg in st.session_state.msgs:
+    with st.chat_message(msg["role"]):
+        st.markdown(msg["content"])
+
+# User Input
+if prompt := st.chat_input("Enter the Dojo..."):
+    st.session_state.msgs.append({"role": "user", "content": prompt})
+    with st.chat_message("user"):
+        st.markdown(prompt)
+
+    # Safety Check
+    def is_crisis(text):
+        keywords = ["cut myself", "self harm", "suicide", "end my life", "blade", "razor"]
+        return any(kw in text.lower() for kw in keywords)
+
+    # --- LIVE GROK CALL ---
+    with st.chat_message("assistant"):
+        # Dynamic Prompting
+        sys_msg = MASTER_PROMPT if st.session_state.phase < 2 else MIRROR_PROMPT
+        if is_crisis(prompt): 
+            sys_msg = CRISIS_PROMPT
+        
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {st.secrets['XAI_API_KEY']}"
+        }
+        
+        payload = {
+            "model": "grok-beta", 
+            "messages": [
+                {"role": "system", "content": sys_msg},
+                *st.session_state.msgs
+            ],
+            "temperature": 0.3
+        }
+        
+        try:
+            res = requests.post("https://api.xai.com/v1/chat/completions", headers=headers, json=payload)
+            res.raise_for_status()
+            response = res.json()['choices'][0]['message']['content']
+        except Exception as e:
+            response = f"**System Alert:** Connection interrupted. Error: {str(e)}"
+        
+        st.markdown(response)
+        st.session_state.msgs.append({"role": "assistant", "content": response})
+        st.session_state.exchange_count += 1
+        
+        if st.session_state.exchange_count >= 3:
+            st.session_state._advance_ready = True
+        
+        st.rerun()
+
+# --- DELAYED ADVANCE BUTTON ---
+if st.session_state.get('_advance_ready'):
+    st.divider()
+    next_label = current_phases[st.session_state.phase + 1] if st.session_state.phase < 3 else "Next Rank"
+    if st.button(f"Advance to {next_label}"):
+        if st.session_state.phase < 3:
+            st.session_state.phase += 1
+        else:
+            st.session_state.phase = 0
+            # Logic for Rank advancement would trigger here
+        st.session_state.exchange_count = 0
+        st.session_state._advance_ready = False
+        st.rerun()
+
+st.divider()
+st.caption("We Never Quit | Sovereign v10.8.3")
