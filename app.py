@@ -15,23 +15,23 @@ PHASE_SETS = {
 
 MASTER_PROMPT = (
     "ROLE: Dojo Mentor. \n"
-    "You are a grounded, supportive guide. You are a mentor—not a soft therapist, and NOT a harsh sensei.\n"
+    "You are a grounded, supportive guide. You are a mentor—not a soft therapist.\n"
     "CRITICAL RULES:\n"
-    "1. CONVERSATIONAL LENGTH: 1 to 2 paragraphs.\n"
+    "1. CONVERSATIONAL LENGTH: Write 1 to 2 paragraphs. Match user input depth.\n"
     "2. GROUNDED EMPATHY: Acknowledge reality without clinical fluff.\n"
     "3. PATTERNS: Offer practical observations based on 'User Recent History'.\n"
-    "4. FORWARD MOVEMENT: End with a thoughtful question to prompt growth."
+    "4. FORWARD MOVEMENT: End with ONE sharp, tactical, growth-oriented question."
 )
 
 MIRROR_PROMPT = (
-    "ROLE: Dojo Mirror. Reflect truth with supportive, grounded wisdom. "
-    "Concise paragraph. No therapy fluff. One probing question."
+    "ROLE: Dojo Mirror. Reflect truth with absolute discipline. "
+    "Concise paragraph. No therapy fluff. One probing tactical question."
 )
 
 # ==================================================
 # 2. ARCHWAY UI - SOVEREIGN LIGHT MODE
 # ==================================================
-st.set_page_config(page_title="Sovereign Dojo", layout="wide")
+st.set_page_config(page_title="The Dojo", layout="wide")
 
 st.markdown("""
     <style>
@@ -45,6 +45,13 @@ st.markdown("""
     .watermark { position: fixed; bottom: 40%; left: 50%; transform: translateX(-50%); font-size: 11rem; opacity: 0.04; color: #111111; pointer-events: none; z-index: -1; user-select: none; }
     .crisis-box { background-color: #ffe6e6; border-left: 5px solid #ff0000; padding: 15px; margin-top: 10px; border-radius: 5px; }
     .crisis-text { color: #cc0000; font-weight: bold; font-size: 1.1em; margin-bottom: 5px; }
+    
+    /* Branding Header */
+    .dojo-header { font-size: 2.2rem; font-weight: 700; text-align: center; margin-bottom: 0px; margin-top: 10px; }
+    .slogan-top { font-size: 1.1em; text-align: center; color: #666666; font-style: italic; margin-top: 0px; margin-bottom: 20px; }
+    
+    /* Bottom Branding */
+    .bottom-quit { font-size: 1.1em; text-align: center; color: #666666; font-style: italic; margin-top: 10px; margin-bottom: 40px; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -71,65 +78,49 @@ def save_to_ledger(role, text, rank, phase):
               (time.time(), role, text, rank, phase))
     conn.commit()
 
-# --- STATE RECOVERY ---
 if 'msgs' not in st.session_state:
     st.session_state.msgs = []
     st.session_state.exchange_count = 0
     st.session_state.rank = "Student"
     st.session_state.phase = 0
-    
     conn = get_db_connection()
     c = conn.cursor()
     c.execute("SELECT role, content, rank, phase FROM records ORDER BY timestamp ASC")
     rows = c.fetchall()
     for r in rows:
         st.session_state.msgs.append({"role": r[0], "content": r[1]})
-    
     if rows:
         st.session_state.rank = rows[-1][2]
-        try:
-            st.session_state.phase = int(rows[-1][3])
-        except:
-            st.session_state.phase = 0
+        try: st.session_state.phase = int(rows[-1][3])
+        except: st.session_state.phase = 0
 
 # ==================================================
-# 4. SIDEBAR LOGIC (Cleaned Up)
+# 4. SIDEBAR
 # ==================================================
 with st.sidebar:
     st.markdown("## **Sovereign UI**")
     st.divider()
-    
     ranks = ["Student", "Practitioner", "Sentinel", "Sovereign"]
     for r in ranks:
-        if r == st.session_state.rank:
-            st.markdown(f"<p class='active-rank'>➤ {r}</p>", unsafe_allow_html=True)
-        else:
-            st.markdown(f"<p class='inactive-rank'>{r}</p>", unsafe_allow_html=True)
-    
+        st.markdown(f"<p class='{'active-rank' if r == st.session_state.rank else 'inactive-rank'}'>{'➤ ' if r == st.session_state.rank else ''}{r}</p>", unsafe_allow_html=True)
     st.divider()
-    
-    # "Current Phase" Label Removed per instruction
     current_phases = PHASE_SETS.get(st.session_state.rank, PHASE_SETS["Student"])
     for idx, phase_name in enumerate(current_phases):
-        if idx == st.session_state.phase:
-            st.markdown(f"<p class='active-phase'>➤ {phase_name}</p>", unsafe_allow_html=True)
-        else:
-            st.markdown(f"<p class='inactive-phase'>{phase_name}</p>", unsafe_allow_html=True)
-    
+        st.markdown(f"<p class='{'active-phase' if idx == st.session_state.phase else 'inactive-phase'}'>{'➤ ' if idx == st.session_state.phase else ''}{phase_name}</p>", unsafe_allow_html=True)
     st.markdown("<br>", unsafe_allow_html=True)
     if st.button("Bow-Out", use_container_width=True):
         conn = get_db_connection()
         c = conn.cursor()
         c.execute("DELETE FROM records")
         conn.commit()
-        for key in list(st.session_state.keys()):
-            del st.session_state[key]
+        for key in list(st.session_state.keys()): del st.session_state[key]
         st.rerun()
 
 # ==================================================
-# 5. MAIN INTERFACE
+# 5. MAIN INTERFACE: THE SUMMIT
 # ==================================================
-st.markdown('<div style="text-align:center; font-size:2.1rem; font-weight:700; margin:1.5rem 0;">Warriors Don\'t Always Win — Warriors Always Fight</div>', unsafe_allow_html=True)
+st.markdown('<div class="dojo-header">The-Dojo</div>', unsafe_allow_html=True)
+st.markdown('<div class="slogan-top">Warriors Don\'t Always Win — Warriors Always Fight</div>', unsafe_allow_html=True)
 st.markdown('<div class="watermark">;∞</div>', unsafe_allow_html=True)
 
 for msg in st.session_state.msgs:
@@ -143,20 +134,14 @@ if prompt := st.chat_input("Speak from center..."):
     st.session_state.msgs.append({"role": "user", "content": prompt})
     save_to_ledger("user", prompt, st.session_state.rank, str(st.session_state.phase))
     st.session_state.exchange_count += 1
-    
-    with st.chat_message("user"):
-        st.markdown(prompt)
+    with st.chat_message("user"): st.markdown(prompt)
 
     crisis_keywords = ["kill myself", "suicide", "hurt myself", "end my life"]
     is_crisis = any(k in prompt.lower() for k in crisis_keywords)
 
     def check_readiness(user_text):
         headers = {"Authorization": f"Bearer {st.secrets['GROQ_API_KEY']}"}
-        payload = {
-            "model": "llama-3.1-8b-instant",
-            "messages": [{"role": "system", "content": "Analyze if user shows forward growth. Reply ONLY YES or NO."}, {"role": "user", "content": user_text}],
-            "temperature": 0.0, "max_tokens": 5
-        }
+        payload = {"model": "llama-3.1-8b-instant", "messages": [{"role": "system", "content": "Analyze forward growth. Reply ONLY YES or NO."}, {"role": "user", "content": user_text}], "temperature": 0.0, "max_tokens": 5}
         try:
             res = requests.post("https://api.groq.com/openai/v1/chat/completions", headers=headers, json=payload, timeout=5)
             return "YES" in res.json()['choices'][0]['message']['content'].upper()
@@ -164,10 +149,7 @@ if prompt := st.chat_input("Speak from center..."):
 
     with st.chat_message("assistant"):
         if is_crisis:
-            safety_box = (
-                "I am here with you, but I cannot provide guidance or assistance related to self-harm.\n\n"
-                "<div class='crisis-box'><p class='crisis-text'>Support is available: <strong>988</strong> or text <strong>741741</strong></p></div>"
-            )
+            safety_box = "I am here with you, but I cannot provide guidance or assistance related to self-harm.\n\n<div class='crisis-box'><p class='crisis-text'>Immediate support: Call/text **988** or text **741741**.</p></div>"
             st.markdown(safety_box, unsafe_allow_html=True)
             st.session_state.msgs.append({"role": "assistant", "content": safety_box})
             save_to_ledger("assistant", safety_box, st.session_state.rank, str(st.session_state.phase))
@@ -176,26 +158,23 @@ if prompt := st.chat_input("Speak from center..."):
             messages = [{"role": "system", "content": sys_msg}] + st.session_state.msgs[-30:]
             headers = {"Authorization": f"Bearer {st.secrets['GROQ_API_KEY']}"}
             payload = {"model": "llama-3.3-70b-versatile", "messages": messages, "temperature": 0.45, "max_tokens": 512}
-            
             try:
                 res = requests.post("https://api.groq.com/openai/v1/chat/completions", headers=headers, json=payload, timeout=25)
                 final_response = res.json()['choices'][0]['message']['content']
-            except:
-                final_response = "**System Alert:** Transmission issue."
-
+            except: final_response = "**System Alert:** Transmission issue."
             st.markdown(final_response)
             st.session_state.msgs.append({"role": "assistant", "content": final_response})
             save_to_ledger("assistant", final_response, st.session_state.rank, str(st.session_state.phase))
-            
             if st.session_state.exchange_count >= 2:
                 if check_readiness(prompt) or st.session_state.exchange_count >= 6:
                     st.session_state.exchange_count = 0
-                    if st.session_state.phase < 3:
-                        st.session_state.phase += 1
+                    if st.session_state.phase < 3: st.session_state.phase += 1
                     else:
                         st.session_state.phase = 0
                         ranks = ["Student", "Practitioner", "Sentinel", "Sovereign"]
-                        try:
-                            st.session_state.rank = ranks[ranks.index(st.session_state.rank) + 1]
+                        try: st.session_state.rank = ranks[ranks.index(st.session_state.rank) + 1]
                         except: pass
     st.rerun()
+
+# --- THE BASE: WE. NEVER. QUIT. ---
+st.markdown('<div class="bottom-quit">We. Never. Quit.</div>', unsafe_allow_html=True)
