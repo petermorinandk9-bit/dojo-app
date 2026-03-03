@@ -18,14 +18,14 @@ You are a supportive, conversational mentor and a caring listener.
 CRITICAL RULES:
 1. BALANCE: Write 1 to 2 conversational paragraphs. Let the response breathe.
 2. AUTHENTIC EMPATHY: Validate their feelings naturally. Be warm and human.
-3. PATTERN RECOGNITION: Review the 'User's Recent History' provided below. If you notice a recurring theme, strength, or struggle across these past interactions, gently point it out to show you are tracking their journey.
+3. PATTERN RECOGNITION: Review the 'User's Recent History' provided below. If you notice a recurring theme, strength, or struggle, gently point it out.
 4. NO PARROTING: Do not just summarize what they just said."""
 
 MIRROR_PROMPT = """ROLE: Dojo Mirror.
 Reflect on the user's words with conversational, genuine warmth.
 CRITICAL RULES:
 1. BALANCE: Write about 3 to 5 sentences. Keep it focused but human.
-2. PATTERN TRACKING: Review the 'User's Recent History'. Point out a strength or underlying pattern they might be missing based on their past entries.
+2. PATTERN TRACKING: Review the 'User's Recent History'. Point out a strength or underlying pattern they might be missing.
 3. TONE: Speak like a wise, caring friend."""
 
 # ==================================================
@@ -49,7 +49,7 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 # ==================================================
-# 3. DATABASE: THE ROLLING LEDGER (Expanded to 30)
+# 3. DATABASE: THE ROLLING LEDGER
 # ==================================================
 def init_db():
     conn = sqlite3.connect('sovereign.db', check_same_thread=False)
@@ -67,14 +67,11 @@ def save_to_ledger(role, text, rank, phase):
               (time.time(), role, text, rank, phase))
     conn.commit()
 
-# Expanded limit to 30 for deeper pattern recognition
 def get_recent_history(limit=30):
     c = conn.cursor()
     c.execute("SELECT role, content FROM records ORDER BY timestamp DESC LIMIT ?", (limit,))
     rows = c.fetchall()
     if not rows: return "No past patterns established yet."
-    
-    # Reverse to chronological order
     history = "\n".join([f"{row[0]}: {row[1]}" for row in reversed(rows)])
     return history
 
@@ -85,7 +82,7 @@ if 'msgs' not in st.session_state: st.session_state.msgs = []
 if 'exchange_count' not in st.session_state: st.session_state.exchange_count = 0
 
 # ==================================================
-# 4. SIDEBAR LOGIC
+# 4. SIDEBAR LOGIC (Exchanges removed, Bow-Out moved)
 # ==================================================
 with st.sidebar:
     st.markdown("## **The Dojo**")
@@ -108,9 +105,7 @@ with st.sidebar:
         else:
             st.markdown(f"<p class='inactive-phase'>{phase_name}</p>", unsafe_allow_html=True)
     
-    st.markdown(f"<br><span style='color: #666; font-size: 0.9em;'>Exchanges: {st.session_state.exchange_count}/3</span>", unsafe_allow_html=True)
-    st.divider()
-
+    st.markdown("<br>", unsafe_allow_html=True)
     if st.button("Bow-Out"):
         for key in list(st.session_state.keys()): del st.session_state[key]
         st.rerun()
@@ -126,11 +121,12 @@ for msg in st.session_state.msgs:
         st.markdown(msg["content"], unsafe_allow_html=True)
 
 # ==================================================
-# 6. GROQ ENGINE ROUTING & SAFETY
+# 6. ENGINE ROUTING & QUALITATIVE ADVANCEMENT
 # ==================================================
 if prompt := st.chat_input("Enter the Dojo..."):
     st.session_state.msgs.append({"role": "user", "content": prompt})
     save_to_ledger("user", prompt, st.session_state.rank, str(st.session_state.phase))
+    st.session_state.exchange_count += 1
     
     with st.chat_message("user"):
         st.markdown(prompt)
@@ -143,9 +139,27 @@ if prompt := st.chat_input("Enter the Dojo..."):
 
     is_crisis = contains_self_harm(prompt)
 
+    # --- THE QUALITATIVE GATEKEEPER (Fast 8B Model) ---
+    def check_readiness(user_text):
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {st.secrets.get('GROQ_API_KEY', '')}"
+        }
+        eval_prompt = "Analyze this message. Is the user showing signs of forward growth, realization, closure, or readiness to move on? If they are still asking for guidance, venting, or stuck, reply NO. If they show a shift in perspective or readiness, reply YES. Reply ONLY with YES or NO."
+        payload = {
+            "model": "llama-3.1-8b-instant",
+            "messages": [{"role": "system", "content": eval_prompt}, {"role": "user", "content": user_text}],
+            "temperature": 0.0,
+            "max_tokens": 5
+        }
+        try:
+            res = requests.post("https://api.groq.com/openai/v1/chat/completions", headers=headers, json=payload, timeout=5)
+            return "YES" in res.json()['choices'][0]['message']['content'].upper()
+        except:
+            return False
+
     with st.chat_message("assistant"):
         if is_crisis:
-            # Soft Disengagement + Red Safety Box
             safety_box = """
             I am here with you, but I cannot provide guidance or assistance related to self-harm.
             <div class='crisis-box'>
@@ -160,10 +174,8 @@ if prompt := st.chat_input("Enter the Dojo..."):
             st.session_state.msgs.append({"role": "assistant", "content": safety_box})
 
         else:
-            # --- NORMAL DOJO ROUTING ---
+            # --- DOJO RESPONSE GENERATION ---
             sys_msg = MIRROR_PROMPT if st.session_state.phase >= 2 else MASTER_PROMPT
-            
-            # Fetch Expanded Rolling Ledger
             recent_history = get_recent_history(30)
             sys_msg += f"\n\n--- USER'S RECENT HISTORY ---\n{recent_history}\n-----------------------------"
 
@@ -191,21 +203,22 @@ if prompt := st.chat_input("Enter the Dojo..."):
                 final_response = f"**System Alert:** Transmission issue. Groq returned: {str(e)[:120]}"
 
             st.markdown(final_response)
-            
-            # Save and Advance
             st.session_state.msgs.append({"role": "assistant", "content": final_response})
             save_to_ledger("assistant", final_response, st.session_state.rank, str(st.session_state.phase))
             
-            st.session_state.exchange_count += 1
-            if st.session_state.exchange_count >= 3:
-                st.session_state.exchange_count = 0
-                if st.session_state.phase < 3:
-                    st.session_state.phase += 1
-                else:
-                    st.session_state.phase = 0
-                    ranks = ["Student", "Practitioner", "Sentinel", "Sovereign"]
-                    try:
-                        st.session_state.rank = ranks[ranks.index(st.session_state.rank) + 1]
-                    except: pass
+            # --- ADVANCEMENT EVALUATION ---
+            # Requires at least 2 exchanges to prevent accidental skipping, OR hits hard cap at 6 to prevent permanent stalling.
+            if st.session_state.exchange_count >= 2:
+                is_ready = check_readiness(prompt)
+                if is_ready or st.session_state.exchange_count >= 6:
+                    st.session_state.exchange_count = 0
+                    if st.session_state.phase < 3:
+                        st.session_state.phase += 1
+                    else:
+                        st.session_state.phase = 0
+                        ranks = ["Student", "Practitioner", "Sentinel", "Sovereign"]
+                        try:
+                            st.session_state.rank = ranks[ranks.index(st.session_state.rank) + 1]
+                        except: pass
 
     st.rerun()
