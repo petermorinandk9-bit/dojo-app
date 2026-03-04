@@ -5,7 +5,7 @@ from datetime import datetime
 from supabase import create_client, Client
 
 # 1. MUST BE THE VERY FIRST ST COMMAND
-st.set_page_config(page_title="The Dojo", layout="wide")
+st.set_page_config(page_title="The-Dojo", layout="wide")
 
 # ==================================================
 # 1. CLOUD DATABASE CONNECTION
@@ -58,6 +58,8 @@ if 'user' not in st.session_state:
             if st.form_submit_button("Join the Dojo", use_container_width=True):
                 if invite_c != "dojoentry":
                     st.error("Invalid Invite Code.")
+                elif not new_name or not new_pass:
+                    st.warning("Username and Password required.")
                 else:
                     user_data = {"username": new_name, "password": new_pass, "display_name": display_n}
                     new_user = supabase.table("users").insert(user_data).execute()
@@ -88,6 +90,7 @@ ADMIN_USER = "joseph"
 if 'mood' not in st.session_state:
     st.session_state.mood = "neutral"
 
+# Stable Flute Tracks (Uplifting, Melancholy, Intense, Neutral)
 MOOD_MUSIC = {
     "neutral": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-8.mp3",
     "uplifting": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3",
@@ -113,8 +116,9 @@ st.markdown("""
     .inactive-item { color: #bbb; border-left: 1px solid #eee; padding-left: 20px; margin-top: 5px; }
     .sidebar-header { font-size: 0.85em; color: #999; text-transform: uppercase; letter-spacing: 1.5px; margin-top: 25px; }
     .sidebar-dojo { font-size: 2.2rem !important; font-weight: 800; font-style: italic; margin-bottom: -10px; }
-    .slogan-stack-refined { font-size: 1.65em; text-align: center; color: #666; font-style: italic; padding-top: 20px; }
-    .music-wrapper { display: flex; justify-content: center; margin-bottom: 20px; }
+    .slogan-warrior { font-size: 1.1em; text-align: center; color: #888; letter-spacing: 2px; text-transform: uppercase; margin-top: 20px; }
+    .slogan-quit { font-size: 1.8em; text-align: center; color: #1a1a1a; font-style: italic; font-weight: 800; margin-bottom: 10px; }
+    .music-wrapper { display: flex; justify-content: center; margin-bottom: 30px; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -141,7 +145,7 @@ if 'msgs' not in st.session_state:
     except: pass
 
 # ==================================================
-# 6. SIDEBAR
+# 6. SIDEBAR - RESTORED LINEAGE & ROSTER
 # ==================================================
 with st.sidebar:
     st.markdown('<p class="sidebar-dojo">The-Dojo</p>', unsafe_allow_html=True)
@@ -156,8 +160,7 @@ with st.sidebar:
     
     st.divider()
     st.markdown('<p class="sidebar-header">Lineage</p>', unsafe_allow_html=True)
-    ranks = ["Student", "Practitioner", "Sentinel", "Sovereign"]
-    for r in ranks:
+    for r in ["Student", "Practitioner", "Sentinel", "Sovereign"]:
         style = 'active-item' if r == st.session_state.rank else 'inactive-item'
         st.markdown(f"<div class='{style}'>{r}</div>", unsafe_allow_html=True)
     
@@ -180,9 +183,7 @@ with st.sidebar:
             supabase.table("ledger_wisdom").insert({"user_id": USER_ID, "timestamp": time.time(), "summary": summary}).execute()
         
         supabase.table("records").delete().eq("user_id", USER_ID).execute()
-        st.session_state.msgs = []
-        st.session_state.exchange_count = 0
-        st.session_state.phase = 0
+        st.session_state.msgs, st.session_state.exchange_count, st.session_state.phase = [], 0, 0
         st.rerun()
 
     if st.button("Logout"):
@@ -192,7 +193,8 @@ with st.sidebar:
 # ==================================================
 # 7. MAIN ENGINE
 # ==================================================
-st.markdown('<div class="slogan-stack-refined">We. Never. Quit.</div>', unsafe_allow_html=True)
+st.markdown('<p class="slogan-warrior">Warriors Dont Always Win - Warriors Always Fight.</p>', unsafe_allow_html=True)
+st.markdown('<p class="slogan-quit">We. Never. Quit.</p>', unsafe_allow_html=True)
 
 st.markdown('<div class="music-wrapper">', unsafe_allow_html=True)
 st.audio(MOOD_MUSIC[st.session_state.mood], format="audio/mp3", loop=True)
@@ -215,8 +217,8 @@ if prompt := st.chat_input("Speak from center..."):
             st.session_state.exchange_count = 0
 
     headers = {"Authorization": f"Bearer {st.secrets['GROQ_API_KEY']}"}
-    MASTER_PROMPT = f"ROLE: Dojo Mentor. WARRIOR: {USER_NAME}. At the end of your response, add: [MOOD: neutral/uplifting/melancholy/intense]"
-    messages = [{"role": "system", "content": MASTER_PROMPT}] + st.session_state.msgs[-10:]
+    MOOD_PROMPT = f"ROLE: Dojo Mentor. WARRIOR: {USER_NAME}. At the end of your response, add: [MOOD: neutral/uplifting/melancholy/intense]"
+    messages = [{"role": "system", "content": MOOD_PROMPT}] + st.session_state.msgs[-10:]
     res = requests.post("https://api.groq.com/openai/v1/chat/completions", 
                         json={"model": "llama-3.3-70b-versatile", "messages": messages, "temperature": 0.6}, 
                         headers=headers)
@@ -225,10 +227,8 @@ if prompt := st.chat_input("Speak from center..."):
     
     if "[MOOD:" in full_text:
         parts = full_text.split("[MOOD:")
-        clean_response = parts[0].strip()
-        new_mood = parts[1].replace("]", "").strip().lower()
-        if new_mood in MOOD_MUSIC:
-            st.session_state.mood = new_mood
+        clean_response, new_mood = parts[0].strip(), parts[1].replace("]", "").strip().lower()
+        if new_mood in MOOD_MUSIC: st.session_state.mood = new_mood
     else:
         clean_response = full_text
     
