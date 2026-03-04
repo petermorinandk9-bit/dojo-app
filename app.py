@@ -192,9 +192,6 @@ with st.sidebar:
 
     st.divider()
 
-    # ===============================
-    # BOW OUT BUTTON (LEFT SIDE)
-    # ===============================
     if st.button("Bow Out"):
 
         bow_prompt = f"""
@@ -239,7 +236,7 @@ End with one sentence of encouragement.
 tab_train, tab_history = st.tabs(["Training","History"])
 
 # ==================================================
-# HISTORY TAB
+# HISTORY
 # ==================================================
 with tab_history:
 
@@ -289,7 +286,7 @@ with tab_history:
         pass
 
 # ==================================================
-# TRAINING TAB
+# TRAINING
 # ==================================================
 with tab_train:
 
@@ -330,10 +327,20 @@ with tab_train:
         MASTER_PROMPT = f"""
 You are the Dojo Mentor for {USER_NAME}.
 
+Your role is to guide reflection and emotional discipline like an experienced martial arts instructor.
+
 Session summary:
 {session_summary}
 
-Offer grounded reflection and practical guidance.
+Respond with thoughtful insight and grounded advice.
+
+Style guidelines:
+• Be reflective and insightful, but stay practical.
+• Avoid overly poetic metaphors or mystical language.
+• Speak like a calm, experienced coach.
+• It is okay to use occasional martial arts analogies, but keep them simple.
+• Responses should be about 4–8 sentences.
+• Focus on the user's current situation rather than abstract philosophy.
 
 Rank: {rank}
 Phase: {PHASE_SETS[rank][st.session_state.phase]}
