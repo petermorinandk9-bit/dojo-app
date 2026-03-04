@@ -38,19 +38,22 @@ if 'user' not in st.session_state:
             max-width: 400px;
         }
         .audio-label { font-size: 0.85em; color: #888; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 8px; }
+        .audio-hint { font-size: 0.75em; color: #bbb; margin-top: 5px; }
         </style>
         """, unsafe_allow_html=True)
     
     st.markdown('<p class="login-header">The-Dojo</p>', unsafe_allow_html=True)
     st.markdown('<p class="login-sub">Forge your discipline. Step onto the mat.</p>', unsafe_allow_html=True)
 
-    # --- THE ZEN FLUTE PLAYER (Authentic Shakuhachi) ---
+    # --- THE ZEN FLUTE PLAYER (Direct Archive.org Stream) ---
     st.markdown('<div class="audio-container">', unsafe_allow_html=True)
     st.markdown('<p class="audio-label">🔊 Relaxing Music</p>', unsafe_allow_html=True)
     
-    # Authentic Zen Flute (Shakuhachi) - High Reliability Link
-    audio_url = "https://cdn.pixabay.com/audio/2022/02/10/audio_03d957d187.mp3"
+    # High-reliability direct link to authentic Shakuhachi flute
+    audio_url = "https://archive.org/download/shakuhachi-flute-solo/Shakuhachi%20Flute%20Solo.mp3"
     st.audio(audio_url, format="audio/mp3", loop=True, autoplay=True)
+    
+    st.markdown('<p class="audio-hint">Click play if the flute does not start automatically.</p>', unsafe_allow_html=True)
     st.markdown('</div>', unsafe_allow_html=True)
     
     tab_login, tab_signup = st.tabs(["Login", "Create Account"])
