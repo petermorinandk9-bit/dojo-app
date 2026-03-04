@@ -1,7 +1,6 @@
 import streamlit as st
 import requests
 import time
-import base64
 from datetime import datetime
 from supabase import create_client, Client
 
@@ -20,7 +19,7 @@ def init_supabase():
 supabase: Client = init_supabase()
 
 # ==================================================
-# 2. THE DOJO GATE (LOGIN & SIGN-UP) - WITH SOUND
+# 2. THE DOJO GATE (LOGIN & SIGN-UP)
 # ==================================================
 if 'user' not in st.session_state:
     st.markdown("""
@@ -28,32 +27,16 @@ if 'user' not in st.session_state:
         .stApp { background-color: #ffffff; }
         .login-header { text-align: center; font-style: italic; font-weight: 800; font-size: 3.5rem; color: #1a1a1a; margin-bottom: 0px; }
         .login-sub { text-align: center; color: #666; font-size: 1.1rem; margin-bottom: 20px; }
-        
-        .audio-container { 
-            text-align: center; 
-            margin: 0 auto 30px auto; 
-            padding: 15px; 
-            background: #fdfdfd; 
-            border: 1px solid #eeeeee;
-            border-radius: 12px;
-            max-width: 400px;
-        }
-        .audio-label { font-size: 0.85em; color: #888; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 8px; }
+        .audio-container { text-align: center; margin: 0 auto 30px auto; padding: 15px; background: #fdfdfd; border: 1px solid #eeeeee; border-radius: 12px; max-width: 400px; }
         </style>
         """, unsafe_allow_html=True)
     
     st.markdown('<p class="login-header">The-Dojo</p>', unsafe_allow_html=True)
     st.markdown('<p class="login-sub">Forge your discipline. Step onto the mat.</p>', unsafe_allow_html=True)
 
-    # --- THE ZEN FLUTE PLAYER (Direct Stream) ---
     st.markdown('<div class="audio-container">', unsafe_allow_html=True)
-    st.markdown('<p class="audio-label">🔊 Relaxing Music</p>', unsafe_allow_html=True)
-    
-    # High-reliability direct link to meditative flute
-    audio_url = "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-8.mp3"
-    st.audio(audio_url, format="audio/mp3", loop=True)
-    
-    st.caption("Center yourself. Click play if the flute does not start.")
+    st.caption("🔊 Entrance Ritual")
+    st.audio("https://www.soundhelix.com/examples/mp3/SoundHelix-Song-8.mp3", format="audio/mp3", loop=True)
     st.markdown('</div>', unsafe_allow_html=True)
     
     tab_login, tab_signup = st.tabs(["Login", "Create Account"])
@@ -79,29 +62,32 @@ if 'user' not in st.session_state:
             new_pass = st.text_input("Choose Password", type="password")
             invite_c = st.text_input("Dojo Invite Code", type="password")
             if st.form_submit_button("Join the Dojo", use_container_width=True):
-                if invite_c != "dojoentry":
-                    st.error("Invalid Invite Code.")
-                elif not new_name or not new_pass or not display_n:
-                    st.warning("All fields required.")
-                else:
-                    check = supabase.table("users").select("id").eq("username", new_name).execute()
-                    if check.data:
-                        st.error("Username taken.")
-                    else:
-                        user_data = {"username": new_name, "password": new_pass, "display_name": display_n}
-                        new_user = supabase.table("users").insert(user_data).execute()
-                        if new_user.data:
-                            st.session_state.user = new_user.data[0]
-                            st.success("Account created. Welcome to the lineage.")
-                            time.sleep(1)
-                            st.rerun()
+                if invite_c == "dojoentry" and new_name and new_pass:
+                    user_data = {"username": new_name, "password": new_pass, "display_name": display_n}
+                    new_user = supabase.table("users").insert(user_data).execute()
+                    if new_user.data:
+                        st.session_state.user = new_user.data[0]
+                        st.rerun()
     st.stop()
 
 # ==================================================
-# 3. IDENTITY & CORE CONFIG
+# 3. IDENTITY & ATMOSPHERE CONFIG
 # ==================================================
 USER_ID = st.session_state.user['id']
 USER_NAME = st.session_state.user['display_name']
+ADMIN_USER = "joseph"
+
+# Initialize Mood in Session State
+if 'mood' not in st.session_state:
+    st.session_state.mood = "neutral"
+
+# Music Tracks for different moods
+MOOD_MUSIC = {
+    "neutral": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3",
+    "uplifting": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3",
+    "melancholy": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3",
+    "intense": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3"
+}
 
 PHASE_SETS = {
     "Student": ["Welcome Mat", "Warm Up", "Training", "Reflection/Cool Down"],
@@ -111,50 +97,23 @@ PHASE_SETS = {
 }
 
 # ==================================================
-# 4. ARCHWAY UI (INTEGRATED LINEAGE STYLE)
+# 4. ARCHWAY UI
 # ==================================================
 st.markdown("""
     <style>
     .stApp { background-color: #ffffff; color: #1a1a1a; }
     [data-testid="stSidebar"] { background-color: #f8f9fa; border-right: 1px solid #e0e0e0; }
-    .active-item { 
-        color: #000000; font-weight: 800; font-size: 1.15em; 
-        border-left: 3px solid #000; padding-left: 20px; margin-top: 8px; 
-    }
-    .inactive-item { 
-        color: #bbbbbb; font-weight: 400; font-size: 0.95em; 
-        border-left: 1px solid #eeeeee; padding-left: 20px; margin-top: 5px; 
-    }
-    .sidebar-header { font-size: 0.85em; color: #999; text-transform: uppercase; letter-spacing: 1.5px; margin-top: 25px; margin-bottom: 10px; }
-    .sidebar-dojo { font-size: 2.2rem !important; font-weight: 800; color: #1a1a1a; font-style: italic; margin-bottom: -10px; }
-    .slogan-stack-refined { font-size: 1.65em; text-align: center; color: #666666; font-style: italic; padding-top: 20px; }
+    .active-item { color: #000; font-weight: 800; border-left: 3px solid #000; padding-left: 20px; margin-top: 8px; }
+    .inactive-item { color: #bbb; border-left: 1px solid #eee; padding-left: 20px; margin-top: 5px; }
+    .sidebar-header { font-size: 0.85em; color: #999; text-transform: uppercase; letter-spacing: 1.5px; margin-top: 25px; }
+    .sidebar-dojo { font-size: 2.2rem !important; font-weight: 800; font-style: italic; margin-bottom: -10px; }
+    .slogan-stack-refined { font-size: 1.65em; text-align: center; color: #666; font-style: italic; padding-top: 20px; }
+    .mood-indicator { text-align: center; font-size: 0.8em; color: #aaa; margin-bottom: 10px; }
     </style>
     """, unsafe_allow_html=True)
 
 # ==================================================
-# 5. DATA & SESSION
-# ==================================================
-def save_to_ledger(role, text, rank, phase):
-    data = {"user_id": USER_ID, "timestamp": time.time(), "role": role, "content": text, "rank": rank, "phase": str(phase)}
-    supabase.table("records").insert(data).execute()
-
-if 'msgs' not in st.session_state:
-    st.session_state.msgs = []
-    st.session_state.exchange_count = 0
-    st.session_state.rank = "Student"
-    st.session_state.phase = 0
-    try:
-        r_res = supabase.table("records").select("*").eq("user_id", USER_ID).order("timestamp").execute()
-        for r in r_res.data:
-            ts = datetime.fromtimestamp(r['timestamp']).strftime('%Y-%m-%d %H:%M')
-            st.session_state.msgs.append({"role": r['role'], "content": f"[{ts}] {r['content']}"})
-        if r_res.data:
-            st.session_state.rank = r_res.data[-1]['rank']
-            st.session_state.phase = int(r_res.data[-1]['phase'])
-    except: pass
-
-# ==================================================
-# 6. SIDEBAR - THE INTEGRATED LINEAGE
+# 6. SIDEBAR
 # ==================================================
 with st.sidebar:
     st.markdown('<p class="sidebar-dojo">The-Dojo</p>', unsafe_allow_html=True)
@@ -162,69 +121,68 @@ with st.sidebar:
     st.divider()
     
     st.markdown('<p class="sidebar-header">Current Path</p>', unsafe_allow_html=True)
-    current_phases = PHASE_SETS[st.session_state.rank]
+    current_phases = PHASE_SETS.get(st.session_state.get('rank', 'Student'), PHASE_SETS["Student"])
     for idx, p_name in enumerate(current_phases):
-        is_active_phase = (idx == st.session_state.phase)
-        style = 'active-item' if is_active_phase else 'inactive-item'
+        style = 'active-item' if idx == st.session_state.get('phase', 0) else 'inactive-item'
         st.markdown(f"<div class='{style}'>{p_name}</div>", unsafe_allow_html=True)
     
-    st.divider()
-    
-    st.markdown('<p class="sidebar-header">Lineage</p>', unsafe_allow_html=True)
-    ranks = ["Student", "Practitioner", "Sentinel", "Sovereign"]
-    for r in ranks:
-        is_active_rank = (r == st.session_state.rank)
-        style = 'active-item' if is_active_rank else 'inactive-item'
-        st.markdown(f"<div class='{style}'>{r}</div>", unsafe_allow_html=True)
-    
-    st.divider()
-    if st.button("Bow-Out (Save & Clear)", use_container_width=True):
-        if len(st.session_state.msgs) > 2:
-            chat_log = "\n".join([f"{m['role']}: {m['content']}" for m in st.session_state.msgs])
-            headers = {"Authorization": f"Bearer {st.secrets['GROQ_API_KEY']}"}
-            payload = {"model": "llama-3.1-8b-instant", "messages": [{"role": "system", "content": "Summarize growth. One dense paragraph."}, {"role": "user", "content": chat_log}], "temperature": 0.3}
-            res = requests.post("https://api.groq.com/openai/v1/chat/completions", json=payload, headers=headers)
-            summary = res.json()['choices'][0]['message']['content']
-            supabase.table("ledger_wisdom").insert({"user_id": USER_ID, "timestamp": time.time(), "summary": summary}).execute()
-        
-        supabase.table("records").delete().eq("user_id", USER_ID).execute()
-        st.session_state.msgs = []
-        st.session_state.exchange_count = 0
-        st.session_state.phase = 0
-        st.rerun()
+    if st.session_state.user['username'] == ADMIN_USER:
+        st.divider()
+        st.markdown('<p class="sidebar-header">🥋 Dojo Roster</p>', unsafe_allow_html=True)
+        try:
+            all_users = supabase.table("users").select("display_name").execute()
+            for u in all_users.data: st.caption(f"• {u['display_name']}")
+        except: pass
 
+    st.divider()
     if st.button("Logout"):
         del st.session_state.user
         st.rerun()
 
 # ==================================================
-# 7. MAIN ENGINE
+# 7. MAIN ENGINE (WITH MOOD DJ)
 # ==================================================
 st.markdown('<div class="slogan-stack-refined">We. Never. Quit.</div>', unsafe_allow_html=True)
 
+# THE INNER DOJO MUSIC (Swaps based on mood)
+st.markdown(f'<div class="mood-indicator">Current Atmosphere: {st.session_state.mood.title()}</div>', unsafe_allow_html=True)
+st.audio(MOOD_MUSIC[st.session_state.mood], format="audio/mp3", loop=True)
+
+if 'msgs' not in st.session_state:
+    st.session_state.msgs = []
+
 for msg in st.session_state.msgs:
-    with st.chat_message(msg["role"]):
-        st.markdown(msg["content"].split("] ", 1)[-1] if "] " in msg["content"] else msg["content"])
+    with st.chat_message(msg["role"]): st.markdown(msg["content"])
 
 if prompt := st.chat_input("Speak from center..."):
-    ts = datetime.now().strftime('%Y-%m-%d %H:%M')
-    st.session_state.msgs.append({"role": "user", "content": f"[{ts}] {prompt}"})
-    save_to_ledger("user", prompt, st.session_state.rank, st.session_state.phase)
+    st.session_state.msgs.append({"role": "user", "content": prompt})
     with st.chat_message("user"): st.markdown(prompt)
 
-    st.session_state.exchange_count += 1
-    if st.session_state.exchange_count >= 2:
-        if st.session_state.phase < 3:
-            st.session_state.phase += 1
-            st.session_state.exchange_count = 0
-
+    # ASK GROQ FOR RESPONSE + MOOD CATEGORY
     headers = {"Authorization": f"Bearer {st.secrets['GROQ_API_KEY']}"}
-    MASTER_PROMPT = f"ROLE: Dojo Mentor. WARRIOR: {USER_NAME}. STYLE: Grounded, visceral, observant."
-    messages = [{"role": "system", "content": MASTER_PROMPT}] + st.session_state.msgs[-15:]
-    res = requests.post("https://api.groq.com/openai/v1/chat/completions", json={"model": "llama-3.3-70b-versatile", "messages": messages, "temperature": 0.6}, headers=headers)
-    final_response = res.json()['choices'][0]['message']['content']
+    MOOD_PROMPT = f"""
+    ROLE: Dojo Mentor. WARRIOR: {USER_NAME}.
+    At the very end of your response, add a single line with the mood tag: 
+    [MOOD: neutral/uplifting/melancholy/intense]
+    """
     
-    with st.chat_message("assistant"): st.markdown(final_response)
-    st.session_state.msgs.append({"role": "assistant", "content": final_response})
-    save_to_ledger("assistant", final_response, st.session_state.rank, st.session_state.phase)
+    messages = [{"role": "system", "content": MOOD_PROMPT}] + st.session_state.msgs[-10:]
+    res = requests.post("https://api.groq.com/openai/v1/chat/completions", 
+                        json={"model": "llama-3.3-70b-versatile", "messages": messages, "temperature": 0.6}, 
+                        headers=headers)
+    
+    full_text = res.json()['choices'][0]['message']['content']
+    
+    # Extract Mood and Clean Response
+    if "[MOOD:" in full_text:
+        parts = full_text.split("[MOOD:")
+        clean_response = parts[0].strip()
+        new_mood = parts[1].replace("]", "").strip().lower()
+        if new_mood in MOOD_MUSIC:
+            st.session_state.mood = new_mood
+    else:
+        clean_response = full_text
+
+    with st.chat_message("assistant"): st.markdown(clean_response)
+    st.session_state.msgs.append({"role": "assistant", "content": clean_response})
     st.rerun()
