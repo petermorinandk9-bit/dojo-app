@@ -44,12 +44,12 @@ if 'user' not in st.session_state:
     st.markdown('<p class="login-header">The-Dojo</p>', unsafe_allow_html=True)
     st.markdown('<p class="login-sub">Forge your discipline. Step onto the mat.</p>', unsafe_allow_html=True)
 
-    # --- THE ZEN FLUTE PLAYER (Reliable Pixabay CDN) ---
+    # --- THE ZEN FLUTE PLAYER (Restored High-Speed Link) ---
     st.markdown('<div class="audio-container">', unsafe_allow_html=True)
-    st.markdown('<p class="audio-label">🔊 Establish Presence</p>', unsafe_allow_html=True)
+    st.markdown('<p class="audio-label">🔊 Relaxing Music</p>', unsafe_allow_html=True)
     
-    # High-reliability Zen/Meditation Flute track
-    audio_url = "https://cdn.pixabay.com/audio/2022/05/27/audio_1808d0510e.mp3"
+    # New ultra-reliable direct audio stream
+    audio_url = "https://res.cloudinary.com/dxfq3iotg/video/upload/v1557233294/info.mp3"
     st.audio(audio_url, format="audio/mp3", loop=True, autoplay=True)
     st.markdown('</div>', unsafe_allow_html=True)
     
