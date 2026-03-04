@@ -5,7 +5,7 @@ import time
 from datetime import datetime
 
 # ==================================================
-# 1. CORE CONFIG & TEMPORAL MENTOR PROMPTS
+# 1. CORE CONFIG - THE SENSEI'S SOUL (RE-ALIGNED)
 # ==================================================
 PHASE_SETS = {
     "Student": ["Welcome Mat", "Warm Up", "Training", "Reflection/Cool Down"],
@@ -14,20 +14,27 @@ PHASE_SETS = {
     "Sovereign": ["Check-In", "Look Closer", "Name It", "The Wisdom Step"]
 }
 
+# RE-ENGINEERED: Authority over Accounting. 
 MASTER_PROMPT = (
     "ROLE: Dojo Mentor. \n"
-    "CONTEXT: You are a structural Life Coach. You have access to the Persistent Ledger.\n"
-    "TEMPORAL LOGIC: Do NOT refer to '30 days'. Refer to 'The Ledger' or 'Our path so far.'\n"
-    "CRITICAL RULES:\n"
-    "1. SPECIFIC TIMELINES: Look at timestamps. Call out specific durations (e.g., 'You've circled this for 3 days').\n"
-    "2. NO FLUFF: Strategic mentorship only. No clinical 'processing'.\n"
-    "3. FORWARD MOVEMENT: End with ONE sharp, tactical question."
+    "STYLE: Grounded, authoritative, observant. Speak like a man who has seen a thousand students. "
+    "Use short, punchy sentences. Match the user's intensity. \n"
+    "TEMPORAL SOUL: You see the [YYYY-MM-DD] timestamps to understand the rhythm of life, "
+    "but NEVER read them aloud like a robot. Do not calculate 'minutes' unless it's a point of discipline.\n"
+    "RULES:\n"
+    "1. THE LEDGER: Refer to 'The Ledger' as the sacred record of growth.\n"
+    "2. PATTERN RECOGNITION: Only mention time to highlight a habit. "
+    "Example: 'You've been circling this same drain for three days' is better than 'It has been 72 hours.'\n"
+    "3. SENSEI VIBE: If the user needs coffee or food, acknowledge the man, not the clock. "
+    "Tell them to sharpen their blade while they fuel up.\n"
+    "4. NO FLUFF: No 'I understand' or 'It's natural to feel.' Just the observation and the move.\n"
+    "5. FORWARD MOVEMENT: End with ONE sharp, tactical question."
 )
 
 MIRROR_PROMPT = (
-    "ROLE: Dojo Mirror (The Wisdom Phase). \n"
-    "CONTEXT: This is the Reflection/Cool Down phase. \n"
-    "RULES: Use timestamps to show the length of struggle or progress. Be sharp and minimalist."
+    "ROLE: Dojo Mirror. \n"
+    "GOAL: Pure synthesis of the Ledger. Use the timestamps to spot a deep behavioral pattern. "
+    "Do not narrate the time—narrate the GROWTH or the STAGNATION. Be minimalist."
 )
 
 # ==================================================
@@ -55,7 +62,6 @@ st.markdown("""
     .inactive-phase { color: #888888; font-size: 1.0em; margin-bottom: 2px; padding-left: 10px; }
     
     .watermark { position: fixed; bottom: 40%; left: 50%; transform: translateX(-50%); font-size: 11rem; opacity: 0.04; color: #111111; pointer-events: none; z-index: -1; user-select: none; }
-    .crisis-box { background-color: #ffe6e6; border-left: 5px solid #ff0000; padding: 15px; margin-top: 10px; border-radius: 5px; }
     
     .slogan-stack-refined { 
         font-size: 1.65em; 
@@ -153,54 +159,44 @@ if prompt := st.chat_input("Speak from center..."):
     st.session_state.exchange_count += 1
     with st.chat_message("user"): st.markdown(prompt)
 
-    crisis_keywords = ["kill myself", "suicide", "hurt myself", "end my life"]
-    is_crisis = any(k in prompt.lower() for k in crisis_keywords)
-
     with st.chat_message("assistant"):
-        if is_crisis:
-            safety_box = "I am here with you, but I cannot provide guidance or assistance related to self-harm.\n\n<div class='crisis-box'><p class='crisis-text'>Immediate support: Call/text **988** or text **741741**.</p></div>"
-            st.markdown(safety_box, unsafe_allow_html=True)
-            st.session_state.msgs.append({"role": "assistant", "content": safety_box})
-            save_to_ledger("assistant", safety_box, st.session_state.rank, str(st.session_state.phase))
-        else:
-            # --- THE MEDITATION DELAY ---
-            with st.status("🧘‍♂️ Consultng the Ledger...", expanded=False) as status:
-                # Artificial latency: 1 second base + 0.5 per 10 words
-                delay = 1.0 + (len(prompt.split()) / 20)
-                time.sleep(min(delay, 4.0)) # Cap it at 4 seconds
-                
-                sys_msg = MIRROR_PROMPT if st.session_state.phase == 3 else MASTER_PROMPT
-                messages = [{"role": "system", "content": sys_msg}] + st.session_state.msgs[-30:]
-                
-                headers = {"Authorization": f"Bearer {st.secrets['GROQ_API_KEY']}"}
-                payload = {"model": "llama-3.3-70b-versatile", "messages": messages, "temperature": 0.45, "max_tokens": 512}
-                
-                try:
-                    res = requests.post("https://api.groq.com/openai/v1/chat/completions", json=payload, headers=headers, timeout=25)
-                    final_response = res.json()['choices'][0]['message']['content']
-                    status.update(label="🙏 Wisdom Found.", state="complete", expanded=False)
-                except: 
-                    final_response = "**System Alert:** Transmission issue."
-                    status.update(label="⚠️ Connection Severed.", state="error")
+        # --- THE MEDITATION DELAY ---
+        with st.status("🧘‍♂️ Consulting the Ledger...", expanded=False) as status:
+            delay = 1.0 + (len(prompt.split()) / 20)
+            time.sleep(min(delay, 4.0)) 
             
-            st.markdown(final_response)
-            st.session_state.msgs.append({"role": "assistant", "content": final_response})
-            save_to_ledger("assistant", final_response, st.session_state.rank, str(st.session_state.phase))
+            sys_msg = MIRROR_PROMPT if st.session_state.phase == 3 else MASTER_PROMPT
+            messages = [{"role": "system", "content": sys_msg}] + st.session_state.msgs[-30:]
             
-            # Advancement logic...
-            if st.session_state.exchange_count >= 2:
-                check_payload = {"model": "llama-3.1-8b-instant", "messages": [{"role": "system", "content": "Analyze growth. Reply ONLY YES or NO."}, {"role": "user", "content": prompt}], "temperature": 0.0}
-                try:
-                    readiness = requests.post("https://api.groq.com/openai/v1/chat/completions", json=check_payload, headers=headers, timeout=5)
-                    is_ready = "YES" in readiness.json()['choices'][0]['message']['content'].upper()
-                except: is_ready = False
+            headers = {"Authorization": f"Bearer {st.secrets['GROQ_API_KEY']}"}
+            payload = {"model": "llama-3.3-70b-versatile", "messages": messages, "temperature": 0.45, "max_tokens": 512}
+            
+            try:
+                res = requests.post("https://api.groq.com/openai/v1/chat/completions", json=payload, headers=headers, timeout=25)
+                final_response = res.json()['choices'][0]['message']['content']
+                status.update(label="🙏 Wisdom Found.", state="complete", expanded=False)
+            except: 
+                final_response = "**System Alert:** Transmission issue."
+                status.update(label="⚠️ Connection Severed.", state="error")
+        
+        st.markdown(final_response)
+        st.session_state.msgs.append({"role": "assistant", "content": final_response})
+        save_to_ledger("assistant", final_response, st.session_state.rank, str(st.session_state.phase))
+        
+        # Advancement logic...
+        if st.session_state.exchange_count >= 2:
+            check_payload = {"model": "llama-3.1-8b-instant", "messages": [{"role": "system", "content": "Analyze growth. Reply ONLY YES or NO."}, {"role": "user", "content": prompt}], "temperature": 0.0}
+            try:
+                readiness = requests.post("https://api.groq.com/openai/v1/chat/completions", json=check_payload, headers=headers, timeout=5)
+                is_ready = "YES" in readiness.json()['choices'][0]['message']['content'].upper()
+            except: is_ready = False
 
-                if is_ready or st.session_state.exchange_count >= 6:
-                    st.session_state.exchange_count = 0
-                    if st.session_state.phase < 3: st.session_state.phase += 1
-                    else:
-                        st.session_state.phase = 0
-                        ranks = ["Student", "Practitioner", "Sentinel", "Sovereign"]
-                        try: st.session_state.rank = ranks[ranks.index(st.session_state.rank) + 1]
-                        except: pass
+            if is_ready or st.session_state.exchange_count >= 6:
+                st.session_state.exchange_count = 0
+                if st.session_state.phase < 3: st.session_state.phase += 1
+                else:
+                    st.session_state.phase = 0
+                    ranks = ["Student", "Practitioner", "Sentinel", "Sovereign"]
+                    try: st.session_state.rank = ranks[ranks.index(st.session_state.rank) + 1]
+                    except: pass
     st.rerun()
