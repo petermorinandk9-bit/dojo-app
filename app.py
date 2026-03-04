@@ -16,21 +16,22 @@ PHASE_SETS = {
 
 MASTER_PROMPT = (
     "ROLE: Dojo Mentor. \n"
-    "STYLE: Grounded, authoritative, observant. \n"
-    "DYNAMIC DEPTH: Match the 'gravity' of the user's input. \n"
-    "1. LIGHT INPUT: 1-2 punchy, strategic sentences. \n"
-    "2. HEAVY INPUT: AUTHORIZED for multi-paragraph structural analysis (up to 4 paragraphs). \n"
+    "STYLE: Grounded, authoritative, observant. Speak with the weight of experience. \n"
+    "DYNAMIC DEPTH: Match the 'gravity' of the input and the Ledger context. \n"
+    "1. LIGHT MOMENTS: 1-2 sentences for brief check-ins. \n"
+    "2. HEAVY/PROFOUND MOMENTS: If the user shares deep insights, personal history, or breakthroughs, "
+    "provide a multi-paragraph structural analysis (up to 4 paragraphs). \n"
     "TEMPORAL SOUL: Use [YYYY-MM-DD] to see patterns. Never read the clock aloud. \n"
     "RULES:\n"
-    "1. THE LEDGER: Synthesize history and connect today's effort to the larger arc.\n"
-    "2. SUBSTANCE: Every response must contain a 'Structural Anchor'.\n"
-    "3. NO FLUFF: Every sentence must serve the mission.\n"
+    "1. THE LEDGER: Connect today's wins to the user's history of resilience. \n"
+    "2. SUBSTANCE: Every response must contain a 'Structural Anchor'—a truth that turns ego into discipline.\n"
+    "3. NO FLUFF: No 'I understand' or 'It's great that.' Just the insight.\n"
     "4. FORWARD MOVEMENT: End with ONE sharp, tactical question."
 )
 
 MIRROR_PROMPT = (
     "ROLE: Dojo Mirror. \n"
-    "GOAL: Pure synthesis of the Ledger. Observe the rhythm of the timestamps and point out deep patterns."
+    "GOAL: Pure synthesis of the Ledger. Point out deep patterns with minimalist weight."
 )
 
 # ==================================================
@@ -137,34 +138,21 @@ if prompt := st.chat_input("Speak from center..."):
     st.session_state.exchange_count += 1
     with st.chat_message("user"): st.markdown(prompt)
 
-    # THE REINFORCED TRIPWIRE
-    crisis_keywords = [
-        "kill myself", "suicide", "hurt myself", "end my life", 
-        "want to die", "harm myself", "don't want to live", "ending it all"
-    ]
+    crisis_keywords = ["kill myself", "suicide", "hurt myself", "end my life", "want to die", "harm myself", "don't want to live", "ending it all"]
     is_crisis = any(k in prompt.lower() for k in crisis_keywords)
 
     with st.chat_message("assistant"):
         if is_crisis:
-            # INSTANT BYPASS & PERMANENT INSTRUCTION
             safety_box = """
             <div style="background-color: #ffe6e6; border-left: 5px solid #ff0000; padding: 20px; border-radius: 5px;">
-                <p style="color: #cc0000; font-weight: bold; font-size: 1.2em; margin-bottom: 10px;">
-                    🛡️ SAFETY PROTOCOL ACTIVATED
-                </p>
-                <p style="color: #1a1a1a;">
-                    I am here with you, but I am a structural mentor, not a crisis counselor. 
-                    If you are feeling overwhelmed, please reach out to those who can help right now:
-                </p>
+                <p style="color: #cc0000; font-weight: bold; font-size: 1.2em; margin-bottom: 10px;">🛡️ SAFETY PROTOCOL ACTIVATED</p>
+                <p style="color: #1a1a1a;">I am here with you, but I am a structural mentor, not a crisis counselor. Please reach out to those who can help right now:</p>
                 <ul style="color: #1a1a1a; font-weight: bold;">
                     <li>Call or Text: 988 (Suicide & Crisis Lifeline)</li>
                     <li>Text: HOME to 741741 (Crisis Text Line)</li>
                 </ul>
                 <hr style="border: 0; border-top: 1px solid #ffcccc; margin: 15px 0;">
-                <p style="color: #1a1a1a; font-size: 0.95em;">
-                    <b>To return to the Dojo:</b> Once you are safe and ready to continue training, 
-                    please use the <b>Bow-Out</b> button in the sidebar to reset your session.
-                </p>
+                <p style="color: #1a1a1a; font-size: 0.95em;"><b>To return to the Dojo:</b> Please use the <b>Bow-Out</b> button in the sidebar to reset your session.</p>
             </div>
             """
             st.markdown(safety_box, unsafe_allow_html=True)
@@ -194,7 +182,6 @@ if prompt := st.chat_input("Speak from center..."):
             st.session_state.msgs.append({"role": "assistant", "content": final_response})
             save_to_ledger("assistant", final_response, st.session_state.rank, str(st.session_state.phase))
             
-            # Advancement logic...
             if st.session_state.exchange_count >= 2:
                 check_payload = {"model": "llama-3.1-8b-instant", "messages": [{"role": "system", "content": "Analyze growth. Reply ONLY YES or NO."}, {"role": "user", "content": prompt}], "temperature": 0.0}
                 try:
