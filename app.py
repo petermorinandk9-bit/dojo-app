@@ -29,7 +29,7 @@ def compute_rank(records_count):
     return "Sovereign"
 
 # ==================================================
-# AUTH GATE
+# AUTH
 # ==================================================
 if 'user' not in st.session_state:
 
@@ -42,7 +42,6 @@ if 'user' not in st.session_state:
         font-weight:800;
         font-size:3.5rem;
         color:#1a1a1a;
-        margin-bottom:0px;
     }
     .login-sub {
         text-align:center;
@@ -60,16 +59,13 @@ if 'user' not in st.session_state:
 
     with tab_login:
         with st.form("login_form"):
+
             u_name = st.text_input("Username").lower().strip()
             u_pass = st.text_input("Password", type="password")
 
             if st.form_submit_button("Enter the Dojo", use_container_width=True):
 
-                res = supabase.table("users")\
-                    .select("*")\
-                    .eq("username", u_name)\
-                    .eq("password", u_pass)\
-                    .execute()
+                res = supabase.table("users").select("*").eq("username", u_name).eq("password", u_pass).execute()
 
                 if res.data:
                     st.session_state.user = res.data[0]
@@ -96,7 +92,7 @@ if "msgs" not in st.session_state:
     st.session_state.mood = "neutral"
 
 # ==================================================
-# LOAD HISTORY ONCE
+# LOAD HISTORY
 # ==================================================
 if "history_loaded" not in st.session_state:
 
@@ -117,7 +113,7 @@ if "history_loaded" not in st.session_state:
     st.session_state.history_loaded = True
 
 # ==================================================
-# LOAD LONG TERM WISDOM
+# LOAD WISDOM
 # ==================================================
 if "past_wisdom" not in st.session_state:
 
@@ -134,13 +130,13 @@ PAST_WISDOM = st.session_state.past_wisdom
 rank = compute_rank(st.session_state.records_count)
 
 # ==================================================
-# PHASES
+# PHASE STRUCTURE
 # ==================================================
 PHASE_SETS = {
-    "Student": ["Welcome Mat","Warm Up","Training","Cool Down"],
-    "Practitioner": ["The Mat","Work the Pattern","The Insight","Close Round"],
-    "Sentinel": ["Center","Engage","The Seal","Reflection"],
-    "Sovereign": ["Check-In","The Pivot","Ownership","Step Out"]
+    "Student": ["Welcome","Warm-Up","Training","Cool Down"],
+    "Practitioner": ["Welcome","Warm-Up","Training","Cool Down"],
+    "Sentinel": ["Welcome","Warm-Up","Training","Cool Down"],
+    "Sovereign": ["Welcome","Warm-Up","Training","Cool Down"]
 }
 
 # ==================================================
@@ -175,11 +171,10 @@ st.markdown("""
 with st.sidebar:
 
     st.markdown('<p class="sidebar-dojo">The-Dojo</p>', unsafe_allow_html=True)
-    st.write(f"Participant: **{USER_NAME}**")
+
+    st.markdown(f"**{rank} · {USER_NAME}**")
 
     st.divider()
-
-    st.markdown(f'<p class="sidebar-header">Rank: {rank}</p>', unsafe_allow_html=True)
 
     for idx,p_name in enumerate(PHASE_SETS[rank]):
         style="active-item" if idx==st.session_state.phase else "inactive-item"
@@ -202,7 +197,7 @@ Conversation:
 
 Rules:
 - Do not summarize the conversation
-- Identify thinking patterns or tendencies
+- Identify patterns in thinking
 - Write 3–5 short insight sentences
 """
 
@@ -239,7 +234,7 @@ Rules:
         st.rerun()
 
 # ==================================================
-# MAIN UI
+# MAIN
 # ==================================================
 st.markdown("<p class='slogan-warrior'>Warriors Don't Always Win — Warriors Always Fight.</p>",unsafe_allow_html=True)
 st.markdown("<p class='slogan-quit'>We. Never. Quit.</p>",unsafe_allow_html=True)
@@ -251,7 +246,7 @@ for msg in st.session_state.msgs[-10:]:
         st.markdown(msg["content"])
 
 # ==================================================
-# USER INPUT
+# INPUT
 # ==================================================
 if prompt := st.chat_input("Speak from center..."):
 
@@ -266,12 +261,10 @@ if prompt := st.chat_input("Speak from center..."):
         "phase":str(st.session_state.phase)
     }).execute()
 
-    # anti repetition memory
     recent_guidance="\n".join(
         [m["content"][:120] for m in st.session_state.msgs if m["role"]=="assistant"][-3:]
     )
 
-    # session awareness
     session_length=len(st.session_state.msgs)
 
     if session_length<6:
@@ -282,8 +275,7 @@ if prompt := st.chat_input("Speak from center..."):
         session_stage="Closing"
 
     MASTER_PROMPT=f"""
-IDENTITY
-You are the Dojo Mentor for {USER_NAME}. Calm, observant, grounded.
+You are the Dojo Mentor for {USER_NAME}.
 
 Take a moment to consider the situation before responding.
 
@@ -291,36 +283,29 @@ LONG TERM TRAINING NOTES
 {PAST_WISDOM}
 
 RECENT GUIDANCE
-Avoid repeating these ideas.
+Avoid repeating:
 {recent_guidance}
 
 SESSION STATE
-Session length: {session_length}
-Session stage: {session_stage}
+Length: {session_length}
+Stage: {session_stage}
 
-Adjust tone naturally:
-Opening → explore
-Working → analyze
-Closing → highlight insights
+Adjust tone naturally.
 
-THE SOVEREIGN APPROACH
-1. Observe the pattern
-2. Acknowledge reality
-3. Offer a practical adjustment
+APPROACH
+1 Observe the pattern
+2 Acknowledge reality
+3 Offer a practical adjustment
 
-COMMUNICATION STYLE
-Calm, direct, no therapy language, no corporate motivation.
+STYLE
+Calm, grounded, no therapy language.
 
-INTERPRETATION RULE
-Respond to meaning, not wording.
+Use grounding metaphors when useful: breath, focus, balance.
 
-Use grounding metaphors: breath, focus, balance, pacing.
-
-CURRENT STATE
 Rank: {rank}
 Phase: {PHASE_SETS[rank][st.session_state.phase]}
 
-END EVERY RESPONSE WITH
+End with
 [MOOD: neutral/uplifting/melancholy/intense]
 """
 
@@ -345,7 +330,7 @@ END EVERY RESPONSE WITH
 
     except Exception:
 
-        full_text="The Mentor pauses for a moment. Take a breath and try again. [MOOD: neutral]"
+        full_text="The Mentor pauses. Take a breath and try again. [MOOD: neutral]"
 
     clean_response=full_text.split("[MOOD:")[0].strip() if "[MOOD:" in full_text else full_text
     mood=full_text.split("[MOOD:")[1].split("]")[0].strip().lower() if "[MOOD:" in full_text else "neutral"
