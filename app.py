@@ -3,11 +3,13 @@ import requests
 import time
 from supabase import create_client, Client
 
-# 1. CONFIG
+# ==================================================
+# CONFIG
+# ==================================================
 st.set_page_config(page_title="The-Dojo", layout="wide")
 
 # ==================================================
-# 1. CONNECTIONS & UTILS
+# CONNECTIONS
 # ==================================================
 @st.cache_resource
 def init_supabase():
@@ -17,6 +19,9 @@ def init_supabase():
 
 supabase: Client = init_supabase()
 
+# ==================================================
+# RANK SYSTEM
+# ==================================================
 def compute_rank(records_count):
     if records_count < 15: return "Student"
     if records_count < 40: return "Practitioner"
@@ -24,9 +29,10 @@ def compute_rank(records_count):
     return "Sovereign"
 
 # ==================================================
-# 2. AUTH GATE (LOCKED & SILENT)
+# AUTH GATE
 # ==================================================
 if 'user' not in st.session_state:
+
     st.markdown("""
         <style>
         .stApp { background-color: #ffffff; }
@@ -44,8 +50,15 @@ if 'user' not in st.session_state:
         with st.form("login_form"):
             u_name = st.text_input("Username").lower().strip()
             u_pass = st.text_input("Password", type="password")
+
             if st.form_submit_button("Enter the Dojo", use_container_width=True):
-                res = supabase.table("users").select("*").eq("username", u_name).eq("password", u_pass).execute()
+
+                res = supabase.table("users")\
+                    .select("*")\
+                    .eq("username", u_name)\
+                    .eq("password", u_pass)\
+                    .execute()
+
                 if res.data:
                     st.session_state.user = res.data[0]
                     st.rerun()
@@ -58,14 +71,24 @@ if 'user' not in st.session_state:
             display_n = st.text_input("Your Name (Display Name)")
             new_pass = st.text_input("Choose Password", type="password")
             invite_c = st.text_input("Dojo Invite Code", type="password")
+
             if st.form_submit_button("Join the Dojo", use_container_width=True):
+
                 if invite_c != "dojoentry":
                     st.error("Invalid Invite Code.")
+
                 elif not new_name or not new_pass:
                     st.warning("All fields required.")
+
                 else:
-                    user_data = {"username": new_name, "password": new_pass, "display_name": display_n}
+                    user_data = {
+                        "username": new_name,
+                        "password": new_pass,
+                        "display_name": display_n
+                    }
+
                     new_user = supabase.table("users").insert(user_data).execute()
+
                     if new_user.data:
                         st.session_state.user = new_user.data[0]
                         st.rerun()
@@ -78,7 +101,7 @@ if 'user' not in st.session_state:
     st.stop()
 
 # ==================================================
-# 3. SESSION & CACHED DATA LOAD
+# SESSION & DATA LOAD
 # ==================================================
 USER_ID = st.session_state.user['id']
 USER_NAME = st.session_state.user['display_name']
@@ -89,16 +112,36 @@ if 'msgs' not in st.session_state:
     st.session_state.mood = "neutral"
 
 if "history_loaded" not in st.session_state:
-    r_res = supabase.table("records").select("*", count="exact").eq("user_id", USER_ID).order("timestamp").execute()
+
+    r_res = supabase.table("records")\
+        .select("*", count="exact")\
+        .eq("user_id", USER_ID)\
+        .order("timestamp")\
+        .execute()
+
     if r_res.data:
         for r in r_res.data[-50:]:
-            st.session_state.msgs.append({"role": r['role'], "content": r['content']})
+            st.session_state.msgs.append({
+                "role": r['role'],
+                "content": r['content']
+            })
+
     st.session_state.records_count = r_res.count if r_res.count else 0
     st.session_state.history_loaded = True
 
 if "past_wisdom" not in st.session_state:
-    wisdom_res = supabase.table("ledger_wisdom").select("summary").eq("user_id", USER_ID).order("timestamp", desc=True).limit(1).execute()
-    st.session_state.past_wisdom = wisdom_res.data[0]['summary'] if wisdom_res.data else "No past records. Fresh mat."
+
+    wisdom_res = supabase.table("ledger_wisdom")\
+        .select("summary")\
+        .eq("user_id", USER_ID)\
+        .order("timestamp", desc=True)\
+        .limit(1)\
+        .execute()
+
+    if wisdom_res.data:
+        st.session_state.past_wisdom = wisdom_res.data[0]['summary']
+    else:
+        st.session_state.past_wisdom = "No past records. Fresh mat."
 
 PAST_WISDOM = st.session_state.past_wisdom
 rank = compute_rank(st.session_state.records_count)
@@ -118,85 +161,160 @@ MOOD_MUSIC = {
 }
 
 # ==================================================
-# 4. UI STYLE
+# UI STYLE
 # ==================================================
-st.markdown("""<style>.stApp { background-color:#ffffff; color:#1a1a1a; }[data-testid="stSidebar"] { background-color:#f8f9fa; border-right:1px solid #e0e0e0; }.active-item { color:#000; font-weight:800; border-left:3px solid #000; padding-left:20px; margin-top:8px; }.inactive-item { color:#bbb; border-left:1px solid #eee; padding-left:20px; margin-top:5px; }.sidebar-header { font-size:0.85em; color:#999; text-transform:uppercase; letter-spacing:1.5px; margin-top:25px; }.sidebar-dojo { font-size:2.2rem !important; font-weight:800; font-style:italic; margin-bottom:-10px; }.slogan-warrior { font-size:1.1em; text-align:center; color:#888; letter-spacing:2px; text-transform:uppercase; margin-top:20px; }.slogan-quit { font-size:1.8em; text-align:center; color:#1a1a1a; font-style:italic; font-weight:800; margin-bottom:10px; }</style>""", unsafe_allow_html=True)
+st.markdown("""
+<style>
+.stApp { background-color:#ffffff; color:#1a1a1a; }
+[data-testid="stSidebar"] { background-color:#f8f9fa; border-right:1px solid #e0e0e0; }
+.active-item { color:#000; font-weight:800; border-left:3px solid #000; padding-left:20px; margin-top:8px; }
+.inactive-item { color:#bbb; border-left:1px solid #eee; padding-left:20px; margin-top:5px; }
+.sidebar-header { font-size:0.85em; color:#999; text-transform:uppercase; letter-spacing:1.5px; margin-top:25px; }
+.sidebar-dojo { font-size:2.2rem !important; font-weight:800; font-style:italic; margin-bottom:-10px; }
+.slogan-warrior { font-size:1.1em; text-align:center; color:#888; letter-spacing:2px; text-transform:uppercase; margin-top:20px; }
+.slogan-quit { font-size:1.8em; text-align:center; color:#1a1a1a; font-style:italic; font-weight:800; margin-bottom:10px; }
+</style>
+""", unsafe_allow_html=True)
 
 # ==================================================
-# 5. SIDEBAR
+# SIDEBAR
 # ==================================================
 with st.sidebar:
+
     st.markdown('<p class="sidebar-dojo">The-Dojo</p>', unsafe_allow_html=True)
-    st.write(f"Warrior: **{USER_NAME}**")
+    st.write(f"Participant: **{USER_NAME}**")
+
     st.divider()
+
     st.markdown(f'<p class="sidebar-header">Rank: {rank}</p>', unsafe_allow_html=True)
+
     for idx, p_name in enumerate(PHASE_SETS[rank]):
         style = "active-item" if idx == st.session_state.phase else "inactive-item"
         st.markdown(f"<div class='{style}'>{p_name}</div>", unsafe_allow_html=True)
+
     st.divider()
+
     if st.button("Bow-Out", use_container_width=True):
-        st.session_state.msgs, st.session_state.phase = [], 0
+        st.session_state.msgs = []
+        st.session_state.phase = 0
         st.rerun()
 
 # ==================================================
-# 6. MAIN INTERFACE & ENGINE
+# MAIN INTERFACE
 # ==================================================
 st.markdown("<p class='slogan-warrior'>Warriors Don't Always Win — Warriors Always Fight.</p>", unsafe_allow_html=True)
 st.markdown("<p class='slogan-quit'>We. Never. Quit.</p>", unsafe_allow_html=True)
+
 st.audio(MOOD_MUSIC[st.session_state.mood], format="audio/mp3", loop=True)
 
 for msg in st.session_state.msgs[-10:]:
     with st.chat_message(msg["role"]):
         st.markdown(msg["content"])
 
+# ==================================================
+# USER INPUT
+# ==================================================
 if prompt := st.chat_input("Speak from center..."):
+
     st.session_state.msgs.append({"role": "user", "content": prompt})
-    supabase.table("records").insert({"user_id": USER_ID, "timestamp": time.time(), "role": "user", "content": prompt, "rank": rank, "phase": str(st.session_state.phase)}).execute()
+
+    supabase.table("records").insert({
+        "user_id": USER_ID,
+        "timestamp": time.time(),
+        "role": "user",
+        "content": prompt,
+        "rank": rank,
+        "phase": str(st.session_state.phase)
+    }).execute()
 
     MASTER_PROMPT = f"""
-    IDENTITY: Sovereign Mentor. Veteran teammate for {USER_NAME}.
-    
-    LONG TERM TRAINING NOTES:
-    {PAST_WISDOM}
-    (Reference these patterns only when they cut straight to the current friction.)
+IDENTITY
+Sovereign Mentor. A seasoned training partner for {USER_NAME}.
 
-    INTERPRETATION RULE:
-    Never mirror or echo the user's words. Cut to the friction. Name the resistance in the situation. Respond from the meaning, not the phrasing.
+LONG TERM TRAINING NOTES
+{PAST_WISDOM}
+(Use these only when they clearly relate to the present situation.)
 
-    COMMUNICATION STYLE:
-    - Calm. Direct. Respectful. No exclamation marks.
-    - Zero therapy language. Zero corporate padding.
-    - Anchor every response in visceral physical truth: breath, posture, weight, focus.
-    
-    CURRENT STATE: 
-    Rank: {rank} | Phase: {PHASE_SETS[rank][st.session_state.phase]} | Depth: {len(st.session_state.msgs)} messages.
+INTERPRETATION RULE
+Do not mirror the user's wording.
+Interpret the underlying situation and respond to that instead.
+Focus on the tension or difficulty in the situation rather than repeating phrasing.
 
-    END EVERY RESPONSE WITH: [MOOD: neutral/uplifting/melancholy/intense]
-    """
+COMMUNICATION STYLE
+• Calm, direct, and respectful.
+• No therapy language.
+• No corporate motivational tone.
+• No exclamation marks.
+
+GROUNDING STYLE
+Use grounding metaphors related to breath, focus, balance, and physical presence.
+Avoid combat or martial terminology.
+
+CURRENT STATE
+Rank: {rank}
+Phase: {PHASE_SETS[rank][st.session_state.phase]}
+Depth: {len(st.session_state.msgs)} messages
+
+END EVERY RESPONSE WITH:
+[MOOD: neutral/uplifting/melancholy/intense]
+"""
 
     headers = {"Authorization": f"Bearer {st.secrets['GROQ_API_KEY']}"}
-    try:
-        res = requests.post("https://api.groq.com/openai/v1/chat/completions",
-                            json={"model": "llama-3.3-70b-versatile", "messages": [{"role": "system", "content": MASTER_PROMPT}] + st.session_state.msgs[-10:], "temperature": 0.55},
-                            headers=headers, timeout=20)
-        res.raise_for_status()
-        full_text = res.json()['choices'][0]['message']['content']
-    except Exception:
-        full_text = "The line holds. Reset your stance and speak again. [MOOD: neutral]"
 
+    try:
+
+        res = requests.post(
+            "https://api.groq.com/openai/v1/chat/completions",
+            json={
+                "model": "llama-3.3-70b-versatile",
+                "messages": [{"role": "system", "content": MASTER_PROMPT}] + st.session_state.msgs[-10:],
+                "temperature": 0.55
+            },
+            headers=headers,
+            timeout=20
+        )
+
+        res.raise_for_status()
+
+        full_text = res.json()['choices'][0]['message']['content']
+
+    except Exception:
+
+        full_text = "The mentor pauses for a moment. Take a breath and try again. [MOOD: neutral]"
+
+    # ==================================================
+    # RESPONSE PARSING
+    # ==================================================
     clean_response = full_text
     mood = "neutral"
+
     if "[MOOD" in full_text:
+
         clean_response = full_text.split("[MOOD")[0].strip()
+
         try:
             mood_part = full_text.split("[MOOD")[1].split("]")[0]
             mood = mood_part.replace(":", "").strip().lower()
-        except: pass
+        except Exception:
+            pass
 
     st.session_state.mood = mood if mood in MOOD_MUSIC else "neutral"
-    st.session_state.msgs.append({"role": "assistant", "content": clean_response})
-    supabase.table("records").insert({"user_id": USER_ID, "timestamp": time.time(), "role": "assistant", "content": clean_response, "rank": rank, "phase": str(st.session_state.phase)}).execute()
-    
+
+    st.session_state.msgs.append({
+        "role": "assistant",
+        "content": clean_response
+    })
+
+    supabase.table("records").insert({
+        "user_id": USER_ID,
+        "timestamp": time.time(),
+        "role": "assistant",
+        "content": clean_response,
+        "rank": rank,
+        "phase": str(st.session_state.phase)
+    }).execute()
+
     if len(st.session_state.msgs) % 4 == 0 and st.session_state.phase < 3:
         st.session_state.phase += 1
+
     st.rerun()
