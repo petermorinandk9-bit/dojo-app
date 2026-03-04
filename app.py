@@ -19,7 +19,7 @@ supabase: Client = init_supabase()
 # 2. THE DOJO GATE (LOGIN & SIGN-UP)
 # ==================================================
 if 'user' not in st.session_state:
-    st.set_page_config(page_title="The Dojo - Entry", layout="centered")
+    st.set_page_config(page_title="The-Dojo Entry", layout="centered")
     st.markdown("""
         <style>
         .stApp { background-color: #ffffff; }
@@ -86,21 +86,32 @@ PHASE_SETS = {
 }
 
 # ==================================================
-# 4. ARCHWAY UI (RESTORING EXACT SIDEBAR LAYOUT)
+# 4. ARCHWAY UI (UNIFIED HIGHLIGHTING)
 # ==================================================
 st.set_page_config(page_title="The Dojo", layout="wide")
 st.markdown("""
     <style>
     .stApp { background-color: #ffffff; color: #1a1a1a; }
     [data-testid="stSidebar"] { background-color: #f8f9fa; border-right: 1px solid #e0e0e0; }
-    .stChatMessage { background-color: #f8f9fa; border: 1px solid #e0e0e0; }
     .sidebar-dojo { font-size: 2.2rem !important; font-weight: 800; color: #1a1a1a; font-style: italic; margin-bottom: -10px; }
     
-    /* Layout Restoration Styles */
-    .active-rank { color: #000000; font-weight: 800; font-size: 1.4em; margin-top: 15px; margin-bottom: 5px; }
-    .inactive-rank { color: #cccccc; font-weight: 400; font-size: 1.1em; margin-top: 10px; }
-    .active-phase { color: #000000; font-weight: 600; padding-left: 20px; font-size: 1.1em; border-left: 2px solid #000; margin-bottom: 2px; }
-    .inactive-phase { color: #bbbbbb; font-weight: 400; padding-left: 20px; font-size: 0.95em; border-left: 1px solid #eee; margin-bottom: 2px; }
+    /* UNIFIED HIGHLIGHTING STYLE */
+    .active-rank { 
+        color: #000000; font-weight: 800; font-size: 1.3em; 
+        border-left: 4px solid #000; padding-left: 15px; margin-top: 20px; 
+    }
+    .inactive-rank { 
+        color: #cccccc; font-weight: 400; font-size: 1.1em; 
+        border-left: 1px solid #eeeeee; padding-left: 15px; margin-top: 15px; 
+    }
+    .active-phase { 
+        color: #000000; font-weight: 600; font-size: 1.05em; 
+        border-left: 2px solid #000; padding-left: 25px; margin-top: 5px; 
+    }
+    .inactive-phase { 
+        color: #bbbbbb; font-weight: 400; font-size: 0.9em; 
+        border-left: 1px solid #eeeeee; padding-left: 25px; margin-top: 5px; 
+    }
     
     .slogan-stack-refined { font-size: 1.65em; text-align: center; color: #666666; font-style: italic; padding-top: 20px; }
     </style>
@@ -129,29 +140,30 @@ if 'msgs' not in st.session_state:
     except: pass
 
 # ==================================================
-# 6. SIDEBAR - THE RESTORED NESTED LAYOUT
+# 6. SIDEBAR - UNIFIED LINEAGE
 # ==================================================
 with st.sidebar:
     st.markdown('<p class="sidebar-dojo">The-Dojo</p>', unsafe_allow_html=True)
     st.write(f"Warrior: **{USER_NAME}**")
     st.divider()
     
-    # --- DYNAMIC RANK & PHASE LIST ---
+    # --- RANKS & PHASES (Styled as a Unified List) ---
     ranks = ["Student", "Practitioner", "Sentinel", "Sovereign"]
     for r in ranks:
         is_active_rank = (r == st.session_state.rank)
-        st.markdown(f"<div class='{'active-rank' if is_active_rank else 'inactive-rank'}'>{r}</div>", unsafe_allow_html=True)
+        rank_class = 'active-rank' if is_active_rank else 'inactive-rank'
+        st.markdown(f"<div class='{rank_class}'>{r}</div>", unsafe_allow_html=True)
         
-        # If this is the active rank, show its phases underneath
+        # Only show the Phases for the Rank we are currently in
         if is_active_rank:
             current_phases = PHASE_SETS[r]
             for idx, p_name in enumerate(current_phases):
                 is_active_phase = (idx == st.session_state.phase)
-                st.markdown(f"<div class='{'active-phase' if is_active_phase else 'inactive-phase'}'>{p_name}</div>", unsafe_allow_html=True)
+                phase_class = 'active-phase' if is_active_phase else 'inactive-phase'
+                st.markdown(f"<div class='{phase_class}'>{p_name}</div>", unsafe_allow_html=True)
     
     st.divider()
     if st.button("Bow-Out (Save & Clear)", use_container_width=True):
-        # Summary & Clear logic... (remains unchanged for integrity)
         if len(st.session_state.msgs) > 2:
             chat_log = "\n".join([f"{m['role']}: {m['content']}" for m in st.session_state.msgs])
             headers = {"Authorization": f"Bearer {st.secrets['GROQ_API_KEY']}"}
@@ -185,7 +197,7 @@ if prompt := st.chat_input("Speak from center..."):
     save_to_ledger("user", prompt, st.session_state.rank, st.session_state.phase)
     with st.chat_message("user"): st.markdown(prompt)
 
-    # Phase Progression Logic
+    # Phase Progression
     st.session_state.exchange_count += 1
     if st.session_state.exchange_count >= 2:
         if st.session_state.phase < 3:
