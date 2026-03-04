@@ -140,4 +140,66 @@ with st.sidebar:
     ranks = ["Student", "Practitioner", "Sentinel", "Sovereign"]
     for r in ranks:
         is_active_rank = (r == st.session_state.rank)
-        st.markdown(f"<div class='{'active
+        st.markdown(f"<div class='{'active-rank' if is_active_rank else 'inactive-rank'}'>{r}</div>", unsafe_allow_html=True)
+        
+        # If this is the active rank, show its phases underneath
+        if is_active_rank:
+            current_phases = PHASE_SETS[r]
+            for idx, p_name in enumerate(current_phases):
+                is_active_phase = (idx == st.session_state.phase)
+                st.markdown(f"<div class='{'active-phase' if is_active_phase else 'inactive-phase'}'>{p_name}</div>", unsafe_allow_html=True)
+    
+    st.divider()
+    if st.button("Bow-Out (Save & Clear)", use_container_width=True):
+        # Summary & Clear logic... (remains unchanged for integrity)
+        if len(st.session_state.msgs) > 2:
+            chat_log = "\n".join([f"{m['role']}: {m['content']}" for m in st.session_state.msgs])
+            headers = {"Authorization": f"Bearer {st.secrets['GROQ_API_KEY']}"}
+            payload = {"model": "llama-3.1-8b-instant", "messages": [{"role": "system", "content": "Summarize growth. One dense paragraph."}, {"role": "user", "content": chat_log}], "temperature": 0.3}
+            res = requests.post("https://api.groq.com/openai/v1/chat/completions", json=payload, headers=headers)
+            summary = res.json()['choices'][0]['message']['content']
+            supabase.table("ledger_wisdom").insert({"user_id": USER_ID, "timestamp": time.time(), "summary": summary}).execute()
+        
+        supabase.table("records").delete().eq("user_id", USER_ID).execute()
+        st.session_state.msgs = []
+        st.session_state.exchange_count = 0
+        st.session_state.phase = 0
+        st.rerun()
+
+    if st.button("Logout"):
+        del st.session_state.user
+        st.rerun()
+
+# ==================================================
+# 7. MAIN ENGINE (LOGIC INTEGRITY)
+# ==================================================
+st.markdown('<div class="slogan-stack-refined">We. Never. Quit.</div>', unsafe_allow_html=True)
+
+for msg in st.session_state.msgs:
+    with st.chat_message(msg["role"]):
+        st.markdown(msg["content"].split("] ", 1)[-1] if "] " in msg["content"] else msg["content"])
+
+if prompt := st.chat_input("Speak from center..."):
+    ts = datetime.now().strftime('%Y-%m-%d %H:%M')
+    st.session_state.msgs.append({"role": "user", "content": f"[{ts}] {prompt}"})
+    save_to_ledger("user", prompt, st.session_state.rank, st.session_state.phase)
+    with st.chat_message("user"): st.markdown(prompt)
+
+    # Phase Progression Logic
+    st.session_state.exchange_count += 1
+    if st.session_state.exchange_count >= 2:
+        if st.session_state.phase < 3:
+            st.session_state.phase += 1
+            st.session_state.exchange_count = 0
+
+    # AI Call
+    headers = {"Authorization": f"Bearer {st.secrets['GROQ_API_KEY']}"}
+    MASTER_PROMPT = f"ROLE: Dojo Mentor. WARRIOR: {USER_NAME}. STYLE: Grounded, visceral, observant."
+    messages = [{"role": "system", "content": MASTER_PROMPT}] + st.session_state.msgs[-15:]
+    res = requests.post("https://api.groq.com/openai/v1/chat/completions", json={"model": "llama-3.3-70b-versatile", "messages": messages, "temperature": 0.6}, headers=headers)
+    final_response = res.json()['choices'][0]['message']['content']
+    
+    with st.chat_message("assistant"): st.markdown(final_response)
+    st.session_state.msgs.append({"role": "assistant", "content": final_response})
+    save_to_ledger("assistant", final_response, st.session_state.rank, st.session_state.phase)
+    st.rerun()
