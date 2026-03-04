@@ -67,9 +67,6 @@ if "user" not in st.session_state:
 
     st.stop()
 
-# ==================================================
-# USER INFO
-# ==================================================
 USER_ID = st.session_state.user["id"]
 USER_NAME = st.session_state.user["display_name"]
 
@@ -79,7 +76,6 @@ USER_NAME = st.session_state.user["display_name"]
 if "msgs" not in st.session_state:
     st.session_state.msgs = []
     st.session_state.phase = 0
-    st.session_state.mood = "neutral"
 
 # ==================================================
 # LOAD HISTORY
@@ -105,6 +101,31 @@ if "history_loaded" not in st.session_state:
 rank = compute_rank(st.session_state.records_count)
 
 # ==================================================
+# FETCH DOJO MEMORY
+# ==================================================
+def fetch_latest(table, field):
+
+    try:
+        r = supabase.table(table)\
+            .select("*")\
+            .eq("user_id", USER_ID)\
+            .order("timestamp", desc=True)\
+            .limit(1)\
+            .execute()
+
+        if r.data:
+            return r.data[0][field]
+    except:
+        pass
+
+    return None
+
+
+latest_pattern = fetch_latest("dojo_patterns", "pattern")
+latest_doctrine = fetch_latest("dojo_doctrine", "doctrine")
+latest_milestone = fetch_latest("dojo_milestones", "milestone")
+
+# ==================================================
 # PHASES
 # ==================================================
 PHASE_SETS = {
@@ -115,67 +136,11 @@ PHASE_SETS = {
 }
 
 # ==================================================
-# STYLE
-# ==================================================
-st.markdown("""
-<style>
-
-.stApp{background:#fff;color:#1a1a1a}
-
-[data-testid="stSidebar"]{
-background:#f8f9fa;
-border-right:1px solid #e0e0e0
-}
-
-.active-item{
-color:#000;
-font-weight:800;
-border-left:3px solid #000;
-padding-left:20px;
-margin-top:8px
-}
-
-.inactive-item{
-color:#bbb;
-border-left:1px solid #eee;
-padding-left:20px;
-margin-top:5px
-}
-
-.sidebar-dojo{
-font-size:2.2rem!important;
-font-weight:800;
-font-style:italic;
-margin-bottom:-10px
-}
-
-.slogan-warrior{
-font-size:1.1em;
-text-align:center;
-color:#888;
-letter-spacing:2px;
-text-transform:uppercase;
-margin-top:20px
-}
-
-.slogan-quit{
-font-size:1.8em;
-text-align:center;
-color:#1a1a1a;
-font-style:italic;
-font-weight:800;
-margin-bottom:10px
-}
-
-</style>
-""", unsafe_allow_html=True)
-
-# ==================================================
 # SIDEBAR
 # ==================================================
 with st.sidebar:
 
-    st.markdown('<p class="sidebar-dojo">The-Dojo</p>', unsafe_allow_html=True)
+    st.markdown("### The-Dojo")
 
     st.markdown(f"**{rank} · {USER_NAME}**")
 
@@ -183,50 +148,21 @@ with st.sidebar:
 
     for i,p in enumerate(PHASE_SETS[rank]):
 
-        style = "active-item" if i == st.session_state.phase else "inactive-item"
-
-        st.markdown(
-            f"<div class='{style}'>{p}</div>",
-            unsafe_allow_html=True
-        )
+        if i == st.session_state.phase:
+            st.markdown(f"**{p}**")
+        else:
+            st.markdown(p)
 
     st.divider()
 
     if st.button("Bow Out"):
 
-        bow_prompt = f"""
-The user is leaving the dojo session.
-
-Provide a short closing reflection.
-
-Tone: calm martial arts mentor.
-
-User: {USER_NAME}
-Rank: {rank}
-
-End with one sentence of encouragement.
-"""
-
-        headers = {"Authorization": f"Bearer {st.secrets['GROQ_API_KEY']}"}
-
-        res = requests.post(
-            "https://api.groq.com/openai/v1/chat/completions",
-            json={
-                "model":"llama-3.3-70b-versatile",
-                "messages":[{"role":"system","content":bow_prompt}],
-                "temperature":0.5
-            },
-            headers=headers
-        )
-
-        message = res.json()["choices"][0]["message"]["content"]
-
-        st.success(message)
-
         st.session_state.phase = 0
         st.session_state.msgs = []
 
-        time.sleep(2)
+        st.success("You bow out from the mat. Training continues tomorrow.")
+
+        time.sleep(1)
 
         st.rerun()
 
@@ -236,74 +172,40 @@ End with one sentence of encouragement.
 tab_train, tab_history = st.tabs(["Training","History"])
 
 # ==================================================
-# HISTORY
-# ==================================================
-with tab_history:
-
-    st.subheader("Milestones")
-
-    try:
-        ms = supabase.table("dojo_milestones")\
-            .select("*")\
-            .eq("user_id", USER_ID)\
-            .order("timestamp", desc=True)\
-            .execute()
-
-        if ms.data:
-            for m in ms.data:
-                st.write(m["milestone"])
-    except:
-        pass
-
-    st.subheader("Patterns")
-
-    try:
-        pt = supabase.table("dojo_patterns")\
-            .select("*")\
-            .eq("user_id", USER_ID)\
-            .order("timestamp", desc=True)\
-            .execute()
-
-        if pt.data:
-            for p in pt.data:
-                st.write(p["pattern"])
-    except:
-        pass
-
-    st.subheader("Doctrine")
-
-    try:
-        dc = supabase.table("dojo_doctrine")\
-            .select("*")\
-            .eq("user_id", USER_ID)\
-            .order("timestamp", desc=True)\
-            .execute()
-
-        if dc.data:
-            for d in dc.data:
-                st.write(d["doctrine"])
-    except:
-        pass
-
-# ==================================================
 # TRAINING
 # ==================================================
 with tab_train:
 
-    st.markdown(
-        "<p class='slogan-warrior'>Warriors Don't Always Win — Warriors Always Fight.</p>",
-        unsafe_allow_html=True
-    )
+    # ===============================
+    # DOJO AWARENESS BANNER
+    # ===============================
+    with st.container():
 
-    st.markdown(
-        "<p class='slogan-quit'>We. Never. Quit.</p>",
-        unsafe_allow_html=True
-    )
+        st.markdown("### Dojo Awareness")
 
+        if latest_pattern:
+            st.write(f"**Current Pattern:** {latest_pattern}")
+
+        if latest_doctrine:
+            st.write(f"**Recent Doctrine:** {latest_doctrine}")
+
+        if latest_milestone:
+            st.write(f"**Recent Milestone:** {latest_milestone}")
+
+        st.write(f"**Current Phase:** {PHASE_SETS[rank][st.session_state.phase]}")
+
+        st.divider()
+
+    # ===============================
+    # CHAT HISTORY
+    # ===============================
     for msg in st.session_state.msgs[-10:]:
         with st.chat_message(msg["role"]):
             st.markdown(msg["content"])
 
+    # ===============================
+    # USER INPUT
+    # ===============================
     if prompt := st.chat_input("Speak from center..."):
 
         st.session_state.msgs.append({
@@ -311,42 +213,52 @@ with tab_train:
             "content":prompt
         })
 
-        supabase.table("records").insert({
-            "user_id":USER_ID,
-            "timestamp":time.time(),
-            "role":"user",
-            "content":prompt,
-            "rank":rank,
-            "phase":str(st.session_state.phase)
-        }).execute()
-
         session_summary = " ".join(
             [m["content"] for m in st.session_state.msgs if m["role"]=="user"][-3:]
         )
 
+        # ===============================
+        # RANK STYLE
+        # ===============================
+        rank_style = {
+            "Student":"supportive instructor who explains ideas clearly",
+            "Practitioner":"focused coach giving practical guidance",
+            "Sentinel":"reflective strategist who points out patterns",
+            "Sovereign":"minimalist mentor who guides through questions"
+        }
+
+        # ===============================
+        # MASTER PROMPT
+        # ===============================
         MASTER_PROMPT = f"""
 You are the Dojo Mentor for {USER_NAME}.
 
-Your role is to guide reflection and emotional discipline like an experienced martial arts instructor.
+Mentor style: {rank_style[rank]}
+
+Recent Dojo Memory:
+
+Pattern:
+{latest_pattern}
+
+Doctrine:
+{latest_doctrine}
+
+Milestone:
+{latest_milestone}
 
 Session summary:
 {session_summary}
 
-Respond with thoughtful insight and grounded advice.
+Respond with grounded insight and calm guidance.
 
-Style guidelines:
-• Be reflective and insightful, but stay practical.
-• Avoid overly poetic metaphors or mystical language.
-• Speak like a calm, experienced coach.
-• It is okay to use occasional martial arts analogies, but keep them simple.
-• Responses should be about 4–8 sentences.
-• Focus on the user's current situation rather than abstract philosophy.
+Rules:
+• Avoid mystical or overly poetic language.
+• Use patterns implicitly rather than explaining the system.
+• Speak like an experienced martial artist helping someone train their mind.
+• 4-8 sentences.
 
 Rank: {rank}
 Phase: {PHASE_SETS[rank][st.session_state.phase]}
-
-End with
-[MOOD: neutral/uplifting/melancholy/intense]
 """
 
         headers = {"Authorization": f"Bearer {st.secrets['GROQ_API_KEY']}"}
@@ -355,29 +267,17 @@ End with
             "https://api.groq.com/openai/v1/chat/completions",
             json={
                 "model":"llama-3.3-70b-versatile",
-                "messages":[{"role":"system","content":MASTER_PROMPT}] + st.session_state.msgs[-10:],
-                "temperature":0.6
+                "messages":[{"role":"system","content":MASTER_PROMPT}] + st.session_state.msgs[-10:]
             },
             headers=headers
         )
 
-        full = res.json()["choices"][0]["message"]["content"]
-
-        clean = full.split("[MOOD:")[0].strip()
+        reply = res.json()["choices"][0]["message"]["content"]
 
         st.session_state.msgs.append({
             "role":"assistant",
-            "content":clean
+            "content":reply
         })
-
-        supabase.table("records").insert({
-            "user_id":USER_ID,
-            "timestamp":time.time(),
-            "role":"assistant",
-            "content":clean,
-            "rank":rank,
-            "phase":str(st.session_state.phase)
-        }).execute()
 
         if len(st.session_state.msgs) % 4 == 0 and st.session_state.phase < 3:
             st.session_state.phase += 1
