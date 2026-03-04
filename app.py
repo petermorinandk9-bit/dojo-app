@@ -52,6 +52,24 @@ if 'user' not in st.session_state:
                 else:
                     st.error("Credentials not recognized.")
 
+    with tab_signup:
+        with st.form("signup_form"):
+            new_name = st.text_input("Choose Username").lower().strip()
+            display_n = st.text_input("Your Name (Display Name)")
+            new_pass = st.text_input("Choose Password", type="password")
+            invite_c = st.text_input("Dojo Invite Code", type="password")
+            if st.form_submit_button("Join the Dojo", use_container_width=True):
+                if invite_c != "dojoentry":
+                    st.error("Invalid Invite Code.")
+                elif not new_name or not new_pass:
+                    st.warning("All fields required.")
+                else:
+                    user_data = {"username": new_name, "password": new_pass, "display_name": display_n}
+                    new_user = supabase.table("users").insert(user_data).execute()
+                    if new_user.data:
+                        st.session_state.user = new_user.data[0]
+                        st.rerun()
+
     with tab_manual:
         st.subheader("1. THE RITUAL")
         st.write("The Dojo is a sanctuary for focused reflection. Speak from center. Be honest.")
@@ -60,7 +78,7 @@ if 'user' not in st.session_state:
     st.stop()
 
 # ==================================================
-# 3. SESSION & CACHED DATA LOAD (REFINED)
+# 3. SESSION & CACHED DATA LOAD
 # ==================================================
 USER_ID = st.session_state.user['id']
 USER_NAME = st.session_state.user['display_name']
@@ -73,7 +91,6 @@ if 'msgs' not in st.session_state:
 if "history_loaded" not in st.session_state:
     r_res = supabase.table("records").select("*", count="exact").eq("user_id", USER_ID).order("timestamp").execute()
     if r_res.data:
-        # Load only last 50 for performance safety as per audit
         for r in r_res.data[-50:]:
             st.session_state.msgs.append({"role": r['role'], "content": r['content']})
     st.session_state.records_count = r_res.count if r_res.count else 0
@@ -103,18 +120,7 @@ MOOD_MUSIC = {
 # ==================================================
 # 4. UI STYLE
 # ==================================================
-st.markdown("""
-<style>
-.stApp { background-color:#ffffff; color:#1a1a1a; }
-[data-testid="stSidebar"] { background-color:#f8f9fa; border-right:1px solid #e0e0e0; }
-.active-item { color:#000; font-weight:800; border-left:3px solid #000; padding-left:20px; margin-top:8px; }
-.inactive-item { color:#bbb; border-left:1px solid #eee; padding-left:20px; margin-top:5px; }
-.sidebar-header { font-size:0.85em; color:#999; text-transform:uppercase; letter-spacing:1.5px; margin-top:25px; }
-.sidebar-dojo { font-size:2.2rem !important; font-weight:800; font-style:italic; margin-bottom:-10px; }
-.slogan-warrior { font-size:1.1em; text-align:center; color:#888; letter-spacing:2px; text-transform:uppercase; margin-top:20px; }
-.slogan-quit { font-size:1.8em; text-align:center; color:#1a1a1a; font-style:italic; font-weight:800; margin-bottom:10px; }
-</style>
-""", unsafe_allow_html=True)
+st.markdown("""<style>.stApp { background-color:#ffffff; color:#1a1a1a; }[data-testid="stSidebar"] { background-color:#f8f9fa; border-right:1px solid #e0e0e0; }.active-item { color:#000; font-weight:800; border-left:3px solid #000; padding-left:20px; margin-top:8px; }.inactive-item { color:#bbb; border-left:1px solid #eee; padding-left:20px; margin-top:5px; }.sidebar-header { font-size:0.85em; color:#999; text-transform:uppercase; letter-spacing:1.5px; margin-top:25px; }.sidebar-dojo { font-size:2.2rem !important; font-weight:800; font-style:italic; margin-bottom:-10px; }.slogan-warrior { font-size:1.1em; text-align:center; color:#888; letter-spacing:2px; text-transform:uppercase; margin-top:20px; }.slogan-quit { font-size:1.8em; text-align:center; color:#1a1a1a; font-style:italic; font-weight:800; margin-bottom:10px; }</style>""", unsafe_allow_html=True)
 
 # ==================================================
 # 5. SIDEBAR
@@ -148,23 +154,22 @@ if prompt := st.chat_input("Speak from center..."):
     supabase.table("records").insert({"user_id": USER_ID, "timestamp": time.time(), "role": "user", "content": prompt, "rank": rank, "phase": str(st.session_state.phase)}).execute()
 
     MASTER_PROMPT = f"""
-    IDENTITY: Dojo Mentor for {USER_NAME}. Veteran training partner. 
+    IDENTITY: Sovereign Mentor. Veteran teammate for {USER_NAME}.
     
     LONG TERM TRAINING NOTES:
     {PAST_WISDOM}
+    (Reference these patterns only when they cut straight to the current friction.)
 
     INTERPRETATION RULE:
-    Do not repeat or mirror the user's wording. Instead, interpret the underlying situation or pattern.
-    Respond to the meaning, not the phrasing. Use your own perspective.
+    Never mirror or echo the user's words. Cut to the friction. Name the resistance in the situation. Respond from the meaning, not the phrasing.
 
     COMMUNICATION STYLE:
-    - Calm, direct, and observant. No exclamation marks.
-    - No therapy language (avoid "It sounds like", "I hear you", "that's valid").
-    - No corporate motivational phrases ("Consider that", "What if", "Great job").
-    - Use physical awareness metaphors: breath, focus, balance, presence.
+    - Calm. Direct. Respectful. No exclamation marks.
+    - Zero therapy language. Zero corporate padding.
+    - Anchor every response in visceral physical truth: breath, posture, weight, focus.
     
     CURRENT STATE: 
-    Rank: {rank} | Phase: {PHASE_SETS[rank][st.session_state.phase]} | Session Depth: {len(st.session_state.msgs)} messages.
+    Rank: {rank} | Phase: {PHASE_SETS[rank][st.session_state.phase]} | Depth: {len(st.session_state.msgs)} messages.
 
     END EVERY RESPONSE WITH: [MOOD: neutral/uplifting/melancholy/intense]
     """
@@ -172,18 +177,16 @@ if prompt := st.chat_input("Speak from center..."):
     headers = {"Authorization": f"Bearer {st.secrets['GROQ_API_KEY']}"}
     try:
         res = requests.post("https://api.groq.com/openai/v1/chat/completions",
-                            json={"model": "llama-3.3-70b-versatile", "messages": [{"role": "system", "content": MASTER_PROMPT}] + st.session_state.msgs[-10:], "temperature": 0.6},
+                            json={"model": "llama-3.3-70b-versatile", "messages": [{"role": "system", "content": MASTER_PROMPT}] + st.session_state.msgs[-10:], "temperature": 0.55},
                             headers=headers, timeout=20)
         res.raise_for_status()
         full_text = res.json()['choices'][0]['message']['content']
     except Exception:
-        full_text = "The Mentor pauses. The connection is heavy. Take a breath and try again. [MOOD: neutral]"
+        full_text = "The line holds. Reset your stance and speak again. [MOOD: neutral]"
 
-    # DEFENSIVE PARSING
     clean_response = full_text
     mood = "neutral"
     if "[MOOD" in full_text:
-        # Splitting by any variation of MOOD/MOOD: for robustness
         clean_response = full_text.split("[MOOD")[0].strip()
         try:
             mood_part = full_text.split("[MOOD")[1].split("]")[0]
