@@ -27,6 +27,7 @@ if 'user' not in st.session_state:
         .stApp { background-color: #ffffff; }
         .login-header { text-align: center; font-style: italic; font-weight: 800; font-size: 3.5rem; color: #1a1a1a; margin-bottom: 0px; }
         .login-sub { text-align: center; color: #666; font-size: 1.1rem; margin-bottom: 20px; }
+        
         .audio-container { 
             text-align: center; 
             margin: 0 auto 30px auto; 
@@ -43,12 +44,12 @@ if 'user' not in st.session_state:
     st.markdown('<p class="login-header">The-Dojo</p>', unsafe_allow_html=True)
     st.markdown('<p class="login-sub">Forge your discipline. Step onto the mat.</p>', unsafe_allow_html=True)
 
-    # --- THE ZEN FLUTE PLAYER ---
+    # --- THE ZEN FLUTE PLAYER (Reliable Pixabay CDN) ---
     st.markdown('<div class="audio-container">', unsafe_allow_html=True)
     st.markdown('<p class="audio-label">🔊 Establish Presence</p>', unsafe_allow_html=True)
     
-    # Authentic Japanese Shakuhachi Flute
-    audio_url = "https://www.chosic.com/wp-content/uploads/2021/05/Shakuhachi-Japanese-Flute.mp3"
+    # High-reliability Zen/Meditation Flute track
+    audio_url = "https://cdn.pixabay.com/audio/2022/05/27/audio_1808d0510e.mp3"
     st.audio(audio_url, format="audio/mp3", loop=True, autoplay=True)
     st.markdown('</div>', unsafe_allow_html=True)
     
@@ -113,6 +114,7 @@ st.markdown("""
     <style>
     .stApp { background-color: #ffffff; color: #1a1a1a; }
     [data-testid="stSidebar"] { background-color: #f8f9fa; border-right: 1px solid #e0e0e0; }
+    
     .active-item { 
         color: #000000; font-weight: 800; font-size: 1.15em; 
         border-left: 3px solid #000; padding-left: 20px; margin-top: 8px; 
