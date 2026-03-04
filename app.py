@@ -196,7 +196,7 @@ with st.sidebar:
 tab_train, tab_history = st.tabs(["Training","History"])
 
 # ==================================================
-# HISTORY TAB
+# HISTORY
 # ==================================================
 with tab_history:
 
@@ -246,46 +246,52 @@ with tab_history:
         pass
 
 # ==================================================
-# TRAINING TAB
+# TRAINING
 # ==================================================
 with tab_train:
 
-    st.markdown(
-        "<p class='slogan-warrior'>Warriors Don't Always Win — Warriors Always Fight.</p>",
-        unsafe_allow_html=True
-    )
+    left, center, right = st.columns([1,4,1])
 
-    st.markdown(
-        "<p class='slogan-quit'>We. Never. Quit.</p>",
-        unsafe_allow_html=True
-    )
+    with center:
 
-    for msg in st.session_state.msgs[-10:]:
-        with st.chat_message(msg["role"]):
-            st.markdown(msg["content"])
-
-    if prompt := st.chat_input("Speak from center..."):
-
-        st.session_state.msgs.append({
-            "role":"user",
-            "content":prompt
-        })
-
-        supabase.table("records").insert({
-            "user_id":USER_ID,
-            "timestamp":time.time(),
-            "role":"user",
-            "content":prompt,
-            "rank":rank,
-            "phase":str(st.session_state.phase)
-        }).execute()
-
-        # session awareness trick
-        session_summary = " ".join(
-            [m["content"] for m in st.session_state.msgs if m["role"]=="user"][-3:]
+        st.markdown(
+            "<p class='slogan-warrior'>Warriors Don't Always Win — Warriors Always Fight.</p>",
+            unsafe_allow_html=True
         )
 
-        MASTER_PROMPT = f"""
+        st.markdown(
+            "<p class='slogan-quit'>We. Never. Quit.</p>",
+            unsafe_allow_html=True
+        )
+
+        for msg in st.session_state.msgs[-10:]:
+            with st.chat_message(msg["role"]):
+                st.markdown(msg["content"])
+
+        # ===============================
+        # CHAT INPUT
+        # ===============================
+        if prompt := st.chat_input("Speak from center..."):
+
+            st.session_state.msgs.append({
+                "role":"user",
+                "content":prompt
+            })
+
+            supabase.table("records").insert({
+                "user_id":USER_ID,
+                "timestamp":time.time(),
+                "role":"user",
+                "content":prompt,
+                "rank":rank,
+                "phase":str(st.session_state.phase)
+            }).execute()
+
+            session_summary = " ".join(
+                [m["content"] for m in st.session_state.msgs if m["role"]=="user"][-3:]
+            )
+
+            MASTER_PROMPT = f"""
 You are the Dojo Mentor for {USER_NAME}.
 
 Session summary:
@@ -300,37 +306,80 @@ End with
 [MOOD: neutral/uplifting/melancholy/intense]
 """
 
-        headers = {"Authorization": f"Bearer {st.secrets['GROQ_API_KEY']}"}
+            headers = {"Authorization": f"Bearer {st.secrets['GROQ_API_KEY']}"}
 
-        res = requests.post(
-            "https://api.groq.com/openai/v1/chat/completions",
-            json={
-                "model":"llama-3.3-70b-versatile",
-                "messages":[{"role":"system","content":MASTER_PROMPT}] + st.session_state.msgs[-10:],
-                "temperature":0.6
-            },
-            headers=headers
-        )
+            res = requests.post(
+                "https://api.groq.com/openai/v1/chat/completions",
+                json={
+                    "model":"llama-3.3-70b-versatile",
+                    "messages":[{"role":"system","content":MASTER_PROMPT}] + st.session_state.msgs[-10:],
+                    "temperature":0.6
+                },
+                headers=headers
+            )
 
-        full = res.json()["choices"][0]["message"]["content"]
+            full = res.json()["choices"][0]["message"]["content"]
 
-        clean = full.split("[MOOD:")[0].strip()
+            clean = full.split("[MOOD:")[0].strip()
 
-        st.session_state.msgs.append({
-            "role":"assistant",
-            "content":clean
-        })
+            st.session_state.msgs.append({
+                "role":"assistant",
+                "content":clean
+            })
 
-        supabase.table("records").insert({
-            "user_id":USER_ID,
-            "timestamp":time.time(),
-            "role":"assistant",
-            "content":clean,
-            "rank":rank,
-            "phase":str(st.session_state.phase)
-        }).execute()
+            supabase.table("records").insert({
+                "user_id":USER_ID,
+                "timestamp":time.time(),
+                "role":"assistant",
+                "content":clean,
+                "rank":rank,
+                "phase":str(st.session_state.phase)
+            }).execute()
 
-        if len(st.session_state.msgs) % 4 == 0 and st.session_state.phase < 3:
-            st.session_state.phase += 1
+            if len(st.session_state.msgs) % 4 == 0 and st.session_state.phase < 3:
+                st.session_state.phase += 1
 
-        st.rerun()
+            st.rerun()
+
+        # ===============================
+        # BOW OUT BUTTON
+        # ===============================
+        st.divider()
+
+        if st.button("Bow Out"):
+
+            bow_prompt = f"""
+The user is leaving the dojo session.
+
+Provide a short closing reflection.
+
+Tone: calm martial arts mentor.
+
+User: {USER_NAME}
+Rank: {rank}
+
+End with one sentence of encouragement.
+"""
+
+            headers = {"Authorization": f"Bearer {st.secrets['GROQ_API_KEY']}"}
+
+            res = requests.post(
+                "https://api.groq.com/openai/v1/chat/completions",
+                json={
+                    "model":"llama-3.3-70b-versatile",
+                    "messages":[{"role":"system","content":bow_prompt}],
+                    "temperature":0.5
+                },
+                headers=headers
+            )
+
+            message = res.json()["choices"][0]["message"]["content"]
+
+            st.success(message)
+
+            st.session_state.phase = 0
+            st.session_state.msgs = []
+
+            time.sleep(2)
+
+            st.rerun()
