@@ -16,8 +16,43 @@ def init_supabase():
 supabase: Client = init_supabase()
 
 # ==================================================
-# 2. CORE CONFIG - THE BALANCED MENTOR
+# 2. LOGIN GATE (THE BOUNCER)
 # ==================================================
+if 'user' not in st.session_state:
+    st.set_page_config(page_title="The Dojo - Entry", layout="centered")
+    st.markdown("""
+        <style>
+        .stApp { background-color: #ffffff; }
+        .login-header { text-align: center; font-style: italic; font-weight: 800; font-size: 3rem; margin-bottom: 0px; }
+        .login-sub { text-align: center; color: #666; margin-bottom: 30px; }
+        </style>
+        """, unsafe_allow_html=True)
+    
+    st.markdown('<p class="login-header">The-Dojo</p>', unsafe_allow_html=True)
+    st.markdown('<p class="login-sub">Speak from center. Step onto the mat.</p>', unsafe_allow_html=True)
+    
+    with st.form("login_form"):
+        u_name = st.text_input("Username").lower().strip()
+        u_pass = st.text_input("Password", type="password")
+        submit = st.form_submit_with_button("Enter the Dojo", use_container_width=True)
+        
+        if submit:
+            res = supabase.table("users").select("*").eq("username", u_name).eq("password", u_pass).execute()
+            if res.data:
+                st.session_state.user = res.data[0]
+                st.success(f"Welcome, {st.session_state.user['display_name']}.")
+                time.sleep(1)
+                st.rerun()
+            else:
+                st.error("Credentials not recognized.")
+    st.stop() # LOCKS THE REST OF THE APP
+
+# ==================================================
+# 3. CORE CONFIG & PROMPTS
+# ==================================================
+USER_ID = st.session_state.user['id']
+USER_NAME = st.session_state.user['display_name']
+
 PHASE_SETS = {
     "Student": ["Welcome Mat", "Warm Up", "Training", "Reflection/Cool Down"],
     "Practitioner": ["Step Onto the Mat", "Warm Up", "Work the Pattern", "Wisdom/Cool Down"],
@@ -26,60 +61,47 @@ PHASE_SETS = {
 }
 
 MASTER_PROMPT = (
-    "ROLE: Dojo Mentor. \n"
+    f"ROLE: Dojo Mentor. \n"
+    f"CURRENT USER: {USER_NAME}. \n"
     "STYLE: Grounded, authoritative, and deeply observant. Speak like a man who respects the fire but loves the blade it produces. \n"
-    "THE BALANCE: Be visceral and honest about the struggle, but use that honesty to fuel a high-stakes vision. Use 'Architectural' inspiration.\n"
-    "DYNAMIC DEPTH: \n"
-    "1. LIGHT MOMENTS: 1-2 punchy, strategic sentences for brief check-ins. \n"
-    "2. HEAVY MOMENTS: Respond with 3-4 substantial paragraphs when the user shares breakthroughs or personal history. \n"
+    "THE BALANCE: Be visceral and honest about the struggle, but use that honesty to fuel a high-stakes vision. \n"
     "RULES:\n"
-    "1. NO CHEAP PRAISE: Acknowledge the user's raw experience as a forge for their future.\n"
-    "2. THE LEDGER: Read the background context. Address the USER'S specific journey, goals, and struggles. Do NOT assume they are a developer unless they say they are.\n"
-    "3. INSPIRATION: Focus on 'Legacy', 'Impact', and structural habits.\n"
-    "4. NO FLUFF: Keep the prose tight. No fillers.\n"
-    "5. FORWARD MOVEMENT: End with ONE sharp, tactical question."
+    "1. THE LEDGER: Read the background context. Address THIS user's specific journey and patterns.\n"
+    "2. NO CHEAP PRAISE: Acknowledge their raw experience as a forge.\n"
+    "3. FORWARD MOVEMENT: End with ONE sharp, tactical question."
 )
 
-MIRROR_PROMPT = (
-    "ROLE: Dojo Mirror. \n"
-    "GOAL: Pure synthesis of the Ledger. Point out deep patterns with minimalist weight."
-)
+MIRROR_PROMPT = "ROLE: Dojo Mirror. Pure synthesis of the Ledger. Point out deep patterns with minimalist weight."
 
 # ==================================================
-# 3. ARCHWAY UI
+# 4. ARCHWAY UI (MAIN APP)
 # ==================================================
 st.set_page_config(page_title="The Dojo", layout="wide")
-
 st.markdown("""
     <style>
     .stApp { background-color: #ffffff; color: #1a1a1a; }
     [data-testid="stSidebar"] { background-color: #f8f9fa; border-right: 1px solid #e0e0e0; }
-    .stChatMessage { background-color: #f8f9fa; border: 1px solid #e0e0e0; }
-    .sidebar-dojo { font-size: 2.2rem !important; font-weight: 800; color: #1a1a1a; font-style: italic; margin-bottom: -10px; line-height: 1.1; }
-    .active-rank { color: #000000; font-weight: 700; font-size: 1.35em; margin-bottom: 4px; }
-    .inactive-rank { color: #666666; font-size: 1.1em; margin-bottom: 4px; }
-    .active-phase { color: #000000; font-weight: 600; font-size: 1.15em; margin-bottom: 2px; padding-left: 10px; }
-    .inactive-phase { color: #888888; font-size: 1.0em; margin-bottom: 2px; padding-left: 10px; }
-    .watermark { position: fixed; bottom: 40%; left: 50%; transform: translateX(-50%); font-size: 11rem; opacity: 0.04; color: #111111; pointer-events: none; z-index: -1; user-select: none; }
-    .slogan-stack-refined { font-size: 1.65em; text-align: center; color: #666666; font-style: italic; margin-top: 5px; line-height: 1.3; }
-    .spacer { margin-bottom: 20px; }
+    .sidebar-dojo { font-size: 2.2rem !important; font-weight: 800; color: #1a1a1a; font-style: italic; margin-bottom: -10px; }
+    .active-rank { color: #000000; font-weight: 700; font-size: 1.35em; }
+    .inactive-rank { color: #666666; font-size: 1.1em; }
+    .active-phase { color: #000000; font-weight: 600; padding-left: 10px; }
+    .inactive-phase { color: #888888; padding-left: 10px; }
+    .slogan-stack-refined { font-size: 1.65em; text-align: center; color: #666666; font-style: italic; }
     </style>
     """, unsafe_allow_html=True)
 
 # ==================================================
-# 4. MEMORY & STATE MANAGEMENT
+# 5. DATA OPERATIONS (FILTERED BY USER_ID)
 # ==================================================
 def save_to_ledger(role, text, rank, phase):
-    data = {"timestamp": time.time(), "role": role, "content": text, "rank": rank, "phase": str(phase)}
+    data = {"user_id": USER_ID, "timestamp": time.time(), "role": role, "content": text, "rank": rank, "phase": str(phase)}
     supabase.table("records").insert(data).execute()
 
-# LOAD LONG TERM MEMORY FROM CLOUD
+# Load Memory for this User
 try:
-    wisdom_response = supabase.table("ledger_wisdom").select("*").order("timestamp").execute()
-    wisdom_rows = wisdom_response.data
-    long_term_memory = "\n".join([f"- {r['summary']}" for r in wisdom_rows])
-except:
-    long_term_memory = ""
+    w_res = supabase.table("ledger_wisdom").select("*").eq("user_id", USER_ID).order("timestamp").execute()
+    long_term_memory = "\n".join([f"- {r['summary']}" for r in w_res.data])
+except: long_term_memory = ""
 
 if 'msgs' not in st.session_state:
     st.session_state.msgs = []
@@ -87,145 +109,74 @@ if 'msgs' not in st.session_state:
     st.session_state.rank = "Student"
     st.session_state.phase = 0
     
-    # LOAD SHORT TERM CHAT LOG FROM CLOUD
+    # Load Chat History for this User
     try:
-        records_response = supabase.table("records").select("*").order("timestamp").execute()
-        rows = records_response.data
-        for r in rows:
-            timestamp_str = datetime.fromtimestamp(r['timestamp']).strftime('%Y-%m-%d %H:%M')
-            st.session_state.msgs.append({"role": r['role'], "content": f"[{timestamp_str}] {r['content']}"})
-        if rows:
-            st.session_state.rank = rows[-1]['rank']
-            try: st.session_state.phase = int(rows[-1]['phase'])
-            except: st.session_state.phase = 0
-    except:
-        pass
+        r_res = supabase.table("records").select("*").eq("user_id", USER_ID).order("timestamp").execute()
+        for r in r_res.data:
+            ts = datetime.fromtimestamp(r['timestamp']).strftime('%Y-%m-%d %H:%M')
+            st.session_state.msgs.append({"role": r['role'], "content": f"[{ts}] {r['content']}"})
+        if r_res.data:
+            st.session_state.rank = r_res.data[-1]['rank']
+            st.session_state.phase = int(r_res.data[-1]['phase'])
+    except: pass
 
 # ==================================================
-# 5. SIDEBAR - THE CLOUD COMPRESSOR
+# 6. SIDEBAR & BOW-OUT
 # ==================================================
 with st.sidebar:
-    st.markdown('<p class="sidebar-dojo">The-Dojo</p>', unsafe_allow_html=True)
+    st.markdown(f'<p class="sidebar-dojo">The-Dojo</p>', unsafe_allow_html=True)
+    st.write(f"Warrior: **{USER_NAME}**")
     st.divider()
+    
     ranks = ["Student", "Practitioner", "Sentinel", "Sovereign"]
     for r in ranks:
         st.markdown(f"<p class='{'active-rank' if r == st.session_state.rank else 'inactive-rank'}'>{'➤ ' if r == st.session_state.rank else ''}{r}</p>", unsafe_allow_html=True)
-    st.divider()
-    current_phases = PHASE_SETS.get(st.session_state.rank, PHASE_SETS["Student"])
-    for idx, phase_name in enumerate(current_phases):
-        st.markdown(f"<p class='{'active-phase' if idx == st.session_state.phase else 'inactive-phase'}'>{'➤ ' if idx == st.session_state.phase else ''}{phase_name}</p>", unsafe_allow_html=True)
-    st.markdown("<br>", unsafe_allow_html=True)
     
-    # CLOUD BOW-OUT
+    st.divider()
     if st.button("Bow-Out", use_container_width=True):
         if len(st.session_state.msgs) > 2:
-            with st.spinner("Archiving today's wisdom to the cloud..."):
-                try:
-                    chat_log = "\n".join([f"{m['role']}: {m['content']}" for m in st.session_state.msgs])
-                    summary_prompt = "You are the Dojo Secretary. Summarize the key psychological breakthroughs, structural realizations, and specific goals from this session. Keep it to one dense, highly analytical paragraph. Focus on the user's growth. Output ONLY the summary text."
-                    
-                    headers = {"Authorization": f"Bearer {st.secrets['GROQ_API_KEY']}"}
-                    payload = {"model": "llama-3.1-8b-instant", "messages": [{"role": "system", "content": summary_prompt}, {"role": "user", "content": chat_log}], "temperature": 0.3, "max_tokens": 300}
-                    
-                    res = requests.post("https://api.groq.com/openai/v1/chat/completions", json=payload, headers=headers, timeout=15)
-                    summary = res.json()['choices'][0]['message']['content']
-                    
-                    # Save to Cloud Wisdom
-                    supabase.table("ledger_wisdom").insert({"timestamp": time.time(), "summary": summary}).execute()
-                    # Sweep Cloud Mat
-                    supabase.table("records").delete().neq("id", 0).execute() 
-                    
-                    st.toast("Cloud Wisdom Archived. Mat Cleared.", icon="☁️")
-                except Exception as e:
-                    st.toast("Archive failed. Mat cleared.", icon="⚠️")
-                    supabase.table("records").delete().neq("id", 0).execute()
-        else:
-            supabase.table("records").delete().neq("id", 0).execute()
-            
-        st.session_state.phase = 0
-        st.session_state.exchange_count = 0
+            chat_log = "\n".join([f"{m['role']}: {m['content']}" for m in st.session_state.msgs])
+            headers = {"Authorization": f"Bearer {st.secrets['GROQ_API_KEY']}"}
+            payload = {
+                "model": "llama-3.1-8b-instant",
+                "messages": [{"role": "system", "content": "Summarize user growth. One dense paragraph."}, {"role": "user", "content": chat_log}],
+                "temperature": 0.3
+            }
+            res = requests.post("https://api.groq.com/openai/v1/chat/completions", json=payload, headers=headers)
+            summary = res.json()['choices'][0]['message']['content']
+            supabase.table("ledger_wisdom").insert({"user_id": USER_ID, "timestamp": time.time(), "summary": summary}).execute()
+        
+        supabase.table("records").delete().eq("user_id", USER_ID).execute()
         st.session_state.msgs = []
+        st.rerun()
+        
+    if st.button("Logout"):
+        del st.session_state.user
         st.rerun()
 
 # ==================================================
-# 6. MAIN INTERFACE
+# 7. CHAT INTERFACE
 # ==================================================
-st.markdown('<div class="slogan-stack-refined">Warriors Don\'t Always Win — Warriors Always Fight</div>', unsafe_allow_html=True)
 st.markdown('<div class="slogan-stack-refined">We. Never. Quit.</div>', unsafe_allow_html=True)
-st.markdown('<div class="spacer"></div>', unsafe_allow_html=True)
-st.markdown('<div class="watermark">;∞</div>', unsafe_allow_html=True)
 
 for msg in st.session_state.msgs:
     with st.chat_message(msg["role"]):
-        display_text = msg["content"].split("] ", 1)[-1] if "] " in msg["content"] else msg["content"]
-        st.markdown(display_text, unsafe_allow_html=True)
+        st.markdown(msg["content"].split("] ", 1)[-1] if "] " in msg["content"] else msg["content"])
 
-# ==================================================
-# 7. ENGINE ROUTING
-# ==================================================
 if prompt := st.chat_input("Speak from center..."):
-    current_ts = datetime.now().strftime('%Y-%m-%d %H:%M')
-    st.session_state.msgs.append({"role": "user", "content": f"[{current_ts}] {prompt}"})
-    save_to_ledger("user", prompt, st.session_state.rank, str(st.session_state.phase))
-    st.session_state.exchange_count += 1
+    ts = datetime.now().strftime('%Y-%m-%d %H:%M')
+    st.session_state.msgs.append({"role": "user", "content": f"[{ts}] {prompt}"})
+    save_to_ledger("user", prompt, st.session_state.rank, st.session_state.phase)
     with st.chat_message("user"): st.markdown(prompt)
 
-    crisis_keywords = ["kill myself", "suicide", "hurt myself", "end my life", "want to die", "harm myself", "don't want to live", "ending it all"]
-    if any(k in prompt.lower() for k in crisis_keywords):
-        with st.chat_message("assistant"):
-            safety_box = """
-            <div style="background-color: #ffe6e6; border-left: 5px solid #ff0000; padding: 20px; border-radius: 5px;">
-                <p style="color: #cc0000; font-weight: bold; font-size: 1.2em; margin-bottom: 10px;">🛡️ SAFETY PROTOCOL ACTIVATED</p>
-                <p style="color: #1a1a1a;">I am here with you, but I am a structural mentor, not a crisis counselor. Please reach out to those who can help right now:</p>
-                <ul style="color: #1a1a1a; font-weight: bold;">
-                    <li>Call or Text: 988 (Suicide & Crisis Lifeline)</li>
-                    <li>Text: HOME to 741741 (Crisis Text Line)</li>
-                </ul>
-                <hr style="border: 0; border-top: 1px solid #ffcccc; margin: 15px 0;">
-                <p style="color: #1a1a1a; font-size: 0.95em;"><b>To return to the Dojo:</b> Please use the <b>Bow-Out</b> button in the sidebar to reset your session.</p>
-            </div>
-            """
-            st.markdown(safety_box, unsafe_allow_html=True)
-            st.session_state.msgs.append({"role": "assistant", "content": safety_box})
-            save_to_ledger("assistant", "CRISIS_PROTOCOL_ACTIVATED", st.session_state.rank, str(st.session_state.phase))
-            st.rerun()
-    else:
-        with st.chat_message("assistant"):
-            with st.status("🧘‍♂️ Let me think about this a moment...", expanded=False) as status:
-                dynamic_sys_msg = MIRROR_PROMPT if st.session_state.phase == 3 else MASTER_PROMPT
-                if long_term_memory:
-                    dynamic_sys_msg += f"\n\nBACKGROUND CONTEXT (PAST SESSION SUMMARIES):\n{long_term_memory}"
-
-                messages = [{"role": "system", "content": dynamic_sys_msg}] + st.session_state.msgs[-30:]
-                headers = {"Authorization": f"Bearer {st.secrets['GROQ_API_KEY']}"}
-                payload = {"model": "llama-3.3-70b-versatile", "messages": messages, "temperature": 0.55, "max_tokens": 1024}
-                
-                try:
-                    res = requests.post("https://api.groq.com/openai/v1/chat/completions", json=payload, headers=headers, timeout=25)
-                    final_response = res.json()['choices'][0]['message']['content']
-                    time.sleep(min(1.0 + (len(final_response.split()) * 0.05), 5.0))
-                    status.update(label="🙏 Wisdom Found.", state="complete", expanded=False)
-                except: 
-                    final_response = "**System Alert:** Transmission issue."
-                    status.update(label="⚠️ Connection Severed.", state="error")
-            
-            st.markdown(final_response)
-            st.session_state.msgs.append({"role": "assistant", "content": final_response})
-            save_to_ledger("assistant", final_response, st.session_state.rank, str(st.session_state.phase))
-            
-            if st.session_state.exchange_count >= 2:
-                check_payload = {"model": "llama-3.1-8b-instant", "messages": [{"role": "system", "content": "Analyze growth. Reply ONLY YES or NO."}, {"role": "user", "content": prompt}], "temperature": 0.0}
-                try:
-                    readiness = requests.post("https://api.groq.com/openai/v1/chat/completions", json=check_payload, headers=headers, timeout=5)
-                    is_ready = "YES" in readiness.json()['choices'][0]['message']['content'].upper()
-                except: is_ready = False
-
-                if is_ready or st.session_state.exchange_count >= 6:
-                    st.session_state.exchange_count = 0
-                    if st.session_state.phase < 3: st.session_state.phase += 1
-                    else:
-                        st.session_state.phase = 0
-                        ranks = ["Student", "Practitioner", "Sentinel", "Sovereign"]
-                        try: st.session_state.rank = ranks[ranks.index(st.session_state.rank) + 1]
-                        except: pass
-    st.rerun()
+    # Simple AI Call
+    headers = {"Authorization": f"Bearer {st.secrets['GROQ_API_KEY']}"}
+    messages = [{"role": "system", "content": MASTER_PROMPT + f"\n\nContext: {long_term_memory}"}] + st.session_state.msgs[-10:]
+    payload = {"model": "llama-3.3-70b-versatile", "messages": messages, "temperature": 0.6}
+    
+    res = requests.post("https://api.groq.com/openai/v1/chat/completions", json=payload, headers=headers)
+    final_response = res.json()['choices'][0]['message']['content']
+    
+    with st.chat_message("assistant"): st.markdown(final_response)
+    st.session_state.msgs.append({"role": "assistant", "content": final_response})
+    save_to_ledger("assistant", final_response, st.session_state.rank, st.session_state.phase)
