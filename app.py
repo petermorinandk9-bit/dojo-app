@@ -1,81 +1,285 @@
-```python
 import streamlit as st
-from elevenlabs.client import ElevenLabs
+import requests
+import time
+from supabase import create_client, Client
 
 # ==================================================
 # CONFIG
 # ==================================================
+st.set_page_config(page_title="The-Dojo", layout="wide")
 
-st.set_page_config(page_title="Dojo Voice Test", layout="centered")
+# ==================================================
+# CONNECTION
+# ==================================================
+@st.cache_resource
+def init_supabase():
+    url = st.secrets["SUPABASE_URL"]
+    key = st.secrets["SUPABASE_KEY"]
+    return create_client(url, key)
 
-VOICE_ID = "21m00Tcm4TlvDq8ikWAM"  # Rachel (free tier voice)
+supabase: Client = init_supabase()
 
-client = ElevenLabs(
-    api_key=st.secrets["ELEVEN_API_KEY"]
-)
+# ==================================================
+# RANK SYSTEM
+# ==================================================
+def compute_rank(count):
+    if count < 15:
+        return "Student"
+    if count < 40:
+        return "Practitioner"
+    if count < 80:
+        return "Sentinel"
+    return "Sovereign"
+
+# ==================================================
+# AUTH
+# ==================================================
+if "user" not in st.session_state:
+
+    st.markdown("""
+    <style>
+    .stApp {background:#ffffff;}
+    .login-header{text-align:center;font-style:italic;font-weight:800;font-size:3.5rem;}
+    .login-sub{text-align:center;color:#666;margin-bottom:30px;}
+    </style>
+    """, unsafe_allow_html=True)
+
+    st.markdown('<p class="login-header">The-Dojo</p>', unsafe_allow_html=True)
+    st.markdown('<p class="login-sub">Forge your discipline. Step onto the mat.</p>', unsafe_allow_html=True)
+
+    with st.form("login"):
+        u = st.text_input("Username").lower().strip()
+        p = st.text_input("Password", type="password")
+
+        if st.form_submit_button("Enter the Dojo"):
+
+            res = supabase.table("users")\
+                .select("*")\
+                .eq("username", u)\
+                .eq("password", p)\
+                .execute()
+
+            if res.data:
+                st.session_state.user = res.data[0]
+                st.rerun()
+            else:
+                st.error("Credentials not recognized")
+
+    st.stop()
+
+USER_ID = st.session_state.user["id"]
+USER_NAME = st.session_state.user["display_name"]
 
 # ==================================================
 # SESSION STATE
 # ==================================================
+if "msgs" not in st.session_state:
+    st.session_state.msgs = []
+    st.session_state.phase = 0
 
-if "voice_mode" not in st.session_state:
-    st.session_state.voice_mode = False
+# ==================================================
+# LOAD HISTORY
+# ==================================================
+if "history_loaded" not in st.session_state:
+
+    r = supabase.table("records")\
+        .select("*", count="exact")\
+        .eq("user_id", USER_ID)\
+        .order("timestamp")\
+        .execute()
+
+    if r.data:
+        for row in r.data:
+            st.session_state.msgs.append({
+                "role": row["role"],
+                "content": row["content"]
+            })
+
+    st.session_state.records_count = r.count if r.count else 0
+    st.session_state.history_loaded = True
+
+rank = compute_rank(st.session_state.records_count)
+
+# ==================================================
+# FETCH DOJO MEMORY
+# ==================================================
+def fetch_latest(table, field):
+
+    try:
+        r = supabase.table(table)\
+            .select("*")\
+            .eq("user_id", USER_ID)\
+            .order("timestamp", desc=True)\
+            .limit(1)\
+            .execute()
+
+        if r.data:
+            return r.data[0][field]
+    except:
+        pass
+
+    return None
+
+
+latest_pattern = fetch_latest("dojo_patterns", "pattern")
+latest_doctrine = fetch_latest("dojo_doctrine", "doctrine")
+latest_milestone = fetch_latest("dojo_milestones", "milestone")
+
+# ==================================================
+# PHASES
+# ==================================================
+PHASE_SETS = {
+    "Student":["Welcome","Warm-Up","Training","Cool Down"],
+    "Practitioner":["Welcome","Warm-Up","Training","Cool Down"],
+    "Sentinel":["Welcome","Warm-Up","Training","Cool Down"],
+    "Sovereign":["Welcome","Warm-Up","Training","Cool Down"]
+}
 
 # ==================================================
 # SIDEBAR
 # ==================================================
-
 with st.sidebar:
 
-    st.title("Voice Settings")
+    st.markdown("### The-Dojo")
 
-    st.session_state.voice_mode = st.checkbox(
-        "Voice Mode (auto speak mentor)",
-        value=st.session_state.voice_mode
-    )
+    st.markdown(f"**{rank} · {USER_NAME}**")
+
+    st.divider()
+
+    for i,p in enumerate(PHASE_SETS[rank]):
+
+        if i == st.session_state.phase:
+            st.markdown(f"**{p}**")
+        else:
+            st.markdown(p)
+
+    st.divider()
+
+    if st.button("Bow Out"):
+
+        st.session_state.phase = 0
+        st.session_state.msgs = []
+
+        st.success("You bow out from the mat. Training continues tomorrow.")
+
+        time.sleep(1)
+
+        st.rerun()
 
 # ==================================================
-# VOICE FUNCTION
+# TABS
 # ==================================================
-
-def generate_voice(text):
-
-    audio_stream = client.text_to_speech.convert(
-        text=text,
-        voice_id=VOICE_ID,
-        model_id="eleven_multilingual_v2"
-    )
-
-    audio_bytes = b"".join(audio_stream)
-
-    return audio_bytes
+tab_train, tab_history = st.tabs(["Training","History"])
 
 # ==================================================
-# MAIN UI
+# TRAINING
 # ==================================================
+with tab_train:
 
-st.title("Dojo Voice Test")
+    # ===============================
+    # DOJO AWARENESS BANNER
+    # ===============================
+    with st.container():
 
-text = st.text_area(
-    "Enter text for the mentor to speak:",
-    "Welcome back to the dojo. Step onto the mat."
-)
+        st.markdown("### Dojo Awareness")
 
-if st.button("Generate Mentor Response"):
+        if latest_pattern:
+            st.write(f"**Current Pattern:** {latest_pattern}")
 
-    st.markdown("### Mentor")
+        if latest_doctrine:
+            st.write(f"**Recent Doctrine:** {latest_doctrine}")
 
-    st.write(text)
+        if latest_milestone:
+            st.write(f"**Recent Milestone:** {latest_milestone}")
 
-    # Listen button
-    if st.button("▶ Listen"):
+        st.write(f"**Current Phase:** {PHASE_SETS[rank][st.session_state.phase]}")
 
-        audio = generate_voice(text)
-        st.audio(audio)
+        st.divider()
 
-    # Auto voice mode
-    if st.session_state.voice_mode:
+    # ===============================
+    # CHAT HISTORY
+    # ===============================
+    for msg in st.session_state.msgs[-10:]:
+        with st.chat_message(msg["role"]):
+            st.markdown(msg["content"])
 
-        audio = generate_voice(text)
-        st.audio(audio)
-```
+    # ===============================
+    # USER INPUT
+    # ===============================
+    if prompt := st.chat_input("Speak from center..."):
+
+        st.session_state.msgs.append({
+            "role":"user",
+            "content":prompt
+        })
+
+        session_summary = " ".join(
+            [m["content"] for m in st.session_state.msgs if m["role"]=="user"][-3:]
+        )
+
+        # ===============================
+        # RANK STYLE
+        # ===============================
+        rank_style = {
+            "Student":"supportive instructor who explains ideas clearly",
+            "Practitioner":"focused coach giving practical guidance",
+            "Sentinel":"reflective strategist who points out patterns",
+            "Sovereign":"minimalist mentor who guides through questions"
+        }
+
+        # ===============================
+        # MASTER PROMPT
+        # ===============================
+        MASTER_PROMPT = f"""
+You are the Dojo Mentor for {USER_NAME}.
+
+Mentor style: {rank_style[rank]}
+
+Recent Dojo Memory:
+
+Pattern:
+{latest_pattern}
+
+Doctrine:
+{latest_doctrine}
+
+Milestone:
+{latest_milestone}
+
+Session summary:
+{session_summary}
+
+Respond with grounded insight and calm guidance.
+
+Rules:
+• Avoid mystical or overly poetic language.
+• Use patterns implicitly rather than explaining the system.
+• Speak like an experienced martial artist helping someone train their mind.
+• 4-8 sentences.
+
+Rank: {rank}
+Phase: {PHASE_SETS[rank][st.session_state.phase]}
+"""
+
+        headers = {"Authorization": f"Bearer {st.secrets['GROQ_API_KEY']}"}
+
+        res = requests.post(
+            "https://api.groq.com/openai/v1/chat/completions",
+            json={
+                "model":"llama-3.3-70b-versatile",
+                "messages":[{"role":"system","content":MASTER_PROMPT}] + st.session_state.msgs[-10:]
+            },
+            headers=headers
+        )
+
+        reply = res.json()["choices"][0]["message"]["content"]
+
+        st.session_state.msgs.append({
+            "role":"assistant",
+            "content":reply
+        })
+
+        if len(st.session_state.msgs) % 4 == 0 and st.session_state.phase < 3:
+            st.session_state.phase += 1
+
+        st.rerun()
