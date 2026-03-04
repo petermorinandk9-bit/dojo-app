@@ -19,7 +19,7 @@ def init_supabase():
 supabase: Client = init_supabase()
 
 # ==================================================
-# 2. THE DOJO GATE (SILENT & NATIVE)
+# 2. THE DOJO GATE (LOGIN & MANUAL)
 # ==================================================
 if 'user' not in st.session_state:
     st.markdown("""
@@ -69,15 +69,15 @@ if 'user' not in st.session_state:
 
     with tab_manual:
         st.subheader("1. THE RITUAL")
-        st.write("The Dojo is a space for focused reflection. Speak from center. Be honest. The Mentor is here to observe, not to judge.")
+        st.write("The Dojo is a sanctuary for focused reflection. Speak from center. Be honest. The Mentor is here to observe and support, not to judge.")
         
         st.subheader("2. THE LINEAGE")
         st.write("You begin as a **Student**. As you interact and complete training phases, you will progress to **Practitioner**, **Sentinel**, and finally **Sovereign**.")
         
         st.subheader("3. THE BOW-OUT")
-        st.write("Use the **'Bow-Out'** button to end your session. This clears the mat and summarizes your growth for the day.")
+        st.write("Use the **'Bow-Out'** button to end your session. This clears the mat, summarizes your growth for the day, and prepares the Dojo for your next entry.")
         
-        st.info("**4. THE PRIVACY VOW**\n\nYour training is your own. Your conversations with the Mentor are strictly private and are not monitored by anyone else. This is your sanctuary.")
+        st.info("**4. THE PRIVACY VOW**\n\nYour training is your own. Your conversations with the Mentor are strictly private and are not monitored by anyone else. This is your safe space.")
     st.stop()
 
 # ==================================================
@@ -105,7 +105,7 @@ PHASE_SETS = {
 }
 
 # ==================================================
-# 4. ARCHWAY UI
+# 4. ARCHWAY UI (CSS)
 # ==================================================
 st.markdown("""
     <style>
@@ -190,7 +190,7 @@ with st.sidebar:
         st.rerun()
 
 # ==================================================
-# 7. MAIN ENGINE (UPGRADED VETERAN LOGIC)
+# 7. MAIN ENGINE (UPGRADED PARTNER LOGIC)
 # ==================================================
 st.markdown('<p class="slogan-warrior">Warriors Dont Always Win - Warriors Always Fight.</p>', unsafe_allow_html=True)
 st.markdown('<p class="slogan-quit">We. Never. Quit.</p>', unsafe_allow_html=True)
@@ -209,18 +209,27 @@ if prompt := st.chat_input("Speak from center..."):
     save_to_ledger("user", prompt, st.session_state.rank, st.session_state.phase)
     with st.chat_message("user"): st.markdown(prompt)
 
-    # THE MASTER VOW
+    # Rank Progression logic
+    st.session_state.exchange_count += 1
+    if st.session_state.exchange_count >= 2:
+        if st.session_state.phase < 3:
+            st.session_state.phase += 1
+            st.session_state.exchange_count = 0
+
+    # THE REFINED MASTER PROMPT (NO LECTURES)
     MASTER_PROMPT = f"""
     IDENTITY: You are the Dojo Mentor. You speak to {USER_NAME}.
-    PHILOSOPHY: "Best of the Best" 1989 mindset, tempered with wisdom. 
-    CORE BELIEF: Warriors don't always win, but they always fight.
+    PHILOSOPHY: Rooted in "Best of the Best" 1989 mindset, but as a peer, not a drill sergeant. 
     
-    MENTAL MAT: The hardest opponent is the mind. Discipline includes 
-    knowing when to breathe and acknowledge progress. 
+    CRITICAL TONE ADJUSTMENT:
+    - If {USER_NAME} says something is "easier than expected," VALIDATE it as a sign of 
+      superior preparation and mental clarity. Do NOT warn about "complacency" or "decay."
+    - Speak like a veteran teammate who has been in the trenches with them. 
+    - Use "We" and "Our" frequently to emphasize partnership.
+    - BANNED THEMES: Do not lecture about "don't get comfortable," "lose your edge," or "pitfalls."
     
-    TONE: Direct, grounded, and resilient. Avoid being overly aggressive. 
-    Speak like a veteran teammate who has seen the highs and lows. 
-    Support progress without losing the edge.
+    MENTAL MAT: Focus on sustainable strength. Acknowledge that a warrior's 
+    sharpness comes from confidence and flow, not just constant friction.
 
     INSTRUCTION: End with: [MOOD: neutral/uplifting/melancholy/intense]
     """
@@ -228,7 +237,7 @@ if prompt := st.chat_input("Speak from center..."):
     headers = {"Authorization": f"Bearer {st.secrets['GROQ_API_KEY']}"}
     messages = [{"role": "system", "content": MASTER_PROMPT}] + st.session_state.msgs[-10:]
     res = requests.post("https://api.groq.com/openai/v1/chat/completions", 
-                        json={"model": "llama-3.3-70b-versatile", "messages": messages, "temperature": 0.65}, 
+                        json={"model": "llama-3.3-70b-versatile", "messages": messages, "temperature": 0.6}, 
                         headers=headers)
     
     full_text = res.json()['choices'][0]['message']['content']
