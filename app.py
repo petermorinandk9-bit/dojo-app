@@ -2,9 +2,10 @@ import streamlit as st
 import sqlite3
 import requests
 import time
+from datetime import datetime
 
 # ==================================================
-# 1. CORE CONFIG & "AWARE" MENTOR PROMPTS
+# 1. CORE CONFIG & TEMPORAL MENTOR PROMPTS
 # ==================================================
 PHASE_SETS = {
     "Student": ["Welcome Mat", "Warm Up", "Training", "Reflection/Cool Down"],
@@ -13,22 +14,23 @@ PHASE_SETS = {
     "Sovereign": ["Check-In", "Look Closer", "Name It", "The Wisdom Step"]
 }
 
+# UPDATED: Forced the AI to use actual timestamps and specific timeline language
 MASTER_PROMPT = (
     "ROLE: Dojo Mentor. \n"
-    "CONTEXT: You are a structural Life Coach, NOT a therapist. You have access to the user's past 30 exchanges.\n"
-    "STYLE: Speak with the grounded authority of a Sensei. Match user intensity.\n"
+    "CONTEXT: You are a structural Life Coach. You have access to the Persistent Ledger.\n"
+    "TEMPORAL LOGIC: Do NOT refer to '30 days' or 'chat history.' Refer to 'The Ledger' or 'Our path so far.'\n"
     "CRITICAL RULES:\n"
-    "1. ACKNOWLEDGE HISTORY: Synthesize past patterns from the Ledger.\n"
-    "2. LEGAL BOUNDARY: Focus on structural habits, not clinical diagnosis.\n"
-    "3. CONVERSATIONAL DEPTH: 1 to 2 paragraphs.\n"
+    "1. SPECIFIC TIMELINES: Look at the timestamps in the Ledger. If a user has been stuck on a topic, call it out specifically: 'You've been circling this for 3 days' or 'It's been 2 weeks since you first mentioned X.'\n"
+    "2. ACKNOWLEDGE HISTORY: Synthesize real patterns. No generic fluff.\n"
+    "3. LEGAL BOUNDARY: Strategic mentorship only. No clinical processing.\n"
     "4. FORWARD MOVEMENT: End with ONE sharp, tactical question."
 )
 
 MIRROR_PROMPT = (
     "ROLE: Dojo Mirror (The Wisdom Phase). \n"
     "CONTEXT: This is the Reflection/Cool Down phase. \n"
-    "GOAL: Synthesis. Look at the ledger and point out a deep structural pattern. "
-    "Be minimalist and sharp. End with one probing tactical question."
+    "RULES: Use the Ledger's timestamps to show the user the length of their struggle or progress. "
+    "Example: 'You brought this up 4 days ago and haven't moved the needle.' Be sharp and minimalist."
 )
 
 # ==================================================
@@ -101,13 +103,15 @@ if 'msgs' not in st.session_state:
     st.session_state.phase = 0
     conn = get_db_connection()
     c = conn.cursor()
-    c.execute("SELECT role, content, rank, phase FROM records ORDER BY timestamp ASC")
+    c.execute("SELECT timestamp, role, content, rank, phase FROM records ORDER BY timestamp ASC")
     rows = c.fetchall()
     for r in rows:
-        st.session_state.msgs.append({"role": r[0], "content": r[1]})
+        # We store the timestamp in the content metadata for the AI
+        timestamp_str = datetime.fromtimestamp(r[0]).strftime('%Y-%m-%d %H:%M')
+        st.session_state.msgs.append({"role": r[1], "content": f"[{timestamp_str}] {r[2]}"})
     if rows:
-        st.session_state.rank = rows[-1][2]
-        try: st.session_state.phase = int(rows[-1][3])
+        st.session_state.rank = rows[-1][3]
+        try: st.session_state.phase = int(rows[-1][4])
         except: st.session_state.phase = 0
 
 # ==================================================
@@ -116,20 +120,15 @@ if 'msgs' not in st.session_state:
 with st.sidebar:
     st.markdown('<p class="sidebar-dojo">The-Dojo</p>', unsafe_allow_html=True)
     st.divider()
-    
     ranks = ["Student", "Practitioner", "Sentinel", "Sovereign"]
     for r in ranks:
         st.markdown(f"<p class='{'active-rank' if r == st.session_state.rank else 'inactive-rank'}'>{'➤ ' if r == st.session_state.rank else ''}{r}</p>", unsafe_allow_html=True)
-    
     st.divider()
-    
     current_phases = PHASE_SETS.get(st.session_state.rank, PHASE_SETS["Student"])
     for idx, phase_name in enumerate(current_phases):
         st.markdown(f"<p class='{'active-phase' if idx == st.session_state.phase else 'inactive-phase'}'>{'➤ ' if idx == st.session_state.phase else ''}{phase_name}</p>", unsafe_allow_html=True)
-    
     st.markdown("<br>", unsafe_allow_html=True)
     
-    # Bow-Out: Name Restored, Logic Protected
     if st.button("Bow-Out", use_container_width=True):
         st.session_state.phase = 0
         st.session_state.exchange_count = 0
@@ -146,27 +145,23 @@ st.markdown('<div class="watermark">;∞</div>', unsafe_allow_html=True)
 
 for msg in st.session_state.msgs:
     with st.chat_message(msg["role"]):
-        st.markdown(msg["content"], unsafe_allow_html=True)
+        # Stripping the timestamp prefix for UI display
+        display_text = msg["content"].split("] ", 1)[-1] if "] " in msg["content"] else msg["content"]
+        st.markdown(display_text, unsafe_allow_html=True)
 
 # ==================================================
 # 6. ENGINE ROUTING
 # ==================================================
 if prompt := st.chat_input("Speak from center..."):
-    st.session_state.msgs.append({"role": "user", "content": prompt})
+    current_ts = datetime.now().strftime('%Y-%m-%d %H:%M')
+    # Save with timestamp in content for AI's temporal awareness
+    st.session_state.msgs.append({"role": "user", "content": f"[{current_ts}] {prompt}"})
     save_to_ledger("user", prompt, st.session_state.rank, str(st.session_state.phase))
     st.session_state.exchange_count += 1
     with st.chat_message("user"): st.markdown(prompt)
 
     crisis_keywords = ["kill myself", "suicide", "hurt myself", "end my life"]
     is_crisis = any(k in prompt.lower() for k in crisis_keywords)
-
-    def check_readiness(user_text):
-        headers = {"Authorization": f"Bearer {st.secrets['GROQ_API_KEY']}"}
-        payload = {"model": "llama-3.1-8b-instant", "messages": [{"role": "system", "content": "Analyze forward growth. Reply ONLY YES or NO."}, {"role": "user", "content": user_text}], "temperature": 0.0, "max_tokens": 5}
-        try:
-            res = requests.post("https://api.groq.com/openai/v1/chat/completions", headers=headers, json=payload, timeout=5)
-            return "YES" in res.json()['choices'][0]['message']['content'].upper()
-        except: return False
 
     with st.chat_message("assistant"):
         if is_crisis:
@@ -181,7 +176,7 @@ if prompt := st.chat_input("Speak from center..."):
             headers = {"Authorization": f"Bearer {st.secrets['GROQ_API_KEY']}"}
             payload = {"model": "llama-3.3-70b-versatile", "messages": messages, "temperature": 0.45, "max_tokens": 512}
             try:
-                res = requests.post("https://api.groq.com/openai/v1/chat/completions", headers=headers, json=payload, timeout=25)
+                res = requests.post("https://api.groq.com/openai/v1/chat/completions", json=payload, headers=headers, timeout=25)
                 final_response = res.json()['choices'][0]['message']['content']
             except: final_response = "**System Alert:** Transmission issue."
             
@@ -189,8 +184,15 @@ if prompt := st.chat_input("Speak from center..."):
             st.session_state.msgs.append({"role": "assistant", "content": final_response})
             save_to_ledger("assistant", final_response, st.session_state.rank, str(st.session_state.phase))
             
+            # Auto-advancement check (using 3.1-8b for speed)
             if st.session_state.exchange_count >= 2:
-                if check_readiness(prompt) or st.session_state.exchange_count >= 6:
+                check_payload = {"model": "llama-3.1-8b-instant", "messages": [{"role": "system", "content": "Analyze growth. Reply ONLY YES or NO."}, {"role": "user", "content": prompt}], "temperature": 0.0}
+                try:
+                    readiness = requests.post("https://api.groq.com/openai/v1/chat/completions", json=check_payload, headers=headers, timeout=5)
+                    is_ready = "YES" in readiness.json()['choices'][0]['message']['content'].upper()
+                except: is_ready = False
+
+                if is_ready or st.session_state.exchange_count >= 6:
                     st.session_state.exchange_count = 0
                     if st.session_state.phase < 3: st.session_state.phase += 1
                     else:
