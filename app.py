@@ -14,27 +14,24 @@ PHASE_SETS = {
     "Sovereign": ["Check-In", "Look Closer", "Name It", "The Wisdom Step"]
 }
 
-# UPDATED: Forced the AI to use actual timestamps and specific timeline language
 MASTER_PROMPT = (
     "ROLE: Dojo Mentor. \n"
     "CONTEXT: You are a structural Life Coach. You have access to the Persistent Ledger.\n"
-    "TEMPORAL LOGIC: Do NOT refer to '30 days' or 'chat history.' Refer to 'The Ledger' or 'Our path so far.'\n"
+    "TEMPORAL LOGIC: Do NOT refer to '30 days'. Refer to 'The Ledger' or 'Our path so far.'\n"
     "CRITICAL RULES:\n"
-    "1. SPECIFIC TIMELINES: Look at the timestamps in the Ledger. If a user has been stuck on a topic, call it out specifically: 'You've been circling this for 3 days' or 'It's been 2 weeks since you first mentioned X.'\n"
-    "2. ACKNOWLEDGE HISTORY: Synthesize real patterns. No generic fluff.\n"
-    "3. LEGAL BOUNDARY: Strategic mentorship only. No clinical processing.\n"
-    "4. FORWARD MOVEMENT: End with ONE sharp, tactical question."
+    "1. SPECIFIC TIMELINES: Look at timestamps. Call out specific durations (e.g., 'You've circled this for 3 days').\n"
+    "2. NO FLUFF: Strategic mentorship only. No clinical 'processing'.\n"
+    "3. FORWARD MOVEMENT: End with ONE sharp, tactical question."
 )
 
 MIRROR_PROMPT = (
     "ROLE: Dojo Mirror (The Wisdom Phase). \n"
     "CONTEXT: This is the Reflection/Cool Down phase. \n"
-    "RULES: Use the Ledger's timestamps to show the user the length of their struggle or progress. "
-    "Example: 'You brought this up 4 days ago and haven't moved the needle.' Be sharp and minimalist."
+    "RULES: Use timestamps to show the length of struggle or progress. Be sharp and minimalist."
 )
 
 # ==================================================
-# 2. ARCHWAY UI - SOVEREIGN LIGHT MODE
+# 2. ARCHWAY UI
 # ==================================================
 st.set_page_config(page_title="The Dojo", layout="wide")
 
@@ -59,7 +56,6 @@ st.markdown("""
     
     .watermark { position: fixed; bottom: 40%; left: 50%; transform: translateX(-50%); font-size: 11rem; opacity: 0.04; color: #111111; pointer-events: none; z-index: -1; user-select: none; }
     .crisis-box { background-color: #ffe6e6; border-left: 5px solid #ff0000; padding: 15px; margin-top: 10px; border-radius: 5px; }
-    .crisis-text { color: #cc0000; font-weight: bold; font-size: 1.1em; margin-bottom: 5px; }
     
     .slogan-stack-refined { 
         font-size: 1.65em; 
@@ -74,7 +70,7 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 # ==================================================
-# 3. DATABASE & PERSISTENT MEMORY
+# 3. DATABASE
 # ==================================================
 @st.cache_resource
 def get_db_connection():
@@ -106,7 +102,6 @@ if 'msgs' not in st.session_state:
     c.execute("SELECT timestamp, role, content, rank, phase FROM records ORDER BY timestamp ASC")
     rows = c.fetchall()
     for r in rows:
-        # We store the timestamp in the content metadata for the AI
         timestamp_str = datetime.fromtimestamp(r[0]).strftime('%Y-%m-%d %H:%M')
         st.session_state.msgs.append({"role": r[1], "content": f"[{timestamp_str}] {r[2]}"})
     if rows:
@@ -127,8 +122,8 @@ with st.sidebar:
     current_phases = PHASE_SETS.get(st.session_state.rank, PHASE_SETS["Student"])
     for idx, phase_name in enumerate(current_phases):
         st.markdown(f"<p class='{'active-phase' if idx == st.session_state.phase else 'inactive-phase'}'>{'➤ ' if idx == st.session_state.phase else ''}{phase_name}</p>", unsafe_allow_html=True)
-    st.markdown("<br>", unsafe_allow_html=True)
     
+    st.markdown("<br>", unsafe_allow_html=True)
     if st.button("Bow-Out", use_container_width=True):
         st.session_state.phase = 0
         st.session_state.exchange_count = 0
@@ -145,7 +140,6 @@ st.markdown('<div class="watermark">;∞</div>', unsafe_allow_html=True)
 
 for msg in st.session_state.msgs:
     with st.chat_message(msg["role"]):
-        # Stripping the timestamp prefix for UI display
         display_text = msg["content"].split("] ", 1)[-1] if "] " in msg["content"] else msg["content"]
         st.markdown(display_text, unsafe_allow_html=True)
 
@@ -154,7 +148,6 @@ for msg in st.session_state.msgs:
 # ==================================================
 if prompt := st.chat_input("Speak from center..."):
     current_ts = datetime.now().strftime('%Y-%m-%d %H:%M')
-    # Save with timestamp in content for AI's temporal awareness
     st.session_state.msgs.append({"role": "user", "content": f"[{current_ts}] {prompt}"})
     save_to_ledger("user", prompt, st.session_state.rank, str(st.session_state.phase))
     st.session_state.exchange_count += 1
@@ -170,21 +163,31 @@ if prompt := st.chat_input("Speak from center..."):
             st.session_state.msgs.append({"role": "assistant", "content": safety_box})
             save_to_ledger("assistant", safety_box, st.session_state.rank, str(st.session_state.phase))
         else:
-            sys_msg = MIRROR_PROMPT if st.session_state.phase == 3 else MASTER_PROMPT
-            messages = [{"role": "system", "content": sys_msg}] + st.session_state.msgs[-30:]
-            
-            headers = {"Authorization": f"Bearer {st.secrets['GROQ_API_KEY']}"}
-            payload = {"model": "llama-3.3-70b-versatile", "messages": messages, "temperature": 0.45, "max_tokens": 512}
-            try:
-                res = requests.post("https://api.groq.com/openai/v1/chat/completions", json=payload, headers=headers, timeout=25)
-                final_response = res.json()['choices'][0]['message']['content']
-            except: final_response = "**System Alert:** Transmission issue."
+            # --- THE MEDITATION DELAY ---
+            with st.status("🧘‍♂️ Consultng the Ledger...", expanded=False) as status:
+                # Artificial latency: 1 second base + 0.5 per 10 words
+                delay = 1.0 + (len(prompt.split()) / 20)
+                time.sleep(min(delay, 4.0)) # Cap it at 4 seconds
+                
+                sys_msg = MIRROR_PROMPT if st.session_state.phase == 3 else MASTER_PROMPT
+                messages = [{"role": "system", "content": sys_msg}] + st.session_state.msgs[-30:]
+                
+                headers = {"Authorization": f"Bearer {st.secrets['GROQ_API_KEY']}"}
+                payload = {"model": "llama-3.3-70b-versatile", "messages": messages, "temperature": 0.45, "max_tokens": 512}
+                
+                try:
+                    res = requests.post("https://api.groq.com/openai/v1/chat/completions", json=payload, headers=headers, timeout=25)
+                    final_response = res.json()['choices'][0]['message']['content']
+                    status.update(label="🙏 Wisdom Found.", state="complete", expanded=False)
+                except: 
+                    final_response = "**System Alert:** Transmission issue."
+                    status.update(label="⚠️ Connection Severed.", state="error")
             
             st.markdown(final_response)
             st.session_state.msgs.append({"role": "assistant", "content": final_response})
             save_to_ledger("assistant", final_response, st.session_state.rank, str(st.session_state.phase))
             
-            # Auto-advancement check (using 3.1-8b for speed)
+            # Advancement logic...
             if st.session_state.exchange_count >= 2:
                 check_payload = {"model": "llama-3.1-8b-instant", "messages": [{"role": "system", "content": "Analyze growth. Reply ONLY YES or NO."}, {"role": "user", "content": prompt}], "temperature": 0.0}
                 try:
