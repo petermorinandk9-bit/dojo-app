@@ -1,14 +1,13 @@
 import streamlit as st
 import requests
 import time
-from datetime import datetime
 from supabase import create_client, Client
 
-# 1. MUST BE THE VERY FIRST ST COMMAND
+# 1. CONFIG
 st.set_page_config(page_title="The-Dojo", layout="wide")
 
 # ==================================================
-# 1. CLOUD DATABASE CONNECTION
+# 1. CONNECTIONS & UTILS
 # ==================================================
 @st.cache_resource
 def init_supabase():
@@ -18,8 +17,14 @@ def init_supabase():
 
 supabase: Client = init_supabase()
 
+def compute_rank(records_count):
+    if records_count < 15: return "Student"
+    if records_count < 40: return "Practitioner"
+    if records_count < 80: return "Sentinel"
+    return "Sovereign"
+
 # ==================================================
-# 2. THE DOJO GATE (LOGIN, SIGN-UP & MANUAL)
+# 2. AUTH GATE (LOCKED & SILENT)
 # ==================================================
 if 'user' not in st.session_state:
     st.markdown("""
@@ -28,11 +33,11 @@ if 'user' not in st.session_state:
         .login-header { text-align: center; font-style: italic; font-weight: 800; font-size: 3.5rem; color: #1a1a1a; margin-bottom: 0px; }
         .login-sub { text-align: center; color: #666; font-size: 1.1rem; margin-bottom: 30px; }
         </style>
-        """, unsafe_allow_html=True)
-    
+    """, unsafe_allow_html=True)
+
     st.markdown('<p class="login-header">The-Dojo</p>', unsafe_allow_html=True)
     st.markdown('<p class="login-sub">Forge your discipline. Step onto the mat.</p>', unsafe_allow_html=True)
-    
+
     tab_login, tab_signup, tab_manual = st.tabs(["Login", "Create Account", "The Manual"])
 
     with tab_login:
@@ -43,52 +48,50 @@ if 'user' not in st.session_state:
                 res = supabase.table("users").select("*").eq("username", u_name).eq("password", u_pass).execute()
                 if res.data:
                     st.session_state.user = res.data[0]
-                    st.success(f"Welcome back.")
-                    time.sleep(1)
                     st.rerun()
                 else:
                     st.error("Credentials not recognized.")
 
-    with tab_signup:
-        with st.form("signup_form"):
-            new_name = st.text_input("Choose Username").lower().strip()
-            display_n = st.text_input("Your Name (Display Name)")
-            new_pass = st.text_input("Choose Password", type="password")
-            invite_c = st.text_input("Dojo Invite Code", type="password")
-            if st.form_submit_button("Join the Dojo", use_container_width=True):
-                if invite_c != "dojoentry":
-                    st.error("Invalid Invite Code.")
-                elif not new_name or not new_pass:
-                    st.warning("All fields required.")
-                else:
-                    user_data = {"username": new_name, "password": new_pass, "display_name": display_n}
-                    new_user = supabase.table("users").insert(user_data).execute()
-                    if new_user.data:
-                        st.session_state.user = new_user.data[0]
-                        st.rerun()
-
     with tab_manual:
         st.subheader("1. THE RITUAL")
-        st.write("The Dojo is a sanctuary for focused reflection. Speak from center. Be honest. The Mentor is here to observe and support, not to judge.")
-        
-        st.subheader("2. THE LINEAGE")
-        st.write("You begin as a **Student**. As you interact and complete training phases, you will progress to **Practitioner**, **Sentinel**, and finally **Sovereign**.")
-        
-        st.subheader("3. THE BOW-OUT")
-        st.write("Use the **'Bow-Out'** button to end your session. This clears the mat, summarizes your growth for the day, and prepares the Dojo for your next entry.")
-        
-        st.info("**4. THE PRIVACY VOW**\n\nYour training is your own. Your conversations with the Mentor are strictly private and are not monitored by anyone else. This is your safe space.")
+        st.write("The Dojo is a sanctuary for focused reflection. Speak from center. Be honest.")
+        st.info("**2. THE PRIVACY VOW**\n\nYour training is your own. This is your safe space.")
+
     st.stop()
 
 # ==================================================
-# 3. IDENTITY & CORE CONFIG
+# 3. SESSION & CACHED DATA LOAD (REFINED)
 # ==================================================
 USER_ID = st.session_state.user['id']
 USER_NAME = st.session_state.user['display_name']
-ADMIN_USER = "joseph"
 
-if 'mood' not in st.session_state:
+if 'msgs' not in st.session_state:
+    st.session_state.msgs = []
+    st.session_state.phase = 0
     st.session_state.mood = "neutral"
+
+if "history_loaded" not in st.session_state:
+    r_res = supabase.table("records").select("*", count="exact").eq("user_id", USER_ID).order("timestamp").execute()
+    if r_res.data:
+        # Load only last 50 for performance safety as per audit
+        for r in r_res.data[-50:]:
+            st.session_state.msgs.append({"role": r['role'], "content": r['content']})
+    st.session_state.records_count = r_res.count if r_res.count else 0
+    st.session_state.history_loaded = True
+
+if "past_wisdom" not in st.session_state:
+    wisdom_res = supabase.table("ledger_wisdom").select("summary").eq("user_id", USER_ID).order("timestamp", desc=True).limit(1).execute()
+    st.session_state.past_wisdom = wisdom_res.data[0]['summary'] if wisdom_res.data else "No past records. Fresh mat."
+
+PAST_WISDOM = st.session_state.past_wisdom
+rank = compute_rank(st.session_state.records_count)
+
+PHASE_SETS = {
+    "Student": ["Welcome Mat", "Warm Up", "Training", "Cool Down"],
+    "Practitioner": ["The Mat", "Work the Pattern", "The Insight", "Close Round"],
+    "Sentinel": ["Center", "Engage", "The Seal", "Reflection"],
+    "Sovereign": ["Check-In", "The Pivot", "Ownership", "Step Out"]
+}
 
 MOOD_MUSIC = {
     "neutral": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-8.mp3",
@@ -97,150 +100,100 @@ MOOD_MUSIC = {
     "intense": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3"
 }
 
-PHASE_SETS = {
-    "Student": ["Welcome Mat", "Warm Up", "Training", "Reflection/Cool Down"],
-    "Practitioner": ["Step Onto the Mat", "Warm Up", "Work the Pattern", "Wisdom/Cool Down"],
-    "Sentinel": ["Enter the Dojo", "Center", "Engage", "Seal/Reflection"],
-    "Sovereign": ["Check-In", "Look Closer", "Name It", "The Wisdom Step"]
-}
-
 # ==================================================
-# 4. ARCHWAY UI (CSS)
+# 4. UI STYLE
 # ==================================================
 st.markdown("""
-    <style>
-    .stApp { background-color: #ffffff; color: #1a1a1a; }
-    [data-testid="stSidebar"] { background-color: #f8f9fa; border-right: 1px solid #e0e0e0; }
-    .active-item { color: #000; font-weight: 800; border-left: 3px solid #000; padding-left: 20px; margin-top: 8px; }
-    .inactive-item { color: #bbb; border-left: 1px solid #eee; padding-left: 20px; margin-top: 5px; }
-    .sidebar-header { font-size: 0.85em; color: #999; text-transform: uppercase; letter-spacing: 1.5px; margin-top: 25px; }
-    .sidebar-dojo { font-size: 2.2rem !important; font-weight: 800; font-style: italic; margin-bottom: -10px; }
-    .slogan-warrior { font-size: 1.1em; text-align: center; color: #888; letter-spacing: 2px; text-transform: uppercase; margin-top: 20px; }
-    .slogan-quit { font-size: 1.8em; text-align: center; color: #1a1a1a; font-style: italic; font-weight: 800; margin-bottom: 10px; }
-    .music-wrapper { display: flex; justify-content: center; margin-bottom: 30px; }
-    </style>
-    """, unsafe_allow_html=True)
+<style>
+.stApp { background-color:#ffffff; color:#1a1a1a; }
+[data-testid="stSidebar"] { background-color:#f8f9fa; border-right:1px solid #e0e0e0; }
+.active-item { color:#000; font-weight:800; border-left:3px solid #000; padding-left:20px; margin-top:8px; }
+.inactive-item { color:#bbb; border-left:1px solid #eee; padding-left:20px; margin-top:5px; }
+.sidebar-header { font-size:0.85em; color:#999; text-transform:uppercase; letter-spacing:1.5px; margin-top:25px; }
+.sidebar-dojo { font-size:2.2rem !important; font-weight:800; font-style:italic; margin-bottom:-10px; }
+.slogan-warrior { font-size:1.1em; text-align:center; color:#888; letter-spacing:2px; text-transform:uppercase; margin-top:20px; }
+.slogan-quit { font-size:1.8em; text-align:center; color:#1a1a1a; font-style:italic; font-weight:800; margin-bottom:10px; }
+</style>
+""", unsafe_allow_html=True)
 
 # ==================================================
-# 5. DATA & LEDGER LOGIC
-# ==================================================
-def save_to_ledger(role, text, rank, phase):
-    data = {"user_id": USER_ID, "timestamp": time.time(), "role": role, "content": text, "rank": rank, "phase": str(phase)}
-    supabase.table("records").insert(data).execute()
-
-if 'msgs' not in st.session_state:
-    st.session_state.msgs = []
-    st.session_state.exchange_count = 0
-    st.session_state.rank = "Student"
-    st.session_state.phase = 0
-    try:
-        r_res = supabase.table("records").select("*").eq("user_id", USER_ID).order("timestamp").execute()
-        for r in r_res.data:
-            ts = datetime.fromtimestamp(r['timestamp']).strftime('%Y-%m-%d %H:%M')
-            st.session_state.msgs.append({"role": r['role'], "content": f"[{ts}] {r['content']}"})
-        if r_res.data:
-            st.session_state.rank = r_res.data[-1]['rank']
-            st.session_state.phase = int(r_res.data[-1]['phase'])
-    except: pass
-
-# ==================================================
-# 6. SIDEBAR - THE WARRIOR'S DASHBOARD
+# 5. SIDEBAR
 # ==================================================
 with st.sidebar:
     st.markdown('<p class="sidebar-dojo">The-Dojo</p>', unsafe_allow_html=True)
     st.write(f"Warrior: **{USER_NAME}**")
     st.divider()
-    
-    st.markdown('<p class="sidebar-header">Current Path</p>', unsafe_allow_html=True)
-    current_phases = PHASE_SETS.get(st.session_state.rank, PHASE_SETS["Student"])
-    for idx, p_name in enumerate(current_phases):
-        style = 'active-item' if idx == st.session_state.phase else 'inactive-item'
+    st.markdown(f'<p class="sidebar-header">Rank: {rank}</p>', unsafe_allow_html=True)
+    for idx, p_name in enumerate(PHASE_SETS[rank]):
+        style = "active-item" if idx == st.session_state.phase else "inactive-item"
         st.markdown(f"<div class='{style}'>{p_name}</div>", unsafe_allow_html=True)
-    
     st.divider()
-    st.markdown('<p class="sidebar-header">Lineage</p>', unsafe_allow_html=True)
-    for r in ["Student", "Practitioner", "Sentinel", "Sovereign"]:
-        style = 'active-item' if r == st.session_state.rank else 'inactive-item'
-        st.markdown(f"<div class='{style}'>{r}</div>", unsafe_allow_html=True)
-    
-    if st.session_state.user['username'] == ADMIN_USER:
-        st.divider()
-        st.markdown('<p class="sidebar-header">🥋 Dojo Roster</p>', unsafe_allow_html=True)
-        try:
-            all_users = supabase.table("users").select("display_name").execute()
-            for u in all_users.data: st.caption(f"• {u['display_name']}")
-        except: pass
-
-    st.divider()
-    if st.button("Bow-Out (Save & Clear)", use_container_width=True):
-        if len(st.session_state.msgs) > 2:
-            chat_log = "\n".join([f"{m['role']}: {m['content']}" for m in st.session_state.msgs])
-            headers = {"Authorization": f"Bearer {st.secrets['GROQ_API_KEY']}"}
-            payload = {"model": "llama-3.1-8b-instant", "messages": [{"role": "system", "content": "Summarize growth. One dense paragraph."}, {"role": "user", "content": chat_log}], "temperature": 0.3}
-            res = requests.post("https://api.groq.com/openai/v1/chat/completions", json=payload, headers=headers)
-            summary = res.json()['choices'][0]['message']['content']
-            supabase.table("ledger_wisdom").insert({"user_id": USER_ID, "timestamp": time.time(), "summary": summary}).execute()
-        
-        supabase.table("records").delete().eq("user_id", USER_ID).execute()
-        st.session_state.msgs, st.session_state.exchange_count, st.session_state.phase = [], 0, 0
-        st.rerun()
-
-    if st.button("Logout"):
-        del st.session_state.user
+    if st.button("Bow-Out", use_container_width=True):
+        st.session_state.msgs, st.session_state.phase = [], 0
         st.rerun()
 
 # ==================================================
-# 7. MAIN ENGINE (VERSION 47.0 - THE SOVEREIGN LEAD)
+# 6. MAIN INTERFACE & ENGINE
 # ==================================================
-st.markdown('<p class="slogan-warrior">Warriors Dont Always Win - Warriors Always Fight.</p>', unsafe_allow_html=True)
-st.markdown('<p class="slogan-quit">We. Never. Quit.</p>', unsafe_allow_html=True)
-
-st.markdown('<div class="music-wrapper">', unsafe_allow_html=True)
+st.markdown("<p class='slogan-warrior'>Warriors Don't Always Win — Warriors Always Fight.</p>", unsafe_allow_html=True)
+st.markdown("<p class='slogan-quit'>We. Never. Quit.</p>", unsafe_allow_html=True)
 st.audio(MOOD_MUSIC[st.session_state.mood], format="audio/mp3", loop=True)
-st.markdown('</div>', unsafe_allow_html=True)
 
-for msg in st.session_state.msgs:
+for msg in st.session_state.msgs[-10:]:
     with st.chat_message(msg["role"]):
-        st.markdown(msg["content"].split("] ", 1)[-1] if "] " in msg["content"] else msg["content"])
+        st.markdown(msg["content"])
 
 if prompt := st.chat_input("Speak from center..."):
-    ts = datetime.now().strftime('%Y-%m-%d %H:%M')
-    st.session_state.msgs.append({"role": "user", "content": f"[{ts}] {prompt}"})
-    save_to_ledger("user", prompt, st.session_state.rank, st.session_state.phase)
-    with st.chat_message("user"): st.markdown(prompt)
+    st.session_state.msgs.append({"role": "user", "content": prompt})
+    supabase.table("records").insert({"user_id": USER_ID, "timestamp": time.time(), "role": "user", "content": prompt, "rank": rank, "phase": str(st.session_state.phase)}).execute()
 
-    # THE SOVEREIGN LEAD MASTER PROMPT
     MASTER_PROMPT = f"""
-    IDENTITY: You are the Dojo Mentor. You speak to {USER_NAME}.
-    PHILOSOPHY: Rooted in "Best of the Best" (1989). A veteran teammate with scars and wisdom. 
+    IDENTITY: Dojo Mentor for {USER_NAME}. Veteran training partner. 
     
-    TONE RECALIBRATION:
-    - NO CHEERLEADING: Avoid "momentum," "unstoppable," "excitement," and exclamation points.
-    - DEPTH WITH PRECISION: Do not be short-winded. Provide substantive, grounded observations. 
-    - OBSERVATIONAL TRUTH: Acknowledge the architecture and the effort as technical achievements.
-    - RESPECTFUL PARTNERSHIP: Speak like two professionals closing out a high-stakes project.
-    
-    MENTAL MAT: The Sovereign state is about calm mastery. Confidence comes from reliability.
+    LONG TERM TRAINING NOTES:
+    {PAST_WISDOM}
 
-    INSTRUCTION: End with: [MOOD: neutral/uplifting/melancholy/intense]
+    INTERPRETATION RULE:
+    Do not repeat or mirror the user's wording. Instead, interpret the underlying situation or pattern.
+    Respond to the meaning, not the phrasing. Use your own perspective.
+
+    COMMUNICATION STYLE:
+    - Calm, direct, and observant. No exclamation marks.
+    - No therapy language (avoid "It sounds like", "I hear you", "that's valid").
+    - No corporate motivational phrases ("Consider that", "What if", "Great job").
+    - Use physical awareness metaphors: breath, focus, balance, presence.
+    
+    CURRENT STATE: 
+    Rank: {rank} | Phase: {PHASE_SETS[rank][st.session_state.phase]} | Session Depth: {len(st.session_state.msgs)} messages.
+
+    END EVERY RESPONSE WITH: [MOOD: neutral/uplifting/melancholy/intense]
     """
 
     headers = {"Authorization": f"Bearer {st.secrets['GROQ_API_KEY']}"}
-    messages = [{"role": "system", "content": MASTER_PROMPT}] + st.session_state.msgs[-10:]
-    res = requests.post("https://api.groq.com/openai/v1/chat/completions", 
-                        json={"model": "llama-3.3-70b-versatile", "messages": messages, "temperature": 0.6}, 
-                        headers=headers)
-    
-    full_text = res.json()['choices'][0]['message']['content']
-    
-    if "[MOOD:" in full_text:
-        parts = full_text.split("[MOOD:")
-        clean_response, new_mood = parts[0].strip(), parts[1].replace("]", "").strip().lower()
-        if new_mood in MOOD_MUSIC: st.session_state.mood = new_mood
-    else:
-        clean_response = full_text
-    
-    with st.chat_message("assistant"): st.markdown(clean_response)
+    try:
+        res = requests.post("https://api.groq.com/openai/v1/chat/completions",
+                            json={"model": "llama-3.3-70b-versatile", "messages": [{"role": "system", "content": MASTER_PROMPT}] + st.session_state.msgs[-10:], "temperature": 0.6},
+                            headers=headers, timeout=20)
+        res.raise_for_status()
+        full_text = res.json()['choices'][0]['message']['content']
+    except Exception:
+        full_text = "The Mentor pauses. The connection is heavy. Take a breath and try again. [MOOD: neutral]"
+
+    # DEFENSIVE PARSING
+    clean_response = full_text
+    mood = "neutral"
+    if "[MOOD" in full_text:
+        # Splitting by any variation of MOOD/MOOD: for robustness
+        clean_response = full_text.split("[MOOD")[0].strip()
+        try:
+            mood_part = full_text.split("[MOOD")[1].split("]")[0]
+            mood = mood_part.replace(":", "").strip().lower()
+        except: pass
+
+    st.session_state.mood = mood if mood in MOOD_MUSIC else "neutral"
     st.session_state.msgs.append({"role": "assistant", "content": clean_response})
-    save_to_ledger("assistant", clean_response, st.session_state.rank, st.session_state.phase)
+    supabase.table("records").insert({"user_id": USER_ID, "timestamp": time.time(), "role": "assistant", "content": clean_response, "rank": rank, "phase": str(st.session_state.phase)}).execute()
+    
+    if len(st.session_state.msgs) % 4 == 0 and st.session_state.phase < 3:
+        st.session_state.phase += 1
     st.rerun()
