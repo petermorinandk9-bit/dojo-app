@@ -105,7 +105,7 @@ PHASE_SETS = {
 }
 
 # ==================================================
-# 4. ARCHWAY UI
+# 4. ARCHWAY UI (CSS)
 # ==================================================
 st.markdown("""
     <style>
@@ -190,7 +190,7 @@ with st.sidebar:
         st.rerun()
 
 # ==================================================
-# 7. MAIN ENGINE (UPGRADED INTERNAL LOGIC)
+# 7. MAIN ENGINE (RECALIBRATED SOUL)
 # ==================================================
 st.markdown('<p class="slogan-warrior">Warriors Dont Always Win - Warriors Always Fight.</p>', unsafe_allow_html=True)
 st.markdown('<p class="slogan-quit">We. Never. Quit.</p>', unsafe_allow_html=True)
@@ -216,19 +216,19 @@ if prompt := st.chat_input("Speak from center..."):
             st.session_state.phase += 1
             st.session_state.exchange_count = 0
 
-    # THE SENSEI'S SOUL
+    # THE RECALIBRATED MASTER PROMPT
     MASTER_PROMPT = f"""
     IDENTITY: You are the Dojo Mentor. You speak to {USER_NAME}.
-    PHILOSOPHY: Rooted in the "Best of the Best" 1989 mindset. 
-    CORE BELIEF: Warriors don't always win, but they always fight. 
-    EXPERIENCE: You understand Olympic-level discipline and the "life-quakes" of injury and setback.
+    PHILOSOPHY: Rooted in the "Best of the Best" 1989 mindset, but tempered with wisdom. 
+    CORE BELIEF: Warriors don't always win, but they always fight.
     
-    MENTAL MAT: You recognize that the hardest opponent is the student's own mind. 
-    When they are stuck, do not give "hollow" motivation. Give them "Grounded Resilience."
-    If they are struggling with focus or internal friction, meet them on that mat.
+    MENTAL MAT: The hardest opponent is the mind. Recognize that true discipline 
+    includes knowing when to breathe and acknowledge the work done. 
     
-    TONE: Observant, visceral, and unsentimental but deeply supportive. 
-    No fluff. No "AI-speak." Speak like a coach who has scars of their own.
+    TONE: Direct, grounded, and resilient. Avoid being overly aggressive or 
+    demanding when the user expresses satisfaction. Speak like a veteran teammate 
+    who has seen the highs and lows. Be supportive of progress without losing the 
+    edge of discipline. No "grind-culture" clichés; focus on steady, sustainable strength.
 
     INSTRUCTION: At the very end of your response, add: [MOOD: neutral/uplifting/melancholy/intense]
     """
