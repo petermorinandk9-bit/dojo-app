@@ -1,6 +1,7 @@
 import streamlit as st
 import requests
 import time
+import base64
 from datetime import datetime
 from supabase import create_client, Client
 
@@ -38,22 +39,21 @@ if 'user' not in st.session_state:
             max-width: 400px;
         }
         .audio-label { font-size: 0.85em; color: #888; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 8px; }
-        .audio-hint { font-size: 0.75em; color: #bbb; margin-top: 5px; }
         </style>
         """, unsafe_allow_html=True)
     
     st.markdown('<p class="login-header">The-Dojo</p>', unsafe_allow_html=True)
     st.markdown('<p class="login-sub">Forge your discipline. Step onto the mat.</p>', unsafe_allow_html=True)
 
-    # --- THE ZEN FLUTE PLAYER (Direct Archive.org Stream) ---
+    # --- THE ZEN FLUTE PLAYER (Direct Stream) ---
     st.markdown('<div class="audio-container">', unsafe_allow_html=True)
     st.markdown('<p class="audio-label">🔊 Relaxing Music</p>', unsafe_allow_html=True)
     
-    # High-reliability direct link to authentic Shakuhachi flute
-    audio_url = "https://archive.org/download/shakuhachi-flute-solo/Shakuhachi%20Flute%20Solo.mp3"
-    st.audio(audio_url, format="audio/mp3", loop=True, autoplay=True)
+    # High-reliability direct link to meditative flute
+    audio_url = "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-8.mp3"
+    st.audio(audio_url, format="audio/mp3", loop=True)
     
-    st.markdown('<p class="audio-hint">Click play if the flute does not start automatically.</p>', unsafe_allow_html=True)
+    st.caption("Center yourself. Click play if the flute does not start.")
     st.markdown('</div>', unsafe_allow_html=True)
     
     tab_login, tab_signup = st.tabs(["Login", "Create Account"])
@@ -117,7 +117,6 @@ st.markdown("""
     <style>
     .stApp { background-color: #ffffff; color: #1a1a1a; }
     [data-testid="stSidebar"] { background-color: #f8f9fa; border-right: 1px solid #e0e0e0; }
-    
     .active-item { 
         color: #000000; font-weight: 800; font-size: 1.15em; 
         border-left: 3px solid #000; padding-left: 20px; margin-top: 8px; 
