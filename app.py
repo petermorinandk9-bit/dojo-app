@@ -35,7 +35,7 @@ if 'user' not in st.session_state:
 
     st.markdown("""
     <style>
-    .stApp { background-color:#ffffff; }
+    .stApp { background:#ffffff; }
     .login-header {
         text-align:center;
         font-style:italic;
@@ -60,7 +60,6 @@ if 'user' not in st.session_state:
 
     with tab_login:
         with st.form("login_form"):
-
             u_name = st.text_input("Username").lower().strip()
             u_pass = st.text_input("Password", type="password")
 
@@ -118,7 +117,7 @@ if "history_loaded" not in st.session_state:
     st.session_state.history_loaded = True
 
 # ==================================================
-# LONG TERM MEMORY
+# LOAD LONG TERM WISDOM
 # ==================================================
 if "past_wisdom" not in st.session_state:
 
@@ -129,10 +128,9 @@ if "past_wisdom" not in st.session_state:
         .limit(1)\
         .execute()
 
-    st.session_state.past_wisdom = wisdom_res.data[0]["summary"] if wisdom_res.data else "No past records. Fresh mat."
+    st.session_state.past_wisdom = wisdom_res.data[0]["summary"] if wisdom_res.data else "No past records yet."
 
 PAST_WISDOM = st.session_state.past_wisdom
-
 rank = compute_rank(st.session_state.records_count)
 
 # ==================================================
@@ -189,7 +187,53 @@ with st.sidebar:
 
     st.divider()
 
-    if st.button("Bow-Out",use_container_width=True):
+    if st.button("Bow-Out", use_container_width=True):
+
+        convo = "\n".join([
+            f"{m['role']}: {m['content']}"
+            for m in st.session_state.msgs[-20:]
+        ])
+
+        INSIGHT_PROMPT = f"""
+Extract durable insights from this reflection session.
+
+Conversation:
+{convo}
+
+Rules:
+- Do not summarize the conversation
+- Identify thinking patterns or tendencies
+- Write 3–5 short insight sentences
+"""
+
+        headers = {"Authorization": f"Bearer {st.secrets['GROQ_API_KEY']}"}
+
+        try:
+
+            res = requests.post(
+                "https://api.groq.com/openai/v1/chat/completions",
+                json={
+                    "model":"llama-3.3-70b-versatile",
+                    "messages":[{"role":"system","content":INSIGHT_PROMPT}],
+                    "temperature":0.3
+                },
+                headers=headers,
+                timeout=20
+            )
+
+            res.raise_for_status()
+
+            insight = res.json()["choices"][0]["message"]["content"]
+
+            supabase.table("ledger_wisdom").insert({
+                "user_id":USER_ID,
+                "timestamp":time.time(),
+                "summary":insight
+            }).execute()
+
+        except Exception:
+            pass
+
         st.session_state.msgs=[]
         st.session_state.phase=0
         st.rerun()
@@ -227,41 +271,56 @@ if prompt := st.chat_input("Speak from center..."):
         [m["content"][:120] for m in st.session_state.msgs if m["role"]=="assistant"][-3:]
     )
 
+    # session awareness
+    session_length=len(st.session_state.msgs)
+
+    if session_length<6:
+        session_stage="Opening"
+    elif session_length<16:
+        session_stage="Working"
+    else:
+        session_stage="Closing"
+
     MASTER_PROMPT=f"""
 IDENTITY
 You are the Dojo Mentor for {USER_NAME}. Calm, observant, grounded.
 
+Take a moment to consider the situation before responding.
+
 LONG TERM TRAINING NOTES
 {PAST_WISDOM}
 
-RECENT GUIDANCE ALREADY GIVEN
-Avoid repeating the same observations or advice.
-
+RECENT GUIDANCE
+Avoid repeating these ideas.
 {recent_guidance}
 
+SESSION STATE
+Session length: {session_length}
+Session stage: {session_stage}
+
+Adjust tone naturally:
+Opening → explore
+Working → analyze
+Closing → highlight insights
+
 THE SOVEREIGN APPROACH
-1. Begin with a brief observation about the pattern you notice.
-2. Acknowledge the situation clearly and without judgment.
-3. Offer a practical adjustment in thinking or approach.
+1. Observe the pattern
+2. Acknowledge reality
+3. Offer a practical adjustment
 
 COMMUNICATION STYLE
-• Calm and direct
-• No therapy language
-• No corporate motivation tone
-• No exclamation marks
+Calm, direct, no therapy language, no corporate motivation.
 
 INTERPRETATION RULE
-Do not repeat the user's wording.
-Interpret the situation and respond to the meaning.
+Respond to meaning, not wording.
 
-Use physical awareness metaphors when helpful:
-breath, focus, balance, pacing, presence.
+Use grounding metaphors: breath, focus, balance, pacing.
 
 CURRENT STATE
 Rank: {rank}
 Phase: {PHASE_SETS[rank][st.session_state.phase]}
 
-END EVERY RESPONSE WITH:
+END EVERY RESPONSE WITH
 [MOOD: neutral/uplifting/melancholy/intense]
 """
 
