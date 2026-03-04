@@ -33,7 +33,6 @@ if 'user' not in st.session_state:
     
     tab_login, tab_signup = st.tabs(["Login", "Create Account"])
 
-    # --- LOGIN TAB ---
     with tab_login:
         with st.form("login_form"):
             u_name = st.text_input("Username").lower().strip()
@@ -48,31 +47,27 @@ if 'user' not in st.session_state:
                 else:
                     st.error("Credentials not recognized.")
 
-    # --- SIGN-UP TAB ---
     with tab_signup:
         with st.form("signup_form"):
             new_name = st.text_input("Choose Username").lower().strip()
             display_n = st.text_input("Your Name (Display Name)")
             new_pass = st.text_input("Choose Password", type="password")
             invite_c = st.text_input("Dojo Invite Code", type="password")
-            
             if st.form_submit_button("Join the Dojo", use_container_width=True):
                 if invite_c != "dojoentry":
-                    st.error("Invalid Invite Code. Entry Denied.")
+                    st.error("Invalid Invite Code.")
                 elif not new_name or not new_pass or not display_n:
-                    st.warning("All fields are required.")
+                    st.warning("All fields required.")
                 else:
-                    # Check if username exists
                     check = supabase.table("users").select("id").eq("username", new_name).execute()
                     if check.data:
-                        st.error("That username is already taken.")
+                        st.error("Username taken.")
                     else:
-                        # Create User
                         user_data = {"username": new_name, "password": new_pass, "display_name": display_n}
                         new_user = supabase.table("users").insert(user_data).execute()
                         if new_user.data:
                             st.session_state.user = new_user.data[0]
-                            st.success("Account created. Welcome to the lineage.")
+                            st.success("Account created.")
                             time.sleep(1)
                             st.rerun()
     st.stop() 
@@ -101,7 +96,7 @@ MASTER_PROMPT = (
 )
 
 # ==================================================
-# 4. ARCHWAY UI
+# 4. ARCHWAY UI (RESTORING SIDEBAR INTEGRITY)
 # ==================================================
 st.set_page_config(page_title="The Dojo", layout="wide")
 st.markdown("""
@@ -110,31 +105,28 @@ st.markdown("""
     [data-testid="stSidebar"] { background-color: #f8f9fa; border-right: 1px solid #e0e0e0; }
     .stChatMessage { background-color: #f8f9fa; border: 1px solid #e0e0e0; }
     .sidebar-dojo { font-size: 2.2rem !important; font-weight: 800; color: #1a1a1a; font-style: italic; }
-    .active-rank { color: #000000; font-weight: 700; font-size: 1.35em; }
-    .inactive-rank { color: #666666; font-size: 1.1em; }
+    .active-rank { color: #000000; font-weight: 700; font-size: 1.35em; margin-bottom: 0px; }
+    .inactive-rank { color: #666666; font-size: 1.1em; margin-bottom: 0px; }
+    .active-phase { color: #000000; font-weight: 600; padding-left: 15px; font-size: 1.1em; }
+    .inactive-phase { color: #bbbbbb; padding-left: 15px; font-size: 0.95em; }
     .slogan-stack-refined { font-size: 1.65em; text-align: center; color: #666666; font-style: italic; }
     </style>
     """, unsafe_allow_html=True)
 
 # ==================================================
-# 5. DATA OPERATIONS (PRIVATE)
+# 5. DATA OPERATIONS
 # ==================================================
 def save_to_ledger(role, text, rank, phase):
     data = {"user_id": USER_ID, "timestamp": time.time(), "role": role, "content": text, "rank": rank, "phase": str(phase)}
     supabase.table("records").insert(data).execute()
 
-# Load Memory
-try:
-    w_res = supabase.table("ledger_wisdom").select("*").eq("user_id", USER_ID).order("timestamp").execute()
-    long_term_memory = "\n".join([f"- {r['summary']}" for r in w_res.data])
-except: long_term_memory = ""
-
-# Load Session
+# Memory & Session Initialization
 if 'msgs' not in st.session_state:
     st.session_state.msgs = []
     st.session_state.exchange_count = 0
     st.session_state.rank = "Student"
     st.session_state.phase = 0
+    
     try:
         r_res = supabase.table("records").select("*").eq("user_id", USER_ID).order("timestamp").execute()
         for r in r_res.data:
@@ -146,16 +138,25 @@ if 'msgs' not in st.session_state:
     except: pass
 
 # ==================================================
-# 6. SIDEBAR
+# 6. SIDEBAR - THE RESTORED TRACKER
 # ==================================================
 with st.sidebar:
     st.markdown('<p class="sidebar-dojo">The-Dojo</p>', unsafe_allow_html=True)
     st.write(f"Warrior: **{USER_NAME}**")
     st.divider()
     
+    # --- RANK LIST ---
     ranks = ["Student", "Practitioner", "Sentinel", "Sovereign"]
     for r in ranks:
-        st.markdown(f"<p class='{'active-rank' if r == st.session_state.rank else 'inactive-rank'}'>{'➤ ' if r == st.session_state.rank else ''}{r}</p>", unsafe_allow_html=True)
+        is_active = (r == st.session_state.rank)
+        st.markdown(f"<p class='{'active-rank' if is_active else 'inactive-rank'}'>{'➤ ' if is_active else ''}{r}</p>", unsafe_allow_html=True)
+        
+        # --- PHASE LIST (Restored!) ---
+        if is_active:
+            current_phases = PHASE_SETS[r]
+            for idx, p_name in enumerate(current_phases):
+                p_style = "active-phase" if idx == st.session_state.phase else "inactive-phase"
+                st.markdown(f"<p class='{p_style}'>{p_name}</p>", unsafe_allow_html=True)
     
     st.divider()
     if st.button("Bow-Out (Save & Clear)", use_container_width=True):
@@ -192,16 +193,18 @@ if prompt := st.chat_input("Speak from center..."):
     save_to_ledger("user", prompt, st.session_state.rank, st.session_state.phase)
     with st.chat_message("user"): st.markdown(prompt)
 
+    # Simple logic to move through phases every 2 messages
+    st.session_state.exchange_count += 1
+    if st.session_state.exchange_count >= 2:
+        if st.session_state.phase < 3:
+            st.session_state.phase += 1
+            st.session_state.exchange_count = 0
+
     # AI Call
     headers = {"Authorization": f"Bearer {st.secrets['GROQ_API_KEY']}"}
-    messages = [{"role": "system", "content": MASTER_PROMPT + f"\n\nPAST WISDOM:\n{long_term_memory}"}] + st.session_state.msgs[-15:]
-    payload = {"model": "llama-3.3-70b-versatile", "messages": messages, "temperature": 0.6}
-    
-    try:
-        res = requests.post("https://api.groq.com/openai/v1/chat/completions", json=payload, headers=headers)
-        final_response = res.json()['choices'][0]['message']['content']
-    except:
-        final_response = "The transmission was severed."
+    messages = [{"role": "system", "content": MASTER_PROMPT}] + st.session_state.msgs[-15:]
+    res = requests.post("https://api.groq.com/openai/v1/chat/completions", json={"model": "llama-3.3-70b-versatile", "messages": messages, "temperature": 0.6}, headers=headers)
+    final_response = res.json()['choices'][0]['message']['content']
     
     with st.chat_message("assistant"): st.markdown(final_response)
     st.session_state.msgs.append({"role": "assistant", "content": final_response})
