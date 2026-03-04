@@ -86,33 +86,25 @@ PHASE_SETS = {
 }
 
 # ==================================================
-# 4. ARCHWAY UI (UNIFIED HIGHLIGHTING)
+# 4. ARCHWAY UI (UNIFIED JOURNEY STYLING)
 # ==================================================
 st.set_page_config(page_title="The Dojo", layout="wide")
 st.markdown("""
     <style>
     .stApp { background-color: #ffffff; color: #1a1a1a; }
     [data-testid="stSidebar"] { background-color: #f8f9fa; border-right: 1px solid #e0e0e0; }
+    
+    /* THE UNIFIED TRACKER STYLE */
+    .active-item { 
+        color: #000000; font-weight: 800; font-size: 1.15em; 
+        border-left: 3px solid #000; padding-left: 20px; margin-top: 8px; 
+    }
+    .inactive-item { 
+        color: #bbbbbb; font-weight: 400; font-size: 0.95em; 
+        border-left: 1px solid #eeeeee; padding-left: 20px; margin-top: 5px; 
+    }
+    .sidebar-header { font-size: 0.8em; color: #999; text-transform: uppercase; letter-spacing: 1px; margin-top: 20px; }
     .sidebar-dojo { font-size: 2.2rem !important; font-weight: 800; color: #1a1a1a; font-style: italic; margin-bottom: -10px; }
-    
-    /* UNIFIED HIGHLIGHTING STYLE */
-    .active-rank { 
-        color: #000000; font-weight: 800; font-size: 1.3em; 
-        border-left: 4px solid #000; padding-left: 15px; margin-top: 20px; 
-    }
-    .inactive-rank { 
-        color: #cccccc; font-weight: 400; font-size: 1.1em; 
-        border-left: 1px solid #eeeeee; padding-left: 15px; margin-top: 15px; 
-    }
-    .active-phase { 
-        color: #000000; font-weight: 600; font-size: 1.05em; 
-        border-left: 2px solid #000; padding-left: 25px; margin-top: 5px; 
-    }
-    .inactive-phase { 
-        color: #bbbbbb; font-weight: 400; font-size: 0.9em; 
-        border-left: 1px solid #eeeeee; padding-left: 25px; margin-top: 5px; 
-    }
-    
     .slogan-stack-refined { font-size: 1.65em; text-align: center; color: #666666; font-style: italic; padding-top: 20px; }
     </style>
     """, unsafe_allow_html=True)
@@ -140,27 +132,36 @@ if 'msgs' not in st.session_state:
     except: pass
 
 # ==================================================
-# 6. SIDEBAR - UNIFIED LINEAGE
+# 6. SIDEBAR - THE UNIFIED JOURNEY
 # ==================================================
 with st.sidebar:
     st.markdown('<p class="sidebar-dojo">The-Dojo</p>', unsafe_allow_html=True)
     st.write(f"Warrior: **{USER_NAME}**")
     st.divider()
     
-    # --- RANKS & PHASES (Styled as a Unified List) ---
+    # 1. THE ACTIVE PATH (Rank + Phases together)
+    st.markdown('<p class="sidebar-header">Current Path</p>', unsafe_allow_html=True)
+    
+    # Show the Active Rank first
+    st.markdown(f"<div class='active-item'>{st.session_state.rank}</div>", unsafe_allow_html=True)
+    
+    # Show the Phases nested directly under it
+    current_phases = PHASE_SETS[st.session_state.rank]
+    for idx, p_name in enumerate(current_phases):
+        is_active_phase = (idx == st.session_state.phase)
+        style = 'active-item' if is_active_phase else 'inactive-item'
+        # Indent phases slightly more than the Rank to show hierarchy
+        indent = "margin-left: 15px;" if not is_active_phase else "margin-left: 0px;"
+        st.markdown(f"<div class='{style}' style='{indent}'>{p_name}</div>", unsafe_allow_html=True)
+    
+    st.divider()
+    
+    # 2. THE OTHER RANKS (Faded out)
+    st.markdown('<p class="sidebar-header">Lineage</p>', unsafe_allow_html=True)
     ranks = ["Student", "Practitioner", "Sentinel", "Sovereign"]
     for r in ranks:
-        is_active_rank = (r == st.session_state.rank)
-        rank_class = 'active-rank' if is_active_rank else 'inactive-rank'
-        st.markdown(f"<div class='{rank_class}'>{r}</div>", unsafe_allow_html=True)
-        
-        # Only show the Phases for the Rank we are currently in
-        if is_active_rank:
-            current_phases = PHASE_SETS[r]
-            for idx, p_name in enumerate(current_phases):
-                is_active_phase = (idx == st.session_state.phase)
-                phase_class = 'active-phase' if is_active_phase else 'inactive-phase'
-                st.markdown(f"<div class='{phase_class}'>{p_name}</div>", unsafe_allow_html=True)
+        if r != st.session_state.rank:
+            st.markdown(f"<div class='inactive-item'>{r}</div>", unsafe_allow_html=True)
     
     st.divider()
     if st.button("Bow-Out (Save & Clear)", use_container_width=True):
@@ -183,7 +184,7 @@ with st.sidebar:
         st.rerun()
 
 # ==================================================
-# 7. MAIN ENGINE (LOGIC INTEGRITY)
+# 7. MAIN ENGINE
 # ==================================================
 st.markdown('<div class="slogan-stack-refined">We. Never. Quit.</div>', unsafe_allow_html=True)
 
@@ -197,14 +198,12 @@ if prompt := st.chat_input("Speak from center..."):
     save_to_ledger("user", prompt, st.session_state.rank, st.session_state.phase)
     with st.chat_message("user"): st.markdown(prompt)
 
-    # Phase Progression
     st.session_state.exchange_count += 1
     if st.session_state.exchange_count >= 2:
         if st.session_state.phase < 3:
             st.session_state.phase += 1
             st.session_state.exchange_count = 0
 
-    # AI Call
     headers = {"Authorization": f"Bearer {st.secrets['GROQ_API_KEY']}"}
     MASTER_PROMPT = f"ROLE: Dojo Mentor. WARRIOR: {USER_NAME}. STYLE: Grounded, visceral, observant."
     messages = [{"role": "system", "content": MASTER_PROMPT}] + st.session_state.msgs[-15:]
