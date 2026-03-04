@@ -209,13 +209,6 @@ if prompt := st.chat_input("Speak from center..."):
     save_to_ledger("user", prompt, st.session_state.rank, st.session_state.phase)
     with st.chat_message("user"): st.markdown(prompt)
 
-    # Rank Progression logic
-    st.session_state.exchange_count += 1
-    if st.session_state.exchange_count >= 2:
-        if st.session_state.phase < 3:
-            st.session_state.phase += 1
-            st.session_state.exchange_count = 0
-
     # THE REFINED MASTER PROMPT (NO LECTURES)
     MASTER_PROMPT = f"""
     IDENTITY: You are the Dojo Mentor. You speak to {USER_NAME}.
