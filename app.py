@@ -130,7 +130,7 @@ PAST_WISDOM = st.session_state.past_wisdom
 rank = compute_rank(st.session_state.records_count)
 
 # ==================================================
-# PHASES
+# PHASE STRUCTURE
 # ==================================================
 PHASE_SETS = {
     "Student": ["Welcome","Warm-Up","Training","Cool Down"],
@@ -150,94 +150,18 @@ MOOD_MUSIC = {
 }
 
 # ==================================================
-# STYLE + DOJO CREST
+# STYLE
 # ==================================================
 st.markdown("""
 <style>
-
-.stApp{
-    background:#ffffff;
-}
-
-/* Watermark crest */
-
-.stApp::before{
-content:"";
-position:fixed;
-top:50%;
-left:50%;
-transform:translate(-50%,-50%);
-width:700px;
-height:700px;
-opacity:0.05;
-background-repeat:no-repeat;
-background-size:contain;
-z-index:-1;
-
-background-image:url("data:image/svg+xml;utf8,
-<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 500 500'>
-<circle cx='250' cy='250' r='230' stroke='black' stroke-width='6' fill='none'/>
-<circle cx='250' cy='250' r='190' stroke='black' stroke-width='2' fill='none'/>
-
-<text x='250' y='90' text-anchor='middle' font-size='18' font-family='serif'>
-Warriors Don't Always Win - Warriors Always Fight
-</text>
-
-<text x='250' y='260' text-anchor='middle' font-size='42' font-weight='bold' font-family='serif'>
-The-Dojo
-</text>
-
-<text x='250' y='420' text-anchor='middle' font-size='20' font-family='serif'>
-We. Never. Quit.
-</text>
-</svg>");
-}
-
-[data-testid="stSidebar"]{
-background:#f8f9fa;
-border-right:1px solid #e0e0e0;
-}
-
-.active-item{
-color:#000;
-font-weight:800;
-border-left:3px solid #000;
-padding-left:20px;
-margin-top:8px;
-}
-
-.inactive-item{
-color:#bbb;
-border-left:1px solid #eee;
-padding-left:20px;
-margin-top:5px;
-}
-
-.sidebar-dojo{
-font-size:2.2rem!important;
-font-weight:800;
-font-style:italic;
-margin-bottom:-10px;
-}
-
-.slogan-warrior{
-font-size:1.1em;
-text-align:center;
-color:#888;
-letter-spacing:2px;
-text-transform:uppercase;
-margin-top:20px;
-}
-
-.slogan-quit{
-font-size:1.8em;
-text-align:center;
-color:#1a1a1a;
-font-style:italic;
-font-weight:800;
-margin-bottom:10px;
-}
-
+.stApp{background:#fff;color:#1a1a1a}
+[data-testid="stSidebar"]{background:#f8f9fa;border-right:1px solid #e0e0e0}
+.active-item{color:#000;font-weight:800;border-left:3px solid #000;padding-left:20px;margin-top:8px}
+.inactive-item{color:#bbb;border-left:1px solid #eee;padding-left:20px;margin-top:5px}
+.sidebar-header{font-size:.85em;color:#999;text-transform:uppercase;letter-spacing:1.5px;margin-top:25px}
+.sidebar-dojo{font-size:2.2rem!important;font-weight:800;font-style:italic;margin-bottom:-10px}
+.slogan-warrior{font-size:1.1em;text-align:center;color:#888;letter-spacing:2px;text-transform:uppercase;margin-top:20px}
+.slogan-quit{font-size:1.8em;text-align:center;color:#1a1a1a;font-style:italic;font-weight:800;margin-bottom:10px}
 </style>
 """, unsafe_allow_html=True)
 
@@ -256,8 +180,61 @@ with st.sidebar:
         style="active-item" if idx==st.session_state.phase else "inactive-item"
         st.markdown(f"<div class='{style}'>{p_name}</div>",unsafe_allow_html=True)
 
+    st.divider()
+
+    if st.button("Bow-Out", use_container_width=True):
+
+        convo = "\n".join([
+            f"{m['role']}: {m['content']}"
+            for m in st.session_state.msgs[-20:]
+        ])
+
+        INSIGHT_PROMPT = f"""
+Extract durable insights from this reflection session.
+
+Conversation:
+{convo}
+
+Rules:
+- Do not summarize the conversation
+- Identify patterns in thinking
+- Write 3–5 short insight sentences
+"""
+
+        headers = {"Authorization": f"Bearer {st.secrets['GROQ_API_KEY']}"}
+
+        try:
+
+            res = requests.post(
+                "https://api.groq.com/openai/v1/chat/completions",
+                json={
+                    "model":"llama-3.3-70b-versatile",
+                    "messages":[{"role":"system","content":INSIGHT_PROMPT}],
+                    "temperature":0.3
+                },
+                headers=headers,
+                timeout=20
+            )
+
+            res.raise_for_status()
+
+            insight = res.json()["choices"][0]["message"]["content"]
+
+            supabase.table("ledger_wisdom").insert({
+                "user_id":USER_ID,
+                "timestamp":time.time(),
+                "summary":insight
+            }).execute()
+
+        except Exception:
+            pass
+
+        st.session_state.msgs=[]
+        st.session_state.phase=0
+        st.rerun()
+
 # ==================================================
-# MAIN UI
+# MAIN
 # ==================================================
 st.markdown("<p class='slogan-warrior'>Warriors Don't Always Win — Warriors Always Fight.</p>",unsafe_allow_html=True)
 st.markdown("<p class='slogan-quit'>We. Never. Quit.</p>",unsafe_allow_html=True)
@@ -269,7 +246,7 @@ for msg in st.session_state.msgs[-10:]:
         st.markdown(msg["content"])
 
 # ==================================================
-# CHAT INPUT
+# INPUT
 # ==================================================
 if prompt := st.chat_input("Speak from center..."):
 
@@ -284,31 +261,76 @@ if prompt := st.chat_input("Speak from center..."):
         "phase":str(st.session_state.phase)
     }).execute()
 
+    recent_guidance="\n".join(
+        [m["content"][:120] for m in st.session_state.msgs if m["role"]=="assistant"][-3:]
+    )
+
+    session_length=len(st.session_state.msgs)
+
+    if session_length<6:
+        session_stage="Opening"
+    elif session_length<16:
+        session_stage="Working"
+    else:
+        session_stage="Closing"
+
     MASTER_PROMPT=f"""
 You are the Dojo Mentor for {USER_NAME}.
 
-Observe patterns, acknowledge reality, and offer practical adjustments.
+Take a moment to consider the situation before responding.
+
+LONG TERM TRAINING NOTES
+{PAST_WISDOM}
+
+RECENT GUIDANCE
+Avoid repeating:
+{recent_guidance}
+
+SESSION STATE
+Length: {session_length}
+Stage: {session_stage}
+
+Adjust tone naturally.
+
+APPROACH
+1 Observe the pattern
+2 Acknowledge reality
+3 Offer a practical adjustment
+
+STYLE
+Calm, grounded, no therapy language.
+
+Use grounding metaphors when useful: breath, focus, balance.
 
 Rank: {rank}
 Phase: {PHASE_SETS[rank][st.session_state.phase]}
 
-End every response with
+End with
 [MOOD: neutral/uplifting/melancholy/intense]
 """
 
     headers={"Authorization":f"Bearer {st.secrets['GROQ_API_KEY']}"}
 
-    res=requests.post(
-        "https://api.groq.com/openai/v1/chat/completions",
-        json={
-            "model":"llama-3.3-70b-versatile",
-            "messages":[{"role":"system","content":MASTER_PROMPT}]+st.session_state.msgs[-10:],
-            "temperature":0.6
-        },
-        headers=headers
-    )
+    try:
 
-    full_text=res.json()["choices"][0]["message"]["content"]
+        res=requests.post(
+            "https://api.groq.com/openai/v1/chat/completions",
+            json={
+                "model":"llama-3.3-70b-versatile",
+                "messages":[{"role":"system","content":MASTER_PROMPT}]+st.session_state.msgs[-10:],
+                "temperature":0.6
+            },
+            headers=headers,
+            timeout=20
+        )
+
+        res.raise_for_status()
+
+        full_text=res.json()["choices"][0]["message"]["content"]
+
+    except Exception:
+
+        full_text="The Mentor pauses. Take a breath and try again. [MOOD: neutral]"
 
     clean_response=full_text.split("[MOOD:")[0].strip() if "[MOOD:" in full_text else full_text
     mood=full_text.split("[MOOD:")[1].split("]")[0].strip().lower() if "[MOOD:" in full_text else "neutral"
@@ -316,6 +338,15 @@ End every response with
     st.session_state.mood=mood if mood in MOOD_MUSIC else "neutral"
 
     st.session_state.msgs.append({"role":"assistant","content":clean_response})
+
+    supabase.table("records").insert({
+        "user_id":USER_ID,
+        "timestamp":time.time(),
+        "role":"assistant",
+        "content":clean_response,
+        "rank":rank,
+        "phase":str(st.session_state.phase)
+    }).execute()
 
     if len(st.session_state.msgs)%4==0 and st.session_state.phase<3:
         st.session_state.phase+=1
