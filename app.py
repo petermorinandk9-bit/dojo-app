@@ -27,14 +27,14 @@ if 'user' not in st.session_state:
         .stApp { background-color: #ffffff; }
         .login-header { text-align: center; font-style: italic; font-weight: 800; font-size: 3.5rem; color: #1a1a1a; margin-bottom: 0px; }
         .login-sub { text-align: center; color: #666; font-size: 1.1rem; margin-bottom: 20px; }
-        .audio-container { text-align: center; margin: 0 auto 30px auto; padding: 15px; background: #fdfdfd; border: 1px solid #eeeeee; border-radius: 12px; max-width: 400px; }
+        .audio-container-gate { text-align: center; margin: 0 auto 30px auto; padding: 15px; background: #fdfdfd; border: 1px solid #eeeeee; border-radius: 12px; max-width: 400px; }
         </style>
         """, unsafe_allow_html=True)
     
     st.markdown('<p class="login-header">The-Dojo</p>', unsafe_allow_html=True)
     st.markdown('<p class="login-sub">Forge your discipline. Step onto the mat.</p>', unsafe_allow_html=True)
 
-    st.markdown('<div class="audio-container">', unsafe_allow_html=True)
+    st.markdown('<div class="audio-container-gate">', unsafe_allow_html=True)
     st.caption("🔊 Entrance Ritual")
     st.audio("https://www.soundhelix.com/examples/mp3/SoundHelix-Song-8.mp3", format="audio/mp3", loop=True)
     st.markdown('</div>', unsafe_allow_html=True)
@@ -81,7 +81,7 @@ ADMIN_USER = "joseph"
 if 'mood' not in st.session_state:
     st.session_state.mood = "neutral"
 
-# Music Tracks for different moods
+# Mood Music Logic (Update these URLs for your final Flute tracks)
 MOOD_MUSIC = {
     "neutral": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3",
     "uplifting": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3",
@@ -97,18 +97,31 @@ PHASE_SETS = {
 }
 
 # ==================================================
-# 4. ARCHWAY UI
+# 4. ARCHWAY UI (With Floating Corner Player)
 # ==================================================
 st.markdown("""
     <style>
     .stApp { background-color: #ffffff; color: #1a1a1a; }
     [data-testid="stSidebar"] { background-color: #f8f9fa; border-right: 1px solid #e0e0e0; }
+    
+    /* THE FLOATING CORNER PLAYER */
+    .floating-audio-box {
+        position: fixed;
+        top: 50px;
+        right: 20px;
+        z-index: 1000;
+        width: 220px;
+        background: rgba(255, 255, 255, 0.9);
+        padding: 5px;
+        border-radius: 10px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+    }
+
     .active-item { color: #000; font-weight: 800; border-left: 3px solid #000; padding-left: 20px; margin-top: 8px; }
     .inactive-item { color: #bbb; border-left: 1px solid #eee; padding-left: 20px; margin-top: 5px; }
     .sidebar-header { font-size: 0.85em; color: #999; text-transform: uppercase; letter-spacing: 1.5px; margin-top: 25px; }
     .sidebar-dojo { font-size: 2.2rem !important; font-weight: 800; font-style: italic; margin-bottom: -10px; }
     .slogan-stack-refined { font-size: 1.65em; text-align: center; color: #666; font-style: italic; padding-top: 20px; }
-    .mood-indicator { text-align: center; font-size: 0.8em; color: #aaa; margin-bottom: 10px; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -121,7 +134,8 @@ with st.sidebar:
     st.divider()
     
     st.markdown('<p class="sidebar-header">Current Path</p>', unsafe_allow_html=True)
-    current_phases = PHASE_SETS.get(st.session_state.get('rank', 'Student'), PHASE_SETS["Student"])
+    current_rank = st.session_state.get('rank', 'Student')
+    current_phases = PHASE_SETS.get(current_rank, PHASE_SETS["Student"])
     for idx, p_name in enumerate(current_phases):
         style = 'active-item' if idx == st.session_state.get('phase', 0) else 'inactive-item'
         st.markdown(f"<div class='{style}'>{p_name}</div>", unsafe_allow_html=True)
@@ -140,13 +154,14 @@ with st.sidebar:
         st.rerun()
 
 # ==================================================
-# 7. MAIN ENGINE (WITH MOOD DJ)
+# 7. MAIN ENGINE (With Floating Atmosphere)
 # ==================================================
 st.markdown('<div class="slogan-stack-refined">We. Never. Quit.</div>', unsafe_allow_html=True)
 
-# THE INNER DOJO MUSIC (Swaps based on mood)
-st.markdown(f'<div class="mood-indicator">Current Atmosphere: {st.session_state.mood.title()}</div>', unsafe_allow_html=True)
+# THE SHRUNK CORNER PLAYER
+st.markdown('<div class="floating-audio-box">', unsafe_allow_html=True)
 st.audio(MOOD_MUSIC[st.session_state.mood], format="audio/mp3", loop=True)
+st.markdown('</div>', unsafe_allow_html=True)
 
 if 'msgs' not in st.session_state:
     st.session_state.msgs = []
@@ -162,6 +177,7 @@ if prompt := st.chat_input("Speak from center..."):
     headers = {"Authorization": f"Bearer {st.secrets['GROQ_API_KEY']}"}
     MOOD_PROMPT = f"""
     ROLE: Dojo Mentor. WARRIOR: {USER_NAME}.
+    Assess the tone of the student. 
     At the very end of your response, add a single line with the mood tag: 
     [MOOD: neutral/uplifting/melancholy/intense]
     """
