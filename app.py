@@ -139,7 +139,7 @@ if prompt := st.chat_input("Speak from center..."):
 
     with st.chat_message("assistant"):
         with st.status("🧘‍♂️ Let me think about this a moment...", expanded=False) as status:
-            # Step 1: Get the response first (Background)
+            # Get response first
             sys_msg = MIRROR_PROMPT if st.session_state.phase == 3 else MASTER_PROMPT
             messages = [{"role": "system", "content": sys_msg}] + st.session_state.msgs[-30:]
             headers = {"Authorization": f"Bearer {st.secrets['GROQ_API_KEY']}"}
@@ -149,11 +149,10 @@ if prompt := st.chat_input("Speak from center..."):
                 res = requests.post("https://api.groq.com/openai/v1/chat/completions", json=payload, headers=headers, timeout=25)
                 final_response = res.json()['choices'][0]['message']['content']
                 
-                # Step 2: Dynamic Delay calculation based on AI response length
-                # 1.5s minimum + 0.1s per word of the RESPONSE
+                # Dynamic Delay logic with a 5-second CAP
                 ai_word_count = len(final_response.split())
-                dynamic_delay = 1.5 + (ai_word_count * 0.05) 
-                time.sleep(min(dynamic_delay, 7.0)) # Hard cap at 7 seconds to keep user engaged
+                dynamic_delay = 1.0 + (ai_word_count * 0.05) 
+                time.sleep(min(dynamic_delay, 5.0)) # REFINED: Capped at 5 seconds
                 
                 status.update(label="🙏 Wisdom Found.", state="complete", expanded=False)
             except: 
@@ -164,7 +163,7 @@ if prompt := st.chat_input("Speak from center..."):
         st.session_state.msgs.append({"role": "assistant", "content": final_response})
         save_to_ledger("assistant", final_response, st.session_state.rank, str(st.session_state.phase))
         
-        # Advancement logic...
+        # Advancement logic
         if st.session_state.exchange_count >= 2:
             check_payload = {"model": "llama-3.1-8b-instant", "messages": [{"role": "system", "content": "Analyze growth. Reply ONLY YES or NO."}, {"role": "user", "content": prompt}], "temperature": 0.0}
             try:
