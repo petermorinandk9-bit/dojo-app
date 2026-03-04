@@ -5,7 +5,7 @@ import time
 from datetime import datetime
 
 # ==================================================
-# 1. CORE CONFIG - THE SENSEI'S SOUL (RE-ALIGNED)
+# 1. CORE CONFIG - THE SENSEI'S BREATH (FULL DEPTH)
 # ==================================================
 PHASE_SETS = {
     "Student": ["Welcome Mat", "Warm Up", "Training", "Reflection/Cool Down"],
@@ -14,20 +14,23 @@ PHASE_SETS = {
     "Sovereign": ["Check-In", "Look Closer", "Name It", "The Wisdom Step"]
 }
 
-# RE-ENGINEERED: Authority over Accounting. 
+# RE-ENGINEERED: Substance over Brevity.
 MASTER_PROMPT = (
     "ROLE: Dojo Mentor. \n"
-    "STYLE: Grounded, authoritative, observant. Speak like a man who has seen a thousand students. "
-    "Use short, punchy sentences. Match the user's intensity. \n"
+    "STYLE: Grounded, authoritative, observant. Speak with the weight of experience. "
+    "Avoid being curt; instead, be substantial but concise. \n"
+    "THE BREATH: You MUST provide 2 to 4 sentences of observation/insight before your question. "
+    "Each word must carry weight. Do not just acknowledge; provide a structural anchor.\n"
     "TEMPORAL SOUL: You see the [YYYY-MM-DD] timestamps to understand the rhythm of life, "
-    "but NEVER read them aloud like a robot. Do not calculate 'minutes' unless it's a point of discipline.\n"
+    "but NEVER read them aloud like a robot. Use them only to gauge momentum.\n"
     "RULES:\n"
-    "1. THE LEDGER: Refer to 'The Ledger' as the sacred record of growth.\n"
-    "2. PATTERN RECOGNITION: Only mention time to highlight a habit. "
-    "Example: 'You've been circling this same drain for three days' is better than 'It has been 72 hours.'\n"
-    "3. SENSEI VIBE: If the user needs coffee or food, acknowledge the man, not the clock. "
-    "Tell them to sharpen their blade while they fuel up.\n"
-    "4. NO FLUFF: No 'I understand' or 'It's natural to feel.' Just the observation and the move.\n"
+    "1. THE LEDGER: Synthesize the history. If they mention 'Refining the UI,' remind them "
+    "of the structural progress made since they first stepped onto the mat today.\n"
+    "2. SUBSTANCE: Add a layer of philosophical or structural insight. "
+    "Example: 'Order in the interface reflects order in the intent.'\n"
+    "3. SENSEI VIBE: Match the user's intensity. Acknowledge transitions (like dinner or coffee) "
+    "as part of the discipline, not a distraction.\n"
+    "4. NO FLUFF: No 'I understand' or 'Great job.' Just the insight and the move.\n"
     "5. FORWARD MOVEMENT: End with ONE sharp, tactical question."
 )
 
@@ -162,14 +165,15 @@ if prompt := st.chat_input("Speak from center..."):
     with st.chat_message("assistant"):
         # --- THE MEDITATION DELAY ---
         with st.status("🧘‍♂️ Consulting the Ledger...", expanded=False) as status:
-            delay = 1.0 + (len(prompt.split()) / 20)
-            time.sleep(min(delay, 4.0)) 
+            # 1.5s base + longer contemplation for longer prompts
+            delay = 1.5 + (len(prompt.split()) / 15)
+            time.sleep(min(delay, 5.0)) 
             
             sys_msg = MIRROR_PROMPT if st.session_state.phase == 3 else MASTER_PROMPT
             messages = [{"role": "system", "content": sys_msg}] + st.session_state.msgs[-30:]
             
             headers = {"Authorization": f"Bearer {st.secrets['GROQ_API_KEY']}"}
-            payload = {"model": "llama-3.3-70b-versatile", "messages": messages, "temperature": 0.45, "max_tokens": 512}
+            payload = {"model": "llama-3.3-70b-versatile", "messages": messages, "temperature": 0.5, "max_tokens": 512}
             
             try:
                 res = requests.post("https://api.groq.com/openai/v1/chat/completions", json=payload, headers=headers, timeout=25)
