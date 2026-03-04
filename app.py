@@ -59,7 +59,7 @@ if 'user' not in st.session_state:
                 if invite_c != "dojoentry":
                     st.error("Invalid Invite Code.")
                 elif not new_name or not new_pass:
-                    st.warning("Username and Password required.")
+                    st.warning("All fields required.")
                 else:
                     user_data = {"username": new_name, "password": new_pass, "display_name": display_n}
                     new_user = supabase.table("users").insert(user_data).execute()
@@ -90,7 +90,6 @@ ADMIN_USER = "joseph"
 if 'mood' not in st.session_state:
     st.session_state.mood = "neutral"
 
-# Stable Flute Tracks (Uplifting, Melancholy, Intense, Neutral)
 MOOD_MUSIC = {
     "neutral": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-8.mp3",
     "uplifting": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3",
@@ -145,7 +144,7 @@ if 'msgs' not in st.session_state:
     except: pass
 
 # ==================================================
-# 6. SIDEBAR - RESTORED LINEAGE & ROSTER
+# 6. SIDEBAR - THE WARRIOR'S DASHBOARD
 # ==================================================
 with st.sidebar:
     st.markdown('<p class="sidebar-dojo">The-Dojo</p>', unsafe_allow_html=True)
@@ -191,7 +190,7 @@ with st.sidebar:
         st.rerun()
 
 # ==================================================
-# 7. MAIN ENGINE
+# 7. MAIN ENGINE (UPGRADED INTERNAL LOGIC)
 # ==================================================
 st.markdown('<p class="slogan-warrior">Warriors Dont Always Win - Warriors Always Fight.</p>', unsafe_allow_html=True)
 st.markdown('<p class="slogan-quit">We. Never. Quit.</p>', unsafe_allow_html=True)
@@ -210,17 +209,34 @@ if prompt := st.chat_input("Speak from center..."):
     save_to_ledger("user", prompt, st.session_state.rank, st.session_state.phase)
     with st.chat_message("user"): st.markdown(prompt)
 
+    # Rank Progression logic
     st.session_state.exchange_count += 1
     if st.session_state.exchange_count >= 2:
         if st.session_state.phase < 3:
             st.session_state.phase += 1
             st.session_state.exchange_count = 0
 
+    # THE SENSEI'S SOUL
+    MASTER_PROMPT = f"""
+    IDENTITY: You are the Dojo Mentor. You speak to {USER_NAME}.
+    PHILOSOPHY: Rooted in the "Best of the Best" 1989 mindset. 
+    CORE BELIEF: Warriors don't always win, but they always fight. 
+    EXPERIENCE: You understand Olympic-level discipline and the "life-quakes" of injury and setback.
+    
+    MENTAL MAT: You recognize that the hardest opponent is the student's own mind. 
+    When they are stuck, do not give "hollow" motivation. Give them "Grounded Resilience."
+    If they are struggling with focus or internal friction, meet them on that mat.
+    
+    TONE: Observant, visceral, and unsentimental but deeply supportive. 
+    No fluff. No "AI-speak." Speak like a coach who has scars of their own.
+
+    INSTRUCTION: At the very end of your response, add: [MOOD: neutral/uplifting/melancholy/intense]
+    """
+
     headers = {"Authorization": f"Bearer {st.secrets['GROQ_API_KEY']}"}
-    MOOD_PROMPT = f"ROLE: Dojo Mentor. WARRIOR: {USER_NAME}. At the end of your response, add: [MOOD: neutral/uplifting/melancholy/intense]"
-    messages = [{"role": "system", "content": MOOD_PROMPT}] + st.session_state.msgs[-10:]
+    messages = [{"role": "system", "content": MASTER_PROMPT}] + st.session_state.msgs[-10:]
     res = requests.post("https://api.groq.com/openai/v1/chat/completions", 
-                        json={"model": "llama-3.3-70b-versatile", "messages": messages, "temperature": 0.6}, 
+                        json={"model": "llama-3.3-70b-versatile", "messages": messages, "temperature": 0.65}, 
                         headers=headers)
     
     full_text = res.json()['choices'][0]['message']['content']
