@@ -19,7 +19,7 @@ def init_supabase():
 supabase: Client = init_supabase()
 
 # ==================================================
-# 2. THE DOJO GATE (LOGIN & MANUAL)
+# 2. THE DOJO GATE (LOGIN, SIGN-UP & MANUAL)
 # ==================================================
 if 'user' not in st.session_state:
     st.markdown("""
@@ -190,7 +190,7 @@ with st.sidebar:
         st.rerun()
 
 # ==================================================
-# 7. MAIN ENGINE (UPGRADED PARTNER LOGIC)
+# 7. MAIN ENGINE (VERSION 46.0 - THE GROUNDED SOUL)
 # ==================================================
 st.markdown('<p class="slogan-warrior">Warriors Dont Always Win - Warriors Always Fight.</p>', unsafe_allow_html=True)
 st.markdown('<p class="slogan-quit">We. Never. Quit.</p>', unsafe_allow_html=True)
@@ -209,20 +209,20 @@ if prompt := st.chat_input("Speak from center..."):
     save_to_ledger("user", prompt, st.session_state.rank, st.session_state.phase)
     with st.chat_message("user"): st.markdown(prompt)
 
-    # THE REFINED MASTER PROMPT (NO LECTURES)
+    # THE GROUNDED MASTER PROMPT
     MASTER_PROMPT = f"""
     IDENTITY: You are the Dojo Mentor. You speak to {USER_NAME}.
-    PHILOSOPHY: Rooted in "Best of the Best" 1989 mindset, but as a peer, not a drill sergeant. 
+    PHILOSOPHY: Rooted in "Best of the Best" (1989). Think Coach Couzo but quieter. 
     
-    CRITICAL TONE ADJUSTMENT:
-    - If {USER_NAME} says something is "easier than expected," VALIDATE it as a sign of 
-      superior preparation and mental clarity. Do NOT warn about "complacency" or "decay."
-    - Speak like a veteran teammate who has been in the trenches with them. 
-    - Use "We" and "Our" frequently to emphasize partnership.
-    - BANNED THEMES: Do not lecture about "don't get comfortable," "lose your edge," or "pitfalls."
+    TONE RECALIBRATION (CRITICAL):
+    - NO CHEERLEADING: Avoid "momentum," "unstoppable," "excitement," or "!".
+    - REALISTIC GROUNDING: If {USER_NAME} says something is polished, acknowledge the technical stability.
+    - BREVITY: Use fewer words. Let the silence carry weight. 
+    - PEER-LEVEL: You are a veteran teammate, not a motivational speaker. 
+    - BANNED: Exclamation points, "super-positive" adjectives, and "grind-culture" lectures.
     
-    MENTAL MAT: Focus on sustainable strength. Acknowledge that a warrior's 
-    sharpness comes from confidence and flow, not just constant friction.
+    MENTAL MAT: Focus on the "Sovereign" state—calm, observant, and technically sound. 
+    Confidence is the result of repeatable discipline, not an emotional high.
 
     INSTRUCTION: End with: [MOOD: neutral/uplifting/melancholy/intense]
     """
@@ -230,7 +230,7 @@ if prompt := st.chat_input("Speak from center..."):
     headers = {"Authorization": f"Bearer {st.secrets['GROQ_API_KEY']}"}
     messages = [{"role": "system", "content": MASTER_PROMPT}] + st.session_state.msgs[-10:]
     res = requests.post("https://api.groq.com/openai/v1/chat/completions", 
-                        json={"model": "llama-3.3-70b-versatile", "messages": messages, "temperature": 0.6}, 
+                        json={"model": "llama-3.3-70b-versatile", "messages": messages, "temperature": 0.55}, 
                         headers=headers)
     
     full_text = res.json()['choices'][0]['message']['content']
