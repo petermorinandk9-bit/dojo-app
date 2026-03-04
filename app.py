@@ -1,11 +1,22 @@
 import streamlit as st
-import sqlite3
 import requests
 import time
 from datetime import datetime
+from supabase import create_client, Client
 
 # ==================================================
-# 1. CORE CONFIG - THE BALANCED MENTOR
+# 1. CLOUD DATABASE CONNECTION
+# ==================================================
+@st.cache_resource
+def init_supabase():
+    url = st.secrets["SUPABASE_URL"]
+    key = st.secrets["SUPABASE_KEY"]
+    return create_client(url, key)
+
+supabase: Client = init_supabase()
+
+# ==================================================
+# 2. CORE CONFIG - THE BALANCED MENTOR
 # ==================================================
 PHASE_SETS = {
     "Student": ["Welcome Mat", "Warm Up", "Training", "Reflection/Cool Down"],
@@ -22,9 +33,9 @@ MASTER_PROMPT = (
     "1. LIGHT MOMENTS: 1-2 punchy, strategic sentences for brief check-ins. \n"
     "2. HEAVY MOMENTS: Respond with 3-4 substantial paragraphs when the user shares breakthroughs or personal history. \n"
     "RULES:\n"
-    "1. NO CHEAP PRAISE: Say 'The fact that you've turned that chaos into a forge is a rare advantage. Don't waste it.'\n"
-    "2. THE LEDGER: Reference the user's brilliance as a functional engine.\n"
-    "3. INSPIRATION: Focus on 'Legacy' and 'Impact.'\n"
+    "1. NO CHEAP PRAISE: Acknowledge the user's raw experience as a forge for their future.\n"
+    "2. THE LEDGER: Read the background context. Address the USER'S specific journey, goals, and struggles. Do NOT assume they are a developer unless they say they are.\n"
+    "3. INSPIRATION: Focus on 'Legacy', 'Impact', and structural habits.\n"
     "4. NO FLUFF: Keep the prose tight. No fillers.\n"
     "5. FORWARD MOVEMENT: End with ONE sharp, tactical question."
 )
@@ -35,7 +46,7 @@ MIRROR_PROMPT = (
 )
 
 # ==================================================
-# 2. ARCHWAY UI
+# 3. ARCHWAY UI
 # ==================================================
 st.set_page_config(page_title="The Dojo", layout="wide")
 
@@ -56,55 +67,42 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 # ==================================================
-# 3. DATABASE & MEMORY
+# 4. MEMORY & STATE MANAGEMENT
 # ==================================================
-@st.cache_resource
-def get_db_connection():
-    return sqlite3.connect('sovereign.db', check_same_thread=False)
-
-def init_db():
-    conn = get_db_connection()
-    c = conn.cursor()
-    c.execute('''CREATE TABLE IF NOT EXISTS records
-                 (id INTEGER PRIMARY KEY AUTOINCREMENT, timestamp REAL, role TEXT, content TEXT, rank TEXT, phase TEXT)''')
-    # NEW: Table for long-term compressed memory
-    c.execute('''CREATE TABLE IF NOT EXISTS ledger_wisdom
-                 (id INTEGER PRIMARY KEY AUTOINCREMENT, timestamp REAL, summary TEXT)''')
-    conn.commit()
-
-init_db()
-
 def save_to_ledger(role, text, rank, phase):
-    conn = get_db_connection()
-    c = conn.cursor()
-    c.execute("INSERT INTO records (timestamp, role, content, rank, phase) VALUES (?, ?, ?, ?, ?)",
-              (time.time(), role, text, rank, phase))
-    conn.commit()
+    data = {"timestamp": time.time(), "role": role, "content": text, "rank": rank, "phase": str(phase)}
+    supabase.table("records").insert(data).execute()
 
-# LOAD LONG TERM MEMORY
-conn = get_db_connection()
-c = conn.cursor()
-c.execute("SELECT summary FROM ledger_wisdom ORDER BY timestamp ASC")
-wisdom_rows = c.fetchall()
-long_term_memory = "\n".join([f"- {r[0]}" for r in wisdom_rows])
+# LOAD LONG TERM MEMORY FROM CLOUD
+try:
+    wisdom_response = supabase.table("ledger_wisdom").select("*").order("timestamp").execute()
+    wisdom_rows = wisdom_response.data
+    long_term_memory = "\n".join([f"- {r['summary']}" for r in wisdom_rows])
+except:
+    long_term_memory = ""
 
 if 'msgs' not in st.session_state:
     st.session_state.msgs = []
     st.session_state.exchange_count = 0
     st.session_state.rank = "Student"
     st.session_state.phase = 0
-    c.execute("SELECT timestamp, role, content, rank, phase FROM records ORDER BY timestamp ASC")
-    rows = c.fetchall()
-    for r in rows:
-        timestamp_str = datetime.fromtimestamp(r[0]).strftime('%Y-%m-%d %H:%M')
-        st.session_state.msgs.append({"role": r[1], "content": f"[{timestamp_str}] {r[2]}"})
-    if rows:
-        st.session_state.rank = rows[-1][3]
-        try: st.session_state.phase = int(rows[-1][4])
-        except: st.session_state.phase = 0
+    
+    # LOAD SHORT TERM CHAT LOG FROM CLOUD
+    try:
+        records_response = supabase.table("records").select("*").order("timestamp").execute()
+        rows = records_response.data
+        for r in rows:
+            timestamp_str = datetime.fromtimestamp(r['timestamp']).strftime('%Y-%m-%d %H:%M')
+            st.session_state.msgs.append({"role": r['role'], "content": f"[{timestamp_str}] {r['content']}"})
+        if rows:
+            st.session_state.rank = rows[-1]['rank']
+            try: st.session_state.phase = int(rows[-1]['phase'])
+            except: st.session_state.phase = 0
+    except:
+        pass
 
 # ==================================================
-# 4. SIDEBAR - THE COMPRESSOR
+# 5. SIDEBAR - THE CLOUD COMPRESSOR
 # ==================================================
 with st.sidebar:
     st.markdown('<p class="sidebar-dojo">The-Dojo</p>', unsafe_allow_html=True)
@@ -118,33 +116,31 @@ with st.sidebar:
         st.markdown(f"<p class='{'active-phase' if idx == st.session_state.phase else 'inactive-phase'}'>{'➤ ' if idx == st.session_state.phase else ''}{phase_name}</p>", unsafe_allow_html=True)
     st.markdown("<br>", unsafe_allow_html=True)
     
-    # RE-ENGINEERED BOW-OUT: The Memory Compressor
+    # CLOUD BOW-OUT
     if st.button("Bow-Out", use_container_width=True):
         if len(st.session_state.msgs) > 2:
-            with st.spinner("Archiving today's wisdom..."):
+            with st.spinner("Archiving today's wisdom to the cloud..."):
                 try:
                     chat_log = "\n".join([f"{m['role']}: {m['content']}" for m in st.session_state.msgs])
                     summary_prompt = "You are the Dojo Secretary. Summarize the key psychological breakthroughs, structural realizations, and specific goals from this session. Keep it to one dense, highly analytical paragraph. Focus on the user's growth. Output ONLY the summary text."
                     
                     headers = {"Authorization": f"Bearer {st.secrets['GROQ_API_KEY']}"}
-                    # Uses the cheaper, faster 8B model for summarizing
                     payload = {"model": "llama-3.1-8b-instant", "messages": [{"role": "system", "content": summary_prompt}, {"role": "user", "content": chat_log}], "temperature": 0.3, "max_tokens": 300}
                     
                     res = requests.post("https://api.groq.com/openai/v1/chat/completions", json=payload, headers=headers, timeout=15)
                     summary = res.json()['choices'][0]['message']['content']
                     
-                    c = conn.cursor()
-                    c.execute("INSERT INTO ledger_wisdom (timestamp, summary) VALUES (?, ?)", (time.time(), summary))
-                    c.execute("DELETE FROM records") # Sweeps the mat clean
-                    conn.commit()
-                    st.toast("Wisdom Archived. Mat Cleared.", icon="📜")
-                except:
+                    # Save to Cloud Wisdom
+                    supabase.table("ledger_wisdom").insert({"timestamp": time.time(), "summary": summary}).execute()
+                    # Sweep Cloud Mat
+                    supabase.table("records").delete().neq("id", 0).execute() 
+                    
+                    st.toast("Cloud Wisdom Archived. Mat Cleared.", icon="☁️")
+                except Exception as e:
                     st.toast("Archive failed. Mat cleared.", icon="⚠️")
-                    c.execute("DELETE FROM records")
-                    conn.commit()
+                    supabase.table("records").delete().neq("id", 0).execute()
         else:
-            c.execute("DELETE FROM records")
-            conn.commit()
+            supabase.table("records").delete().neq("id", 0).execute()
             
         st.session_state.phase = 0
         st.session_state.exchange_count = 0
@@ -152,7 +148,7 @@ with st.sidebar:
         st.rerun()
 
 # ==================================================
-# 5. MAIN INTERFACE
+# 6. MAIN INTERFACE
 # ==================================================
 st.markdown('<div class="slogan-stack-refined">Warriors Don\'t Always Win — Warriors Always Fight</div>', unsafe_allow_html=True)
 st.markdown('<div class="slogan-stack-refined">We. Never. Quit.</div>', unsafe_allow_html=True)
@@ -165,7 +161,7 @@ for msg in st.session_state.msgs:
         st.markdown(display_text, unsafe_allow_html=True)
 
 # ==================================================
-# 6. ENGINE ROUTING
+# 7. ENGINE ROUTING
 # ==================================================
 if prompt := st.chat_input("Speak from center..."):
     current_ts = datetime.now().strftime('%Y-%m-%d %H:%M')
@@ -175,10 +171,8 @@ if prompt := st.chat_input("Speak from center..."):
     with st.chat_message("user"): st.markdown(prompt)
 
     crisis_keywords = ["kill myself", "suicide", "hurt myself", "end my life", "want to die", "harm myself", "don't want to live", "ending it all"]
-    is_crisis = any(k in prompt.lower() for k in crisis_keywords)
-
-    with st.chat_message("assistant"):
-        if is_crisis:
+    if any(k in prompt.lower() for k in crisis_keywords):
+        with st.chat_message("assistant"):
             safety_box = """
             <div style="background-color: #ffe6e6; border-left: 5px solid #ff0000; padding: 20px; border-radius: 5px;">
                 <p style="color: #cc0000; font-weight: bold; font-size: 1.2em; margin-bottom: 10px;">🛡️ SAFETY PROTOCOL ACTIVATED</p>
@@ -195,10 +189,9 @@ if prompt := st.chat_input("Speak from center..."):
             st.session_state.msgs.append({"role": "assistant", "content": safety_box})
             save_to_ledger("assistant", "CRISIS_PROTOCOL_ACTIVATED", st.session_state.rank, str(st.session_state.phase))
             st.rerun()
-        
-        else:
+    else:
+        with st.chat_message("assistant"):
             with st.status("🧘‍♂️ Let me think about this a moment...", expanded=False) as status:
-                # INJECT LONG TERM MEMORY INTO THE SENSEI'S BRAIN
                 dynamic_sys_msg = MIRROR_PROMPT if st.session_state.phase == 3 else MASTER_PROMPT
                 if long_term_memory:
                     dynamic_sys_msg += f"\n\nBACKGROUND CONTEXT (PAST SESSION SUMMARIES):\n{long_term_memory}"
@@ -210,9 +203,7 @@ if prompt := st.chat_input("Speak from center..."):
                 try:
                     res = requests.post("https://api.groq.com/openai/v1/chat/completions", json=payload, headers=headers, timeout=25)
                     final_response = res.json()['choices'][0]['message']['content']
-                    ai_word_count = len(final_response.split())
-                    dynamic_delay = 1.0 + (ai_word_count * 0.05) 
-                    time.sleep(min(dynamic_delay, 5.0))
+                    time.sleep(min(1.0 + (len(final_response.split()) * 0.05), 5.0))
                     status.update(label="🙏 Wisdom Found.", state="complete", expanded=False)
                 except: 
                     final_response = "**System Alert:** Transmission issue."
@@ -222,7 +213,6 @@ if prompt := st.chat_input("Speak from center..."):
             st.session_state.msgs.append({"role": "assistant", "content": final_response})
             save_to_ledger("assistant", final_response, st.session_state.rank, str(st.session_state.phase))
             
-            # Advancement logic...
             if st.session_state.exchange_count >= 2:
                 check_payload = {"model": "llama-3.1-8b-instant", "messages": [{"role": "system", "content": "Analyze growth. Reply ONLY YES or NO."}, {"role": "user", "content": prompt}], "temperature": 0.0}
                 try:
