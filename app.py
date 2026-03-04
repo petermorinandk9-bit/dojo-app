@@ -86,7 +86,7 @@ PHASE_SETS = {
 }
 
 # ==================================================
-# 4. ARCHWAY UI (UNIFIED JOURNEY STYLING)
+# 4. ARCHWAY UI (INTEGRATED LINEAGE STYLE)
 # ==================================================
 st.set_page_config(page_title="The Dojo", layout="wide")
 st.markdown("""
@@ -103,7 +103,7 @@ st.markdown("""
         color: #bbbbbb; font-weight: 400; font-size: 0.95em; 
         border-left: 1px solid #eeeeee; padding-left: 20px; margin-top: 5px; 
     }
-    .sidebar-header { font-size: 0.8em; color: #999; text-transform: uppercase; letter-spacing: 1px; margin-top: 20px; }
+    .sidebar-header { font-size: 0.85em; color: #999; text-transform: uppercase; letter-spacing: 1.5px; margin-top: 25px; margin-bottom: 10px; }
     .sidebar-dojo { font-size: 2.2rem !important; font-weight: 800; color: #1a1a1a; font-style: italic; margin-bottom: -10px; }
     .slogan-stack-refined { font-size: 1.65em; text-align: center; color: #666666; font-style: italic; padding-top: 20px; }
     </style>
@@ -132,36 +132,30 @@ if 'msgs' not in st.session_state:
     except: pass
 
 # ==================================================
-# 6. SIDEBAR - THE UNIFIED JOURNEY
+# 6. SIDEBAR - THE INTEGRATED LINEAGE
 # ==================================================
 with st.sidebar:
     st.markdown('<p class="sidebar-dojo">The-Dojo</p>', unsafe_allow_html=True)
     st.write(f"Warrior: **{USER_NAME}**")
     st.divider()
     
-    # 1. THE ACTIVE PATH (Rank + Phases together)
+    # 1. CURRENT PATH (Phases Only)
     st.markdown('<p class="sidebar-header">Current Path</p>', unsafe_allow_html=True)
-    
-    # Show the Active Rank first
-    st.markdown(f"<div class='active-item'>{st.session_state.rank}</div>", unsafe_allow_html=True)
-    
-    # Show the Phases nested directly under it
     current_phases = PHASE_SETS[st.session_state.rank]
     for idx, p_name in enumerate(current_phases):
         is_active_phase = (idx == st.session_state.phase)
         style = 'active-item' if is_active_phase else 'inactive-item'
-        # Indent phases slightly more than the Rank to show hierarchy
-        indent = "margin-left: 15px;" if not is_active_phase else "margin-left: 0px;"
-        st.markdown(f"<div class='{style}' style='{indent}'>{p_name}</div>", unsafe_allow_html=True)
+        st.markdown(f"<div class='{style}'>{p_name}</div>", unsafe_allow_html=True)
     
     st.divider()
     
-    # 2. THE OTHER RANKS (Faded out)
+    # 2. LINEAGE (Ranks Only - Highlighting Current Rank)
     st.markdown('<p class="sidebar-header">Lineage</p>', unsafe_allow_html=True)
     ranks = ["Student", "Practitioner", "Sentinel", "Sovereign"]
     for r in ranks:
-        if r != st.session_state.rank:
-            st.markdown(f"<div class='inactive-item'>{r}</div>", unsafe_allow_html=True)
+        is_active_rank = (r == st.session_state.rank)
+        style = 'active-item' if is_active_rank else 'inactive-item'
+        st.markdown(f"<div class='{style}'>{r}</div>", unsafe_allow_html=True)
     
     st.divider()
     if st.button("Bow-Out (Save & Clear)", use_container_width=True):
