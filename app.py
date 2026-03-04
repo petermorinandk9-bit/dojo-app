@@ -19,7 +19,7 @@ def init_supabase():
 supabase: Client = init_supabase()
 
 # ==================================================
-# 2. THE DOJO GATE (LOGIN & SIGN-UP) - SILENT ENTRY
+# 2. THE DOJO GATE (LOGIN, SIGN-UP & MANUAL)
 # ==================================================
 if 'user' not in st.session_state:
     st.markdown("""
@@ -27,15 +27,15 @@ if 'user' not in st.session_state:
         .stApp { background-color: #ffffff; }
         .login-header { text-align: center; font-style: italic; font-weight: 800; font-size: 3.5rem; color: #1a1a1a; margin-bottom: 0px; }
         .login-sub { text-align: center; color: #666; font-size: 1.1rem; margin-bottom: 30px; }
+        .manual-text { color: #444; line-height: 1.6; font-size: 0.95rem; }
+        .manual-section { font-weight: 800; color: #1a1a1a; margin-top: 15px; text-transform: uppercase; letter-spacing: 1px; }
         </style>
         """, unsafe_allow_html=True)
     
     st.markdown('<p class="login-header">The-Dojo</p>', unsafe_allow_html=True)
     st.markdown('<p class="login-sub">Forge your discipline. Step onto the mat.</p>', unsafe_allow_html=True)
-
-    # Note: Entry Audio Removed for maximum stability across all browsers
     
-    tab_login, tab_signup = st.tabs(["Login", "Create Account"])
+    tab_login, tab_signup, tab_manual = st.tabs(["Login", "Create Account", "The Manual"])
 
     with tab_login:
         with st.form("login_form"):
@@ -45,7 +45,7 @@ if 'user' not in st.session_state:
                 res = supabase.table("users").select("*").eq("username", u_name).eq("password", u_pass).execute()
                 if res.data:
                     st.session_state.user = res.data[0]
-                    st.success(f"Welcome, {st.session_state.user['display_name']}.")
+                    st.success(f"Welcome back.")
                     time.sleep(1)
                     st.rerun()
                 else:
@@ -66,6 +66,28 @@ if 'user' not in st.session_state:
                     if new_user.data:
                         st.session_state.user = new_user.data[0]
                         st.rerun()
+
+    with tab_manual:
+        st.markdown("""
+        <div class="manual-text">
+            <p class="manual-section">1. THE RITUAL</p>
+            The Dojo is a space for focused reflection. When you enter, the atmosphere will adjust to your tone. 
+            Speak from center. Be honest. The Mentor is here to observe, not to judge.
+            
+            <p class="manual-section">2. THE LINEAGE</p>
+            You begin as a <b>Student</b>. As you interact and complete training phases, you will progress to 
+            <b>Practitioner</b>, <b>Sentinel</b>, and finally <b>Sovereign</b>. Your rank is visible to the Sensei, 
+            marking your commitment to the path.
+            
+            <p class="manual-section">3. THE BOW-OUT</p>
+            Use the "Bow-Out" button to end your session. This clears the mat, summarizes your growth for the day, 
+            and prepares the Dojo for your next entry.
+            
+            <p class="manual-section">4. THE PRIVACY VOW</p>
+            Your training is your own. Your conversations with the Mentor are strictly private and are not 
+            monitored or read by anyone else. This is your sanctuary.
+        </div>
+        """, unsafe_allow_html=True)
     st.stop()
 
 # ==================================================
@@ -78,7 +100,6 @@ ADMIN_USER = "joseph"
 if 'mood' not in st.session_state:
     st.session_state.mood = "neutral"
 
-# Stable Asian Flute Mood Tracks
 MOOD_MUSIC = {
     "neutral": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-8.mp3",
     "uplifting": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3",
@@ -94,7 +115,7 @@ PHASE_SETS = {
 }
 
 # ==================================================
-# 4. ARCHWAY UI (SIDEBAR & SLOGAN CSS)
+# 4. ARCHWAY UI
 # ==================================================
 st.markdown("""
     <style>
@@ -132,7 +153,7 @@ if 'msgs' not in st.session_state:
     except: pass
 
 # ==================================================
-# 6. SIDEBAR - LINEAGE & TOOLS
+# 6. SIDEBAR
 # ==================================================
 with st.sidebar:
     st.markdown('<p class="sidebar-dojo">The-Dojo</p>', unsafe_allow_html=True)
@@ -181,11 +202,10 @@ with st.sidebar:
         st.rerun()
 
 # ==================================================
-# 7. MAIN ENGINE (STABLE ATMOSPHERE)
+# 7. MAIN ENGINE
 # ==================================================
 st.markdown('<div class="slogan-stack-refined">We. Never. Quit.</div>', unsafe_allow_html=True)
 
-# Atmosphere player centered under slogan
 st.markdown('<div class="music-wrapper">', unsafe_allow_html=True)
 st.audio(MOOD_MUSIC[st.session_state.mood], format="audio/mp3", loop=True)
 st.markdown('</div>', unsafe_allow_html=True)
