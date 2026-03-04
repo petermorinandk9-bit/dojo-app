@@ -14,25 +14,23 @@ PHASE_SETS = {
     "Sovereign": ["Check-In", "Look Closer", "Name It", "The Wisdom Step"]
 }
 
-# RE-ENGINEERED: Adaptive Depth Logic
 MASTER_PROMPT = (
     "ROLE: Dojo Mentor. \n"
-    "STYLE: Grounded, authoritative, observant. Speak with the weight of experience. \n"
+    "STYLE: Grounded, authoritative, observant. \n"
     "DYNAMIC DEPTH: Match the 'gravity' of the user's input. \n"
-    "1. LIGHT INPUT: If the user is brief or checking in, respond with 1-2 punchy, strategic sentences. \n"
-    "2. HEAVY INPUT: If the user provides depth, complex thoughts, or significant updates, you are AUTHORIZED to provide a deep, multi-paragraph structural analysis (up to 3-4 paragraphs). \n"
-    "TEMPORAL SOUL: Use the [YYYY-MM-DD] timestamps to see patterns of progress. Never read the clock aloud. \n"
+    "1. LIGHT INPUT: 1-2 punchy, strategic sentences. \n"
+    "2. HEAVY INPUT: AUTHORIZED for multi-paragraph structural analysis (up to 4 paragraphs). \n"
+    "TEMPORAL SOUL: Use [YYYY-MM-DD] to see patterns. Never read the clock aloud. \n"
     "RULES:\n"
-    "1. THE LEDGER: Synthesize history. Connect today's effort to the larger arc in the records.\n"
-    "2. SUBSTANCE: Every response must contain a 'Structural Anchor'—a philosophical or tactical truth that grounds the conversation.\n"
-    "3. NO FLUFF: Even in long responses, every sentence must serve the mission. No filler.\n"
+    "1. THE LEDGER: Synthesize history and connect today's effort to the larger arc.\n"
+    "2. SUBSTANCE: Every response must contain a 'Structural Anchor'.\n"
+    "3. NO FLUFF: Every sentence must serve the mission.\n"
     "4. FORWARD MOVEMENT: End with ONE sharp, tactical question."
 )
 
 MIRROR_PROMPT = (
     "ROLE: Dojo Mirror. \n"
-    "GOAL: Pure synthesis of the Ledger. Observe the rhythm of the timestamps. "
-    "Point out the deep patterns of the session with minimalist weight."
+    "GOAL: Pure synthesis of the Ledger. Observe the rhythm of the timestamps and point out deep patterns."
 )
 
 # ==================================================
@@ -45,30 +43,13 @@ st.markdown("""
     .stApp { background-color: #ffffff; color: #1a1a1a; }
     [data-testid="stSidebar"] { background-color: #f8f9fa; border-right: 1px solid #e0e0e0; }
     .stChatMessage { background-color: #f8f9fa; border: 1px solid #e0e0e0; }
-    
-    .sidebar-dojo { 
-        font-size: 2.2rem !important; 
-        font-weight: 800; 
-        color: #1a1a1a; 
-        font-style: italic; 
-        margin-bottom: -10px; 
-        line-height: 1.1;
-    }
+    .sidebar-dojo { font-size: 2.2rem !important; font-weight: 800; color: #1a1a1a; font-style: italic; margin-bottom: -10px; line-height: 1.1; }
     .active-rank { color: #000000; font-weight: 700; font-size: 1.35em; margin-bottom: 4px; }
     .inactive-rank { color: #666666; font-size: 1.1em; margin-bottom: 4px; }
     .active-phase { color: #000000; font-weight: 600; font-size: 1.15em; margin-bottom: 2px; padding-left: 10px; }
     .inactive-phase { color: #888888; font-size: 1.0em; margin-bottom: 2px; padding-left: 10px; }
-    
     .watermark { position: fixed; bottom: 40%; left: 50%; transform: translateX(-50%); font-size: 11rem; opacity: 0.04; color: #111111; pointer-events: none; z-index: -1; user-select: none; }
-    
-    .slogan-stack-refined { 
-        font-size: 1.65em; 
-        text-align: center; 
-        color: #666666; 
-        font-style: italic; 
-        margin-top: 5px; 
-        line-height: 1.3;
-    }
+    .slogan-stack-refined { font-size: 1.65em; text-align: center; color: #666666; font-style: italic; margin-top: 5px; line-height: 1.3; }
     .spacer { margin-bottom: 20px; }
     </style>
     """, unsafe_allow_html=True)
@@ -126,12 +107,11 @@ with st.sidebar:
     current_phases = PHASE_SETS.get(st.session_state.rank, PHASE_SETS["Student"])
     for idx, phase_name in enumerate(current_phases):
         st.markdown(f"<p class='{'active-phase' if idx == st.session_state.phase else 'inactive-phase'}'>{'➤ ' if idx == st.session_state.phase else ''}{phase_name}</p>", unsafe_allow_html=True)
-    
     st.markdown("<br>", unsafe_allow_html=True)
     if st.button("Bow-Out", use_container_width=True):
         st.session_state.phase = 0
         st.session_state.exchange_count = 0
-        st.toast("Mat Cleared. Resetting to Welcome Mat.", icon="🥋")
+        st.toast("Mat Cleared.", icon="🥋")
         st.rerun()
 
 # ==================================================
@@ -158,22 +138,23 @@ if prompt := st.chat_input("Speak from center..."):
     with st.chat_message("user"): st.markdown(prompt)
 
     with st.chat_message("assistant"):
-        with st.status("🧘‍♂️ Consulting the Ledger...", expanded=False) as status:
-            # Delay scales even more now for 'heavy' thoughts
-            word_count = len(prompt.split())
-            delay = 1.5 + (word_count / 10) # Heavy prompts get more 'think time'
-            time.sleep(min(delay, 6.0)) 
-            
+        with st.status("🧘‍♂️ Let me think about this a moment...", expanded=False) as status:
+            # Step 1: Get the response first (Background)
             sys_msg = MIRROR_PROMPT if st.session_state.phase == 3 else MASTER_PROMPT
             messages = [{"role": "system", "content": sys_msg}] + st.session_state.msgs[-30:]
-            
             headers = {"Authorization": f"Bearer {st.secrets['GROQ_API_KEY']}"}
-            # Note: 70B model handles multi-paragraph logic beautifully
             payload = {"model": "llama-3.3-70b-versatile", "messages": messages, "temperature": 0.55, "max_tokens": 1024}
             
             try:
                 res = requests.post("https://api.groq.com/openai/v1/chat/completions", json=payload, headers=headers, timeout=25)
                 final_response = res.json()['choices'][0]['message']['content']
+                
+                # Step 2: Dynamic Delay calculation based on AI response length
+                # 1.5s minimum + 0.1s per word of the RESPONSE
+                ai_word_count = len(final_response.split())
+                dynamic_delay = 1.5 + (ai_word_count * 0.05) 
+                time.sleep(min(dynamic_delay, 7.0)) # Hard cap at 7 seconds to keep user engaged
+                
                 status.update(label="🙏 Wisdom Found.", state="complete", expanded=False)
             except: 
                 final_response = "**System Alert:** Transmission issue."
