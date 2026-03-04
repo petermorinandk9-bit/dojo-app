@@ -81,9 +81,9 @@ ADMIN_USER = "joseph"
 if 'mood' not in st.session_state:
     st.session_state.mood = "neutral"
 
-# HIGH-RELIABILITY CLOUDINARY STREAMS
+# Standardizing on reliable SoundHelix tracks that worked before
 MOOD_MUSIC = {
-    "neutral": "https://res.cloudinary.com/dxfq3iotg/video/upload/v1557233524/sample.mp3",
+    "neutral": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-8.mp3",
     "uplifting": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3",
     "melancholy": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3",
     "intense": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3"
@@ -107,23 +107,19 @@ st.markdown("""
     .inactive-item { color: #bbb; border-left: 1px solid #eee; padding-left: 20px; margin-top: 5px; }
     .sidebar-header { font-size: 0.85em; color: #999; text-transform: uppercase; letter-spacing: 1.5px; margin-top: 25px; }
     .sidebar-dojo { font-size: 2.2rem !important; font-weight: 800; font-style: italic; margin-bottom: -10px; }
-    .slogan-stack-refined { font-size: 1.65em; text-align: center; color: #666; font-style: italic; padding-top: 20px; }
+    .slogan-stack-refined { font-size: 1.65em; text-align: center; color: #666; font-style: italic; padding-top: 20px; margin-bottom: 0px;}
+    .music-wrapper { display: flex; justify-content: center; margin-bottom: 20px; }
     </style>
     """, unsafe_allow_html=True)
 
 # ==================================================
-# 6. SIDEBAR - WITH INTEGRATED MUSIC PLAYER
+# 6. SIDEBAR
 # ==================================================
 with st.sidebar:
     st.markdown('<p class="sidebar-dojo">The-Dojo</p>', unsafe_allow_html=True)
     st.write(f"Warrior: **{USER_NAME}**")
     st.divider()
     
-    # --- MOOD PLAYER IN SIDEBAR ---
-    st.markdown('<p class="sidebar-header">Atmosphere</p>', unsafe_allow_html=True)
-    st.audio(MOOD_MUSIC[st.session_state.mood], format="audio/mp3", loop=True)
-    st.divider()
-
     st.markdown('<p class="sidebar-header">Current Path</p>', unsafe_allow_html=True)
     current_phases = PHASE_SETS.get(st.session_state.get('rank', 'Student'), PHASE_SETS["Student"])
     for idx, p_name in enumerate(current_phases):
@@ -144,9 +140,14 @@ with st.sidebar:
         st.rerun()
 
 # ==================================================
-# 7. MAIN ENGINE
+# 7. MAIN ENGINE (Music Under Slogan)
 # ==================================================
 st.markdown('<div class="slogan-stack-refined">We. Never. Quit.</div>', unsafe_allow_html=True)
+
+# THE ATMOSPHERE PLAYER
+st.markdown('<div class="music-wrapper">', unsafe_allow_html=True)
+st.audio(MOOD_MUSIC[st.session_state.mood], format="audio/mp3", loop=True)
+st.markdown('</div>', unsafe_allow_html=True)
 
 if 'msgs' not in st.session_state:
     st.session_state.msgs = []
