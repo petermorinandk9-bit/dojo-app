@@ -80,12 +80,12 @@ ADMIN_USER = "joseph"
 if 'mood' not in st.session_state:
     st.session_state.mood = "neutral"
 
-# Mood Music Logic
+# ACTUAL Asian Flute Tracks (Uplifting, Sad, Intense, Neutral)
 MOOD_MUSIC = {
-    "neutral": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3",
-    "uplifting": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3",
-    "melancholy": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3",
-    "intense": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3"
+    "neutral": "https://cdn.pixabay.com/audio/2022/02/10/audio_03d957d187.mp3",
+    "uplifting": "https://cdn.pixabay.com/audio/2022/01/26/audio_d0c6ff1bab.mp3",
+    "melancholy": "https://cdn.pixabay.com/audio/2023/10/24/audio_1459a96e6a.mp3",
+    "intense": "https://cdn.pixabay.com/audio/2022/03/15/audio_18c502b4d6.mp3"
 }
 
 PHASE_SETS = {
@@ -96,37 +96,27 @@ PHASE_SETS = {
 }
 
 # ==================================================
-# 4. ARCHWAY UI (With Ultra-Compact Floating Player)
+# 4. ARCHWAY UI (With Micro-Scaled Player)
 # ==================================================
 st.markdown("""
     <style>
     .stApp { background-color: #ffffff; color: #1a1a1a; }
     [data-testid="stSidebar"] { background-color: #f8f9fa; border-right: 1px solid #e0e0e0; }
     
-    /* THE 2-INCH ULTRA-COMPACT PLAYER */
+    /* THE MICRO-SCALED PLAYER */
     .floating-audio-box {
         position: fixed;
-        top: 60px;
-        right: 25px;
+        top: 15px;      /* Tucked way up */
+        right: 15px;    /* Tucked way right */
         z-index: 9999;
-        width: 180px; /* Approx 2 inches */
-        background: rgba(255, 255, 255, 0.5);
-        padding: 2px;
-        border-radius: 8px;
-        opacity: 0.4;
-        transition: opacity 0.3s ease;
-        overflow: hidden;
+        transform: scale(0.65); /* THIS SHRINKS IT TO 2 INCHES */
+        transform-origin: top right;
+        opacity: 0.3;
+        transition: all 0.4s ease;
     }
     .floating-audio-box:hover {
         opacity: 1.0;
-        background: rgba(255, 255, 255, 1.0);
-        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-    }
-    
-    /* Shrink the actual audio element inside */
-    .floating-audio-box audio {
-        width: 100%;
-        height: 35px;
+        transform: scale(0.8); /* Grows slightly when you need it */
     }
 
     .active-item { color: #000; font-weight: 800; border-left: 3px solid #000; padding-left: 20px; margin-top: 8px; }
@@ -166,11 +156,11 @@ with st.sidebar:
         st.rerun()
 
 # ==================================================
-# 7. MAIN ENGINE
+# 7. MAIN ENGINE (With Asian Flute Atmosphere)
 # ==================================================
 st.markdown('<div class="slogan-stack-refined">We. Never. Quit.</div>', unsafe_allow_html=True)
 
-# THE ULTRA-COMPACT CORNER PLAYER
+# THE MICRO-PLAYER
 st.markdown('<div class="floating-audio-box">', unsafe_allow_html=True)
 st.audio(MOOD_MUSIC[st.session_state.mood], format="audio/mp3", loop=True)
 st.markdown('</div>', unsafe_allow_html=True)
