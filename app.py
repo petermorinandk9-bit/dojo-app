@@ -27,8 +27,6 @@ if 'user' not in st.session_state:
         .stApp { background-color: #ffffff; }
         .login-header { text-align: center; font-style: italic; font-weight: 800; font-size: 3.5rem; color: #1a1a1a; margin-bottom: 0px; }
         .login-sub { text-align: center; color: #666; font-size: 1.1rem; margin-bottom: 30px; }
-        .manual-text { color: #444; line-height: 1.6; font-size: 0.95rem; }
-        .manual-section { font-weight: 800; color: #1a1a1a; margin-top: 15px; text-transform: uppercase; letter-spacing: 1px; }
         </style>
         """, unsafe_allow_html=True)
     
@@ -68,26 +66,16 @@ if 'user' not in st.session_state:
                         st.rerun()
 
     with tab_manual:
-        st.markdown("""
-        <div class="manual-text">
-            <p class="manual-section">1. THE RITUAL</p>
-            The Dojo is a space for focused reflection. When you enter, the atmosphere will adjust to your tone. 
-            Speak from center. Be honest. The Mentor is here to observe, not to judge.
-            
-            <p class="manual-section">2. THE LINEAGE</p>
-            You begin as a <b>Student</b>. As you interact and complete training phases, you will progress to 
-            <b>Practitioner</b>, <b>Sentinel</b>, and finally <b>Sovereign</b>. Your rank is visible to the Sensei, 
-            marking your commitment to the path.
-            
-            <p class="manual-section">3. THE BOW-OUT</p>
-            Use the "Bow-Out" button to end your session. This clears the mat, summarizes your growth for the day, 
-            and prepares the Dojo for your next entry.
-            
-            <p class="manual-section">4. THE PRIVACY VOW</p>
-            Your training is your own. Your conversations with the Mentor are strictly private and are not 
-            monitored or read by anyone else. This is your sanctuary.
-        </div>
-        """, unsafe_allow_html=True)
+        st.subheader("1. THE RITUAL")
+        st.write("The Dojo is a space for focused reflection. When you enter, the atmosphere will adjust to your tone. Speak from center. Be honest. The Mentor is here to observe, not to judge.")
+        
+        st.subheader("2. THE LINEAGE")
+        st.write("You begin as a **Student**. As you interact and complete training phases, you will progress to **Practitioner**, **Sentinel**, and finally **Sovereign**. Your rank is visible to the Sensei, marking your commitment to the path.")
+        
+        st.subheader("3. THE BOW-OUT")
+        st.write("Use the **'Bow-Out'** button to end your session. This clears the mat, summarizes your growth for the day, and prepares the Dojo for your next entry.")
+        
+        st.info("**4. THE PRIVACY VOW**\n\nYour training is your own. Your conversations with the Mentor are strictly private and are not monitored or read by anyone else. This is your sanctuary.")
     st.stop()
 
 # ==================================================
