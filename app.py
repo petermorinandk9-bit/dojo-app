@@ -19,25 +19,21 @@ def init_supabase():
 supabase: Client = init_supabase()
 
 # ==================================================
-# 2. THE DOJO GATE (LOGIN & SIGN-UP)
+# 2. THE DOJO GATE (LOGIN & SIGN-UP) - SILENT ENTRY
 # ==================================================
 if 'user' not in st.session_state:
     st.markdown("""
         <style>
         .stApp { background-color: #ffffff; }
         .login-header { text-align: center; font-style: italic; font-weight: 800; font-size: 3.5rem; color: #1a1a1a; margin-bottom: 0px; }
-        .login-sub { text-align: center; color: #666; font-size: 1.1rem; margin-bottom: 20px; }
-        .audio-container-gate { text-align: center; margin: 0 auto 30px auto; padding: 15px; background: #fdfdfd; border: 1px solid #eeeeee; border-radius: 12px; max-width: 400px; }
+        .login-sub { text-align: center; color: #666; font-size: 1.1rem; margin-bottom: 30px; }
         </style>
         """, unsafe_allow_html=True)
     
     st.markdown('<p class="login-header">The-Dojo</p>', unsafe_allow_html=True)
     st.markdown('<p class="login-sub">Forge your discipline. Step onto the mat.</p>', unsafe_allow_html=True)
 
-    st.markdown('<div class="audio-container-gate">', unsafe_allow_html=True)
-    st.caption("🔊 Entrance Ritual")
-    st.audio("https://res.cloudinary.com/dxfq3iotg/video/upload/v1557233294/info.mp3", format="audio/mp3", loop=True)
-    st.markdown('</div>', unsafe_allow_html=True)
+    # Note: Entry Audio Removed for maximum stability across all browsers
     
     tab_login, tab_signup = st.tabs(["Login", "Create Account"])
 
@@ -62,7 +58,9 @@ if 'user' not in st.session_state:
             new_pass = st.text_input("Choose Password", type="password")
             invite_c = st.text_input("Dojo Invite Code", type="password")
             if st.form_submit_button("Join the Dojo", use_container_width=True):
-                if invite_c == "dojoentry" and new_name and new_pass:
+                if invite_c != "dojoentry":
+                    st.error("Invalid Invite Code.")
+                else:
                     user_data = {"username": new_name, "password": new_pass, "display_name": display_n}
                     new_user = supabase.table("users").insert(user_data).execute()
                     if new_user.data:
@@ -80,6 +78,7 @@ ADMIN_USER = "joseph"
 if 'mood' not in st.session_state:
     st.session_state.mood = "neutral"
 
+# Stable Asian Flute Mood Tracks
 MOOD_MUSIC = {
     "neutral": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-8.mp3",
     "uplifting": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3",
@@ -95,7 +94,7 @@ PHASE_SETS = {
 }
 
 # ==================================================
-# 4. ARCHWAY UI (CSS RESTORATION)
+# 4. ARCHWAY UI (SIDEBAR & SLOGAN CSS)
 # ==================================================
 st.markdown("""
     <style>
@@ -133,14 +132,13 @@ if 'msgs' not in st.session_state:
     except: pass
 
 # ==================================================
-# 6. SIDEBAR - RESTORED FULL LINEAGE & TOOLS
+# 6. SIDEBAR - LINEAGE & TOOLS
 # ==================================================
 with st.sidebar:
     st.markdown('<p class="sidebar-dojo">The-Dojo</p>', unsafe_allow_html=True)
     st.write(f"Warrior: **{USER_NAME}**")
     st.divider()
     
-    # 1. CURRENT PATH (Phases)
     st.markdown('<p class="sidebar-header">Current Path</p>', unsafe_allow_html=True)
     current_phases = PHASE_SETS.get(st.session_state.rank, PHASE_SETS["Student"])
     for idx, p_name in enumerate(current_phases):
@@ -148,15 +146,12 @@ with st.sidebar:
         st.markdown(f"<div class='{style}'>{p_name}</div>", unsafe_allow_html=True)
     
     st.divider()
-    
-    # 2. LINEAGE (Ranks)
     st.markdown('<p class="sidebar-header">Lineage</p>', unsafe_allow_html=True)
     ranks = ["Student", "Practitioner", "Sentinel", "Sovereign"]
     for r in ranks:
         style = 'active-item' if r == st.session_state.rank else 'inactive-item'
         st.markdown(f"<div class='{style}'>{r}</div>", unsafe_allow_html=True)
     
-    # 3. ADMIN ROSTER
     if st.session_state.user['username'] == ADMIN_USER:
         st.divider()
         st.markdown('<p class="sidebar-header">🥋 Dojo Roster</p>', unsafe_allow_html=True)
@@ -166,8 +161,6 @@ with st.sidebar:
         except: pass
 
     st.divider()
-    
-    # 4. BOW-OUT (SAVE & CLEAR)
     if st.button("Bow-Out (Save & Clear)", use_container_width=True):
         if len(st.session_state.msgs) > 2:
             chat_log = "\n".join([f"{m['role']}: {m['content']}" for m in st.session_state.msgs])
@@ -177,7 +170,6 @@ with st.sidebar:
             summary = res.json()['choices'][0]['message']['content']
             supabase.table("ledger_wisdom").insert({"user_id": USER_ID, "timestamp": time.time(), "summary": summary}).execute()
         
-        # Clear records for fresh start
         supabase.table("records").delete().eq("user_id", USER_ID).execute()
         st.session_state.msgs = []
         st.session_state.exchange_count = 0
@@ -189,11 +181,11 @@ with st.sidebar:
         st.rerun()
 
 # ==================================================
-# 7. MAIN ENGINE
+# 7. MAIN ENGINE (STABLE ATMOSPHERE)
 # ==================================================
 st.markdown('<div class="slogan-stack-refined">We. Never. Quit.</div>', unsafe_allow_html=True)
 
-# ATMOSPHERE PLAYER (RESTORED TO STABLE POSITION)
+# Atmosphere player centered under slogan
 st.markdown('<div class="music-wrapper">', unsafe_allow_html=True)
 st.audio(MOOD_MUSIC[st.session_state.mood], format="audio/mp3", loop=True)
 st.markdown('</div>', unsafe_allow_html=True)
@@ -208,14 +200,12 @@ if prompt := st.chat_input("Speak from center..."):
     save_to_ledger("user", prompt, st.session_state.rank, st.session_state.phase)
     with st.chat_message("user"): st.markdown(prompt)
 
-    # Rank & Phase Progression Logic
     st.session_state.exchange_count += 1
     if st.session_state.exchange_count >= 2:
         if st.session_state.phase < 3:
             st.session_state.phase += 1
             st.session_state.exchange_count = 0
 
-    # Groq Response with Mood Tagging
     headers = {"Authorization": f"Bearer {st.secrets['GROQ_API_KEY']}"}
     MASTER_PROMPT = f"ROLE: Dojo Mentor. WARRIOR: {USER_NAME}. At the end of your response, add: [MOOD: neutral/uplifting/melancholy/intense]"
     messages = [{"role": "system", "content": MASTER_PROMPT}] + st.session_state.msgs[-10:]
@@ -225,7 +215,6 @@ if prompt := st.chat_input("Speak from center..."):
     
     full_text = res.json()['choices'][0]['message']['content']
     
-    # Extract Mood for the Dynamic Music
     if "[MOOD:" in full_text:
         parts = full_text.split("[MOOD:")
         clean_response = parts[0].strip()
