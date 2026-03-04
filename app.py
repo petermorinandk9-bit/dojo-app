@@ -9,7 +9,7 @@ from supabase import create_client, Client
 st.set_page_config(page_title="The-Dojo", layout="wide")
 
 # ==================================================
-# CONNECTIONS
+# CONNECTION
 # ==================================================
 @st.cache_resource
 def init_supabase():
@@ -22,59 +22,60 @@ supabase: Client = init_supabase()
 # ==================================================
 # RANK SYSTEM
 # ==================================================
-def compute_rank(records_count):
-    if records_count < 15: return "Student"
-    if records_count < 40: return "Practitioner"
-    if records_count < 80: return "Sentinel"
+def compute_rank(count):
+    if count < 15:
+        return "Student"
+    if count < 40:
+        return "Practitioner"
+    if count < 80:
+        return "Sentinel"
     return "Sovereign"
 
 # ==================================================
 # AUTH
 # ==================================================
-if 'user' not in st.session_state:
+if "user" not in st.session_state:
 
     st.markdown("""
     <style>
-    .stApp { background:#ffffff; }
-    .login-header {text-align:center;font-style:italic;font-weight:800;font-size:3.5rem;color:#1a1a1a;}
-    .login-sub {text-align:center;color:#666;font-size:1.1rem;margin-bottom:30px;}
+    .stApp {background:#ffffff;}
+    .login-header{text-align:center;font-style:italic;font-weight:800;font-size:3.5rem;}
+    .login-sub{text-align:center;color:#666;margin-bottom:30px;}
     </style>
     """, unsafe_allow_html=True)
 
     st.markdown('<p class="login-header">The-Dojo</p>', unsafe_allow_html=True)
     st.markdown('<p class="login-sub">Forge your discipline. Step onto the mat.</p>', unsafe_allow_html=True)
 
-    tab_login, tab_signup, tab_manual = st.tabs(["Login","Create Account","The Manual"])
+    with st.form("login"):
+        u = st.text_input("Username").lower().strip()
+        p = st.text_input("Password", type="password")
 
-    with tab_login:
-        with st.form("login_form"):
+        if st.form_submit_button("Enter the Dojo"):
 
-            u_name = st.text_input("Username").lower().strip()
-            u_pass = st.text_input("Password", type="password")
+            res = supabase.table("users")\
+                .select("*")\
+                .eq("username", u)\
+                .eq("password", p)\
+                .execute()
 
-            if st.form_submit_button("Enter the Dojo", use_container_width=True):
-
-                res = supabase.table("users").select("*").eq("username",u_name).eq("password",u_pass).execute()
-
-                if res.data:
-                    st.session_state.user = res.data[0]
-                    st.rerun()
-                else:
-                    st.error("Credentials not recognized.")
-
-    with tab_manual:
-        st.subheader("1. THE RITUAL")
-        st.write("The Dojo is a sanctuary for focused reflection. Speak from center. Be honest.")
-        st.info("**2. THE PRIVACY VOW**\n\nYour training is your own. This is your safe space.")
+            if res.data:
+                st.session_state.user = res.data[0]
+                st.rerun()
+            else:
+                st.error("Credentials not recognized")
 
     st.stop()
 
 # ==================================================
-# SESSION INIT
+# USER INFO
 # ==================================================
 USER_ID = st.session_state.user["id"]
 USER_NAME = st.session_state.user["display_name"]
 
+# ==================================================
+# SESSION STATE
+# ==================================================
 if "msgs" not in st.session_state:
     st.session_state.msgs = []
     st.session_state.phase = 0
@@ -85,17 +86,20 @@ if "msgs" not in st.session_state:
 # ==================================================
 if "history_loaded" not in st.session_state:
 
-    r_res = supabase.table("records")\
+    r = supabase.table("records")\
         .select("*", count="exact")\
         .eq("user_id", USER_ID)\
         .order("timestamp")\
         .execute()
 
-    if r_res.data:
-        for r in r_res.data:
-            st.session_state.msgs.append({"role": r["role"],"content": r["content"]})
+    if r.data:
+        for row in r.data:
+            st.session_state.msgs.append({
+                "role": row["role"],
+                "content": row["content"]
+            })
 
-    st.session_state.records_count = r_res.count if r_res.count else 0
+    st.session_state.records_count = r.count if r.count else 0
     st.session_state.history_loaded = True
 
 rank = compute_rank(st.session_state.records_count)
@@ -111,46 +115,150 @@ PHASE_SETS = {
 }
 
 # ==================================================
-# HISTORY TAB (NEW)
+# STYLE
+# ==================================================
+st.markdown("""
+<style>
+
+.stApp{background:#fff;color:#1a1a1a}
+
+[data-testid="stSidebar"]{
+background:#f8f9fa;
+border-right:1px solid #e0e0e0
+}
+
+.active-item{
+color:#000;
+font-weight:800;
+border-left:3px solid #000;
+padding-left:20px;
+margin-top:8px
+}
+
+.inactive-item{
+color:#bbb;
+border-left:1px solid #eee;
+padding-left:20px;
+margin-top:5px
+}
+
+.sidebar-dojo{
+font-size:2.2rem!important;
+font-weight:800;
+font-style:italic;
+margin-bottom:-10px
+}
+
+.slogan-warrior{
+font-size:1.1em;
+text-align:center;
+color:#888;
+letter-spacing:2px;
+text-transform:uppercase;
+margin-top:20px
+}
+
+.slogan-quit{
+font-size:1.8em;
+text-align:center;
+color:#1a1a1a;
+font-style:italic;
+font-weight:800;
+margin-bottom:10px
+}
+
+</style>
+""", unsafe_allow_html=True)
+
+# ==================================================
+# SIDEBAR
+# ==================================================
+with st.sidebar:
+
+    st.markdown('<p class="sidebar-dojo">The-Dojo</p>', unsafe_allow_html=True)
+
+    st.markdown(f"**{rank} · {USER_NAME}**")
+
+    st.divider()
+
+    for i,p in enumerate(PHASE_SETS[rank]):
+
+        style = "active-item" if i == st.session_state.phase else "inactive-item"
+
+        st.markdown(
+            f"<div class='{style}'>{p}</div>",
+            unsafe_allow_html=True
+        )
+
+# ==================================================
+# TABS
 # ==================================================
 tab_train, tab_history = st.tabs(["Training","History"])
 
 # ==================================================
-# HISTORY VIEW
+# HISTORY TAB
 # ==================================================
 with tab_history:
 
-    st.subheader("Training History")
-
-    rec = supabase.table("records").select("*").eq("user_id",USER_ID).order("timestamp",desc=True).limit(50).execute()
-
-    for r in rec.data:
-        st.markdown(f"**{r['role']}** — {r['content']}")
-
-    st.divider()
-
     st.subheader("Milestones")
 
-    ms = supabase.table("dojo_milestones").select("*").eq("user_id",USER_ID).order("timestamp",desc=True).execute()
-    for m in ms.data:
-        st.write(m["milestone"])
+    try:
+        ms = supabase.table("dojo_milestones")\
+            .select("*")\
+            .eq("user_id", USER_ID)\
+            .order("timestamp", desc=True)\
+            .execute()
+
+        if ms.data:
+            for m in ms.data:
+                st.write(m["milestone"])
+    except:
+        pass
 
     st.subheader("Patterns")
 
-    pt = supabase.table("dojo_patterns").select("*").eq("user_id",USER_ID).order("timestamp",desc=True).execute()
-    for p in pt.data:
-        st.write(p["pattern"])
+    try:
+        pt = supabase.table("dojo_patterns")\
+            .select("*")\
+            .eq("user_id", USER_ID)\
+            .order("timestamp", desc=True)\
+            .execute()
+
+        if pt.data:
+            for p in pt.data:
+                st.write(p["pattern"])
+    except:
+        pass
 
     st.subheader("Doctrine")
 
-    dc = supabase.table("dojo_doctrine").select("*").eq("user_id",USER_ID).order("timestamp",desc=True).execute()
-    for d in dc.data:
-        st.write(d["doctrine"])
+    try:
+        dc = supabase.table("dojo_doctrine")\
+            .select("*")\
+            .eq("user_id", USER_ID)\
+            .order("timestamp", desc=True)\
+            .execute()
+
+        if dc.data:
+            for d in dc.data:
+                st.write(d["doctrine"])
+    except:
+        pass
 
 # ==================================================
-# MAIN TRAINING
+# TRAINING TAB
 # ==================================================
 with tab_train:
+
+    st.markdown(
+        "<p class='slogan-warrior'>Warriors Don't Always Win — Warriors Always Fight.</p>",
+        unsafe_allow_html=True
+    )
+
+    st.markdown(
+        "<p class='slogan-quit'>We. Never. Quit.</p>",
+        unsafe_allow_html=True
+    )
 
     for msg in st.session_state.msgs[-10:]:
         with st.chat_message(msg["role"]):
@@ -158,7 +266,10 @@ with tab_train:
 
     if prompt := st.chat_input("Speak from center..."):
 
-        st.session_state.msgs.append({"role":"user","content":prompt})
+        st.session_state.msgs.append({
+            "role":"user",
+            "content":prompt
+        })
 
         supabase.table("records").insert({
             "user_id":USER_ID,
@@ -169,72 +280,57 @@ with tab_train:
             "phase":str(st.session_state.phase)
         }).execute()
 
-        # ==================================================
-        # SESSION SUMMARY (12 line awareness trick)
-        # ==================================================
+        # session awareness trick
         session_summary = " ".join(
             [m["content"] for m in st.session_state.msgs if m["role"]=="user"][-3:]
         )
 
-        MASTER_PROMPT=f"""
+        MASTER_PROMPT = f"""
 You are the Dojo Mentor for {USER_NAME}.
 
-SESSION SUMMARY
+Session summary:
 {session_summary}
 
-Observe patterns, acknowledge reality, and offer practical adjustments.
+Offer grounded reflection and practical guidance.
 
 Rank: {rank}
 Phase: {PHASE_SETS[rank][st.session_state.phase]}
 
-End every response with
+End with
 [MOOD: neutral/uplifting/melancholy/intense]
 """
 
-        headers={"Authorization":f"Bearer {st.secrets['GROQ_API_KEY']}"}
+        headers = {"Authorization": f"Bearer {st.secrets['GROQ_API_KEY']}"}
 
-        res=requests.post(
+        res = requests.post(
             "https://api.groq.com/openai/v1/chat/completions",
             json={
                 "model":"llama-3.3-70b-versatile",
-                "messages":[{"role":"system","content":MASTER_PROMPT}]+st.session_state.msgs[-10:],
+                "messages":[{"role":"system","content":MASTER_PROMPT}] + st.session_state.msgs[-10:],
                 "temperature":0.6
             },
             headers=headers
         )
 
-        full_text=res.json()["choices"][0]["message"]["content"]
+        full = res.json()["choices"][0]["message"]["content"]
 
-        clean_response=full_text.split("[MOOD:")[0].strip()
-        mood=full_text.split("[MOOD:")[1].split("]")[0].strip().lower()
+        clean = full.split("[MOOD:")[0].strip()
 
-        st.session_state.mood=mood
-
-        st.session_state.msgs.append({"role":"assistant","content":clean_response})
+        st.session_state.msgs.append({
+            "role":"assistant",
+            "content":clean
+        })
 
         supabase.table("records").insert({
             "user_id":USER_ID,
             "timestamp":time.time(),
             "role":"assistant",
-            "content":clean_response,
+            "content":clean,
             "rank":rank,
             "phase":str(st.session_state.phase)
         }).execute()
 
-        # ==================================================
-        # MILESTONE CHECK
-        # ==================================================
-        new_rank = compute_rank(st.session_state.records_count + 1)
-
-        if new_rank != rank:
-
-            supabase.table("dojo_milestones").insert({
-                "user_id":USER_ID,
-                "timestamp":time.time(),
-                "milestone":f"{new_rank} Rank Achieved"
-            }).execute()
-
-        if len(st.session_state.msgs)%4==0 and st.session_state.phase<3:
-            st.session_state.phase+=1
+        if len(st.session_state.msgs) % 4 == 0 and st.session_state.phase < 3:
+            st.session_state.phase += 1
 
         st.rerun()
