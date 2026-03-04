@@ -5,7 +5,7 @@ import time
 from datetime import datetime
 
 # ==================================================
-# 1. CORE CONFIG - THE SENSEI'S BREATH (FULL DEPTH)
+# 1. CORE CONFIG - THE DYNAMIC SENSEI
 # ==================================================
 PHASE_SETS = {
     "Student": ["Welcome Mat", "Warm Up", "Training", "Reflection/Cool Down"],
@@ -14,30 +14,25 @@ PHASE_SETS = {
     "Sovereign": ["Check-In", "Look Closer", "Name It", "The Wisdom Step"]
 }
 
-# RE-ENGINEERED: Substance over Brevity.
+# RE-ENGINEERED: Adaptive Depth Logic
 MASTER_PROMPT = (
     "ROLE: Dojo Mentor. \n"
-    "STYLE: Grounded, authoritative, observant. Speak with the weight of experience. "
-    "Avoid being curt; instead, be substantial but concise. \n"
-    "THE BREATH: You MUST provide 2 to 4 sentences of observation/insight before your question. "
-    "Each word must carry weight. Do not just acknowledge; provide a structural anchor.\n"
-    "TEMPORAL SOUL: You see the [YYYY-MM-DD] timestamps to understand the rhythm of life, "
-    "but NEVER read them aloud like a robot. Use them only to gauge momentum.\n"
+    "STYLE: Grounded, authoritative, observant. Speak with the weight of experience. \n"
+    "DYNAMIC DEPTH: Match the 'gravity' of the user's input. \n"
+    "1. LIGHT INPUT: If the user is brief or checking in, respond with 1-2 punchy, strategic sentences. \n"
+    "2. HEAVY INPUT: If the user provides depth, complex thoughts, or significant updates, you are AUTHORIZED to provide a deep, multi-paragraph structural analysis (up to 3-4 paragraphs). \n"
+    "TEMPORAL SOUL: Use the [YYYY-MM-DD] timestamps to see patterns of progress. Never read the clock aloud. \n"
     "RULES:\n"
-    "1. THE LEDGER: Synthesize the history. If they mention 'Refining the UI,' remind them "
-    "of the structural progress made since they first stepped onto the mat today.\n"
-    "2. SUBSTANCE: Add a layer of philosophical or structural insight. "
-    "Example: 'Order in the interface reflects order in the intent.'\n"
-    "3. SENSEI VIBE: Match the user's intensity. Acknowledge transitions (like dinner or coffee) "
-    "as part of the discipline, not a distraction.\n"
-    "4. NO FLUFF: No 'I understand' or 'Great job.' Just the insight and the move.\n"
-    "5. FORWARD MOVEMENT: End with ONE sharp, tactical question."
+    "1. THE LEDGER: Synthesize history. Connect today's effort to the larger arc in the records.\n"
+    "2. SUBSTANCE: Every response must contain a 'Structural Anchor'—a philosophical or tactical truth that grounds the conversation.\n"
+    "3. NO FLUFF: Even in long responses, every sentence must serve the mission. No filler.\n"
+    "4. FORWARD MOVEMENT: End with ONE sharp, tactical question."
 )
 
 MIRROR_PROMPT = (
     "ROLE: Dojo Mirror. \n"
-    "GOAL: Pure synthesis of the Ledger. Use the timestamps to spot a deep behavioral pattern. "
-    "Do not narrate the time—narrate the GROWTH or the STAGNATION. Be minimalist."
+    "GOAL: Pure synthesis of the Ledger. Observe the rhythm of the timestamps. "
+    "Point out the deep patterns of the session with minimalist weight."
 )
 
 # ==================================================
@@ -163,17 +158,18 @@ if prompt := st.chat_input("Speak from center..."):
     with st.chat_message("user"): st.markdown(prompt)
 
     with st.chat_message("assistant"):
-        # --- THE MEDITATION DELAY ---
         with st.status("🧘‍♂️ Consulting the Ledger...", expanded=False) as status:
-            # 1.5s base + longer contemplation for longer prompts
-            delay = 1.5 + (len(prompt.split()) / 15)
-            time.sleep(min(delay, 5.0)) 
+            # Delay scales even more now for 'heavy' thoughts
+            word_count = len(prompt.split())
+            delay = 1.5 + (word_count / 10) # Heavy prompts get more 'think time'
+            time.sleep(min(delay, 6.0)) 
             
             sys_msg = MIRROR_PROMPT if st.session_state.phase == 3 else MASTER_PROMPT
             messages = [{"role": "system", "content": sys_msg}] + st.session_state.msgs[-30:]
             
             headers = {"Authorization": f"Bearer {st.secrets['GROQ_API_KEY']}"}
-            payload = {"model": "llama-3.3-70b-versatile", "messages": messages, "temperature": 0.5, "max_tokens": 512}
+            # Note: 70B model handles multi-paragraph logic beautifully
+            payload = {"model": "llama-3.3-70b-versatile", "messages": messages, "temperature": 0.55, "max_tokens": 1024}
             
             try:
                 res = requests.post("https://api.groq.com/openai/v1/chat/completions", json=payload, headers=headers, timeout=25)
