@@ -137,46 +137,77 @@ if prompt := st.chat_input("Speak from center..."):
     st.session_state.exchange_count += 1
     with st.chat_message("user"): st.markdown(prompt)
 
-    with st.chat_message("assistant"):
-        with st.status("🧘‍♂️ Let me think about this a moment...", expanded=False) as status:
-            # Get response first
-            sys_msg = MIRROR_PROMPT if st.session_state.phase == 3 else MASTER_PROMPT
-            messages = [{"role": "system", "content": sys_msg}] + st.session_state.msgs[-30:]
-            headers = {"Authorization": f"Bearer {st.secrets['GROQ_API_KEY']}"}
-            payload = {"model": "llama-3.3-70b-versatile", "messages": messages, "temperature": 0.55, "max_tokens": 1024}
-            
-            try:
-                res = requests.post("https://api.groq.com/openai/v1/chat/completions", json=payload, headers=headers, timeout=25)
-                final_response = res.json()['choices'][0]['message']['content']
-                
-                # Dynamic Delay logic with a 5-second CAP
-                ai_word_count = len(final_response.split())
-                dynamic_delay = 1.0 + (ai_word_count * 0.05) 
-                time.sleep(min(dynamic_delay, 5.0)) # REFINED: Capped at 5 seconds
-                
-                status.update(label="🙏 Wisdom Found.", state="complete", expanded=False)
-            except: 
-                final_response = "**System Alert:** Transmission issue."
-                status.update(label="⚠️ Connection Severed.", state="error")
-        
-        st.markdown(final_response)
-        st.session_state.msgs.append({"role": "assistant", "content": final_response})
-        save_to_ledger("assistant", final_response, st.session_state.rank, str(st.session_state.phase))
-        
-        # Advancement logic
-        if st.session_state.exchange_count >= 2:
-            check_payload = {"model": "llama-3.1-8b-instant", "messages": [{"role": "system", "content": "Analyze growth. Reply ONLY YES or NO."}, {"role": "user", "content": prompt}], "temperature": 0.0}
-            try:
-                readiness = requests.post("https://api.groq.com/openai/v1/chat/completions", json=check_payload, headers=headers, timeout=5)
-                is_ready = "YES" in readiness.json()['choices'][0]['message']['content'].upper()
-            except: is_ready = False
+    # THE REINFORCED TRIPWIRE
+    crisis_keywords = [
+        "kill myself", "suicide", "hurt myself", "end my life", 
+        "want to die", "harm myself", "don't want to live", "ending it all"
+    ]
+    is_crisis = any(k in prompt.lower() for k in crisis_keywords)
 
-            if is_ready or st.session_state.exchange_count >= 6:
-                st.session_state.exchange_count = 0
-                if st.session_state.phase < 3: st.session_state.phase += 1
-                else:
-                    st.session_state.phase = 0
-                    ranks = ["Student", "Practitioner", "Sentinel", "Sovereign"]
-                    try: st.session_state.rank = ranks[ranks.index(st.session_state.rank) + 1]
-                    except: pass
+    with st.chat_message("assistant"):
+        if is_crisis:
+            # INSTANT BYPASS & PERMANENT INSTRUCTION
+            safety_box = """
+            <div style="background-color: #ffe6e6; border-left: 5px solid #ff0000; padding: 20px; border-radius: 5px;">
+                <p style="color: #cc0000; font-weight: bold; font-size: 1.2em; margin-bottom: 10px;">
+                    🛡️ SAFETY PROTOCOL ACTIVATED
+                </p>
+                <p style="color: #1a1a1a;">
+                    I am here with you, but I am a structural mentor, not a crisis counselor. 
+                    If you are feeling overwhelmed, please reach out to those who can help right now:
+                </p>
+                <ul style="color: #1a1a1a; font-weight: bold;">
+                    <li>Call or Text: 988 (Suicide & Crisis Lifeline)</li>
+                    <li>Text: HOME to 741741 (Crisis Text Line)</li>
+                </ul>
+                <hr style="border: 0; border-top: 1px solid #ffcccc; margin: 15px 0;">
+                <p style="color: #1a1a1a; font-size: 0.95em;">
+                    <b>To return to the Dojo:</b> Once you are safe and ready to continue training, 
+                    please use the <b>Bow-Out</b> button in the sidebar to reset your session.
+                </p>
+            </div>
+            """
+            st.markdown(safety_box, unsafe_allow_html=True)
+            st.session_state.msgs.append({"role": "assistant", "content": safety_box})
+            save_to_ledger("assistant", "CRISIS_PROTOCOL_ACTIVATED", st.session_state.rank, str(st.session_state.phase))
+            st.rerun()
+        
+        else:
+            with st.status("🧘‍♂️ Let me think about this a moment...", expanded=False) as status:
+                sys_msg = MIRROR_PROMPT if st.session_state.phase == 3 else MASTER_PROMPT
+                messages = [{"role": "system", "content": sys_msg}] + st.session_state.msgs[-30:]
+                headers = {"Authorization": f"Bearer {st.secrets['GROQ_API_KEY']}"}
+                payload = {"model": "llama-3.3-70b-versatile", "messages": messages, "temperature": 0.55, "max_tokens": 1024}
+                
+                try:
+                    res = requests.post("https://api.groq.com/openai/v1/chat/completions", json=payload, headers=headers, timeout=25)
+                    final_response = res.json()['choices'][0]['message']['content']
+                    ai_word_count = len(final_response.split())
+                    dynamic_delay = 1.0 + (ai_word_count * 0.05) 
+                    time.sleep(min(dynamic_delay, 5.0))
+                    status.update(label="🙏 Wisdom Found.", state="complete", expanded=False)
+                except: 
+                    final_response = "**System Alert:** Transmission issue."
+                    status.update(label="⚠️ Connection Severed.", state="error")
+            
+            st.markdown(final_response)
+            st.session_state.msgs.append({"role": "assistant", "content": final_response})
+            save_to_ledger("assistant", final_response, st.session_state.rank, str(st.session_state.phase))
+            
+            # Advancement logic...
+            if st.session_state.exchange_count >= 2:
+                check_payload = {"model": "llama-3.1-8b-instant", "messages": [{"role": "system", "content": "Analyze growth. Reply ONLY YES or NO."}, {"role": "user", "content": prompt}], "temperature": 0.0}
+                try:
+                    readiness = requests.post("https://api.groq.com/openai/v1/chat/completions", json=check_payload, headers=headers, timeout=5)
+                    is_ready = "YES" in readiness.json()['choices'][0]['message']['content'].upper()
+                except: is_ready = False
+
+                if is_ready or st.session_state.exchange_count >= 6:
+                    st.session_state.exchange_count = 0
+                    if st.session_state.phase < 3: st.session_state.phase += 1
+                    else:
+                        st.session_state.phase = 0
+                        ranks = ["Student", "Practitioner", "Sentinel", "Sovereign"]
+                        try: st.session_state.rank = ranks[ranks.index(st.session_state.rank) + 1]
+                        except: pass
     st.rerun()
