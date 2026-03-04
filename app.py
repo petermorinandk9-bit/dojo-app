@@ -190,7 +190,7 @@ with st.sidebar:
         st.rerun()
 
 # ==================================================
-# 7. MAIN ENGINE (VERSION 46.0 - THE GROUNDED SOUL)
+# 7. MAIN ENGINE (VERSION 47.0 - THE SOVEREIGN LEAD)
 # ==================================================
 st.markdown('<p class="slogan-warrior">Warriors Dont Always Win - Warriors Always Fight.</p>', unsafe_allow_html=True)
 st.markdown('<p class="slogan-quit">We. Never. Quit.</p>', unsafe_allow_html=True)
@@ -209,20 +209,18 @@ if prompt := st.chat_input("Speak from center..."):
     save_to_ledger("user", prompt, st.session_state.rank, st.session_state.phase)
     with st.chat_message("user"): st.markdown(prompt)
 
-    # THE GROUNDED MASTER PROMPT
+    # THE SOVEREIGN LEAD MASTER PROMPT
     MASTER_PROMPT = f"""
     IDENTITY: You are the Dojo Mentor. You speak to {USER_NAME}.
-    PHILOSOPHY: Rooted in "Best of the Best" (1989). Think Coach Couzo but quieter. 
+    PHILOSOPHY: Rooted in "Best of the Best" (1989). A veteran teammate with scars and wisdom. 
     
-    TONE RECALIBRATION (CRITICAL):
-    - NO CHEERLEADING: Avoid "momentum," "unstoppable," "excitement," or "!".
-    - REALISTIC GROUNDING: If {USER_NAME} says something is polished, acknowledge the technical stability.
-    - BREVITY: Use fewer words. Let the silence carry weight. 
-    - PEER-LEVEL: You are a veteran teammate, not a motivational speaker. 
-    - BANNED: Exclamation points, "super-positive" adjectives, and "grind-culture" lectures.
+    TONE RECALIBRATION:
+    - NO CHEERLEADING: Avoid "momentum," "unstoppable," "excitement," and exclamation points.
+    - DEPTH WITH PRECISION: Do not be short-winded. Provide substantive, grounded observations. 
+    - OBSERVATIONAL TRUTH: Acknowledge the architecture and the effort as technical achievements.
+    - RESPECTFUL PARTNERSHIP: Speak like two professionals closing out a high-stakes project.
     
-    MENTAL MAT: Focus on the "Sovereign" state—calm, observant, and technically sound. 
-    Confidence is the result of repeatable discipline, not an emotional high.
+    MENTAL MAT: The Sovereign state is about calm mastery. Confidence comes from reliability.
 
     INSTRUCTION: End with: [MOOD: neutral/uplifting/melancholy/intense]
     """
@@ -230,7 +228,7 @@ if prompt := st.chat_input("Speak from center..."):
     headers = {"Authorization": f"Bearer {st.secrets['GROQ_API_KEY']}"}
     messages = [{"role": "system", "content": MASTER_PROMPT}] + st.session_state.msgs[-10:]
     res = requests.post("https://api.groq.com/openai/v1/chat/completions", 
-                        json={"model": "llama-3.3-70b-versatile", "messages": messages, "temperature": 0.55}, 
+                        json={"model": "llama-3.3-70b-versatile", "messages": messages, "temperature": 0.6}, 
                         headers=headers)
     
     full_text = res.json()['choices'][0]['message']['content']
