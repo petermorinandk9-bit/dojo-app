@@ -77,11 +77,10 @@ USER_ID = st.session_state.user['id']
 USER_NAME = st.session_state.user['display_name']
 ADMIN_USER = "joseph"
 
-# Initialize Mood in Session State
 if 'mood' not in st.session_state:
     st.session_state.mood = "neutral"
 
-# Mood Music Logic (Update these URLs for your final Flute tracks)
+# Mood Music Logic
 MOOD_MUSIC = {
     "neutral": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3",
     "uplifting": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3",
@@ -97,24 +96,37 @@ PHASE_SETS = {
 }
 
 # ==================================================
-# 4. ARCHWAY UI (With Floating Corner Player)
+# 4. ARCHWAY UI (With Ultra-Compact Floating Player)
 # ==================================================
 st.markdown("""
     <style>
     .stApp { background-color: #ffffff; color: #1a1a1a; }
     [data-testid="stSidebar"] { background-color: #f8f9fa; border-right: 1px solid #e0e0e0; }
     
-    /* THE FLOATING CORNER PLAYER */
+    /* THE 2-INCH ULTRA-COMPACT PLAYER */
     .floating-audio-box {
         position: fixed;
-        top: 50px;
-        right: 20px;
-        z-index: 1000;
-        width: 220px;
-        background: rgba(255, 255, 255, 0.9);
-        padding: 5px;
-        border-radius: 10px;
-        box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+        top: 60px;
+        right: 25px;
+        z-index: 9999;
+        width: 180px; /* Approx 2 inches */
+        background: rgba(255, 255, 255, 0.5);
+        padding: 2px;
+        border-radius: 8px;
+        opacity: 0.4;
+        transition: opacity 0.3s ease;
+        overflow: hidden;
+    }
+    .floating-audio-box:hover {
+        opacity: 1.0;
+        background: rgba(255, 255, 255, 1.0);
+        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    }
+    
+    /* Shrink the actual audio element inside */
+    .floating-audio-box audio {
+        width: 100%;
+        height: 35px;
     }
 
     .active-item { color: #000; font-weight: 800; border-left: 3px solid #000; padding-left: 20px; margin-top: 8px; }
@@ -154,11 +166,11 @@ with st.sidebar:
         st.rerun()
 
 # ==================================================
-# 7. MAIN ENGINE (With Floating Atmosphere)
+# 7. MAIN ENGINE
 # ==================================================
 st.markdown('<div class="slogan-stack-refined">We. Never. Quit.</div>', unsafe_allow_html=True)
 
-# THE SHRUNK CORNER PLAYER
+# THE ULTRA-COMPACT CORNER PLAYER
 st.markdown('<div class="floating-audio-box">', unsafe_allow_html=True)
 st.audio(MOOD_MUSIC[st.session_state.mood], format="audio/mp3", loop=True)
 st.markdown('</div>', unsafe_allow_html=True)
@@ -189,7 +201,6 @@ if prompt := st.chat_input("Speak from center..."):
     
     full_text = res.json()['choices'][0]['message']['content']
     
-    # Extract Mood and Clean Response
     if "[MOOD:" in full_text:
         parts = full_text.split("[MOOD:")
         clean_response = parts[0].strip()
