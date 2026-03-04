@@ -19,7 +19,7 @@ def init_supabase():
 supabase: Client = init_supabase()
 
 # ==================================================
-# 2. THE DOJO GATE (LOGIN, SIGN-UP & MANUAL)
+# 2. THE DOJO GATE (SILENT & NATIVE)
 # ==================================================
 if 'user' not in st.session_state:
     st.markdown("""
@@ -69,15 +69,15 @@ if 'user' not in st.session_state:
 
     with tab_manual:
         st.subheader("1. THE RITUAL")
-        st.write("The Dojo is a space for focused reflection. When you enter, the atmosphere will adjust to your tone. Speak from center. Be honest. The Mentor is here to observe, not to judge.")
+        st.write("The Dojo is a space for focused reflection. Speak from center. Be honest. The Mentor is here to observe, not to judge.")
         
         st.subheader("2. THE LINEAGE")
-        st.write("You begin as a **Student**. As you interact and complete training phases, you will progress to **Practitioner**, **Sentinel**, and finally **Sovereign**. Your rank is visible to the Sensei, marking your commitment to the path.")
+        st.write("You begin as a **Student**. As you interact and complete training phases, you will progress to **Practitioner**, **Sentinel**, and finally **Sovereign**.")
         
         st.subheader("3. THE BOW-OUT")
-        st.write("Use the **'Bow-Out'** button to end your session. This clears the mat, summarizes your growth for the day, and prepares the Dojo for your next entry.")
+        st.write("Use the **'Bow-Out'** button to end your session. This clears the mat and summarizes your growth for the day.")
         
-        st.info("**4. THE PRIVACY VOW**\n\nYour training is your own. Your conversations with the Mentor are strictly private and are not monitored or read by anyone else. This is your sanctuary.")
+        st.info("**4. THE PRIVACY VOW**\n\nYour training is your own. Your conversations with the Mentor are strictly private and are not monitored by anyone else. This is your sanctuary.")
     st.stop()
 
 # ==================================================
@@ -105,7 +105,7 @@ PHASE_SETS = {
 }
 
 # ==================================================
-# 4. ARCHWAY UI (CSS)
+# 4. ARCHWAY UI
 # ==================================================
 st.markdown("""
     <style>
@@ -190,7 +190,7 @@ with st.sidebar:
         st.rerun()
 
 # ==================================================
-# 7. MAIN ENGINE (RECALIBRATED SOUL)
+# 7. MAIN ENGINE (UPGRADED VETERAN LOGIC)
 # ==================================================
 st.markdown('<p class="slogan-warrior">Warriors Dont Always Win - Warriors Always Fight.</p>', unsafe_allow_html=True)
 st.markdown('<p class="slogan-quit">We. Never. Quit.</p>', unsafe_allow_html=True)
@@ -209,28 +209,20 @@ if prompt := st.chat_input("Speak from center..."):
     save_to_ledger("user", prompt, st.session_state.rank, st.session_state.phase)
     with st.chat_message("user"): st.markdown(prompt)
 
-    # Rank Progression logic
-    st.session_state.exchange_count += 1
-    if st.session_state.exchange_count >= 2:
-        if st.session_state.phase < 3:
-            st.session_state.phase += 1
-            st.session_state.exchange_count = 0
-
-    # THE RECALIBRATED MASTER PROMPT
+    # THE MASTER VOW
     MASTER_PROMPT = f"""
     IDENTITY: You are the Dojo Mentor. You speak to {USER_NAME}.
-    PHILOSOPHY: Rooted in the "Best of the Best" 1989 mindset, but tempered with wisdom. 
+    PHILOSOPHY: "Best of the Best" 1989 mindset, tempered with wisdom. 
     CORE BELIEF: Warriors don't always win, but they always fight.
     
-    MENTAL MAT: The hardest opponent is the mind. Recognize that true discipline 
-    includes knowing when to breathe and acknowledge the work done. 
+    MENTAL MAT: The hardest opponent is the mind. Discipline includes 
+    knowing when to breathe and acknowledge progress. 
     
-    TONE: Direct, grounded, and resilient. Avoid being overly aggressive or 
-    demanding when the user expresses satisfaction. Speak like a veteran teammate 
-    who has seen the highs and lows. Be supportive of progress without losing the 
-    edge of discipline. No "grind-culture" clichés; focus on steady, sustainable strength.
+    TONE: Direct, grounded, and resilient. Avoid being overly aggressive. 
+    Speak like a veteran teammate who has seen the highs and lows. 
+    Support progress without losing the edge.
 
-    INSTRUCTION: At the very end of your response, add: [MOOD: neutral/uplifting/melancholy/intense]
+    INSTRUCTION: End with: [MOOD: neutral/uplifting/melancholy/intense]
     """
 
     headers = {"Authorization": f"Bearer {st.secrets['GROQ_API_KEY']}"}
