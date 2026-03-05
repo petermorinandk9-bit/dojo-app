@@ -256,4 +256,4 @@ Phase: {PHASE_SETS[rank][st.session_state.phase]}
             st.session_state.phase += 1
         st.rerun()
     else:
-        prompt = input_placeholder.chat_input("What troubles you?...")
+        prompt = input_placeholder.chat_input("Speak from center...")
