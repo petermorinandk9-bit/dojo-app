@@ -156,9 +156,15 @@ with tab_train:
         with st.chat_message(msg["role"]):
             st.markdown(msg["content"])
     # ===============================
+    # INPUT PLACEHOLDER
+    # ===============================
+    input_placeholder = st.empty()
+    # ===============================
     # USER INPUT
     # ===============================
-    if prompt := st.chat_input("Speak from center..."):
+    prompt = input_placeholder.chat_input("Speak from center...")
+    if prompt:
+        input_placeholder.empty()
         st.session_state.msgs.append({
             "role":"user",
             "content":prompt
@@ -212,7 +218,6 @@ Phase: {PHASE_SETS[rank][st.session_state.phase]}
             headers=headers
         )
         reply = res.json()["choices"][0]["message"]["content"]
-
         thinking_phrases = [
             "Let me think a moment…",
             "Give me a moment to consider this…",
@@ -221,19 +226,15 @@ Phase: {PHASE_SETS[rank][st.session_state.phase]}
             "Let me consider that carefully…"
         ]
         selected_phrase = random.choice(thinking_phrases)
-
         # Gradual reveal with contemplation first
         with st.chat_message("assistant"):
             message_placeholder = st.empty()
             message_placeholder.markdown(selected_phrase)
-
             # Initial contemplation delay (while showing the phrase)
             time.sleep(2.0)
-
             # Dynamic thinking pause (still showing the phrase)
             char_delay = min(len(reply) / 120, 4)
             time.sleep(char_delay)
-
             # Now start revealing the actual response
             current_text = ""
             sentences = reply.split(". ")
@@ -247,7 +248,6 @@ Phase: {PHASE_SETS[rank][st.session_state.phase]}
                 message_placeholder.markdown(current_text)
                 if i < len(sentences) - 1:
                     time.sleep(0.6)
-
         st.session_state.msgs.append({
             "role":"assistant",
             "content":reply
@@ -255,3 +255,5 @@ Phase: {PHASE_SETS[rank][st.session_state.phase]}
         if len(st.session_state.msgs) % 4 == 0 and st.session_state.phase < 3:
             st.session_state.phase += 1
         st.rerun()
+    else:
+        prompt = input_placeholder.chat_input("What troubles you?...")
