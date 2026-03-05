@@ -283,24 +283,26 @@ Reflections (most recent first):
 # ENHANCED PATTERN MEMORY FETCH
 # ==================================================
 def get_current_pattern_memory():
-    # Fetch patterns with priority: strengthening > highest confidence > most recent
-    patterns = supabase.table("dojo_patterns")\
-        .select("pattern, trajectory_state, confidence_score")\
-        .eq("user_id", USER_ID)\
-        .execute()
+    try:
+        patterns = supabase.table("dojo_patterns")\
+            .select("pattern, trajectory_state, confidence_score")\
+            .eq("user_id", USER_ID)\
+            .execute()
 
-    if not patterns.data:
+        if not patterns.data:
+            return "No current pattern detected."
+
+        # Priority 1: strengthening patterns
+        strengthening = [p for p in patterns.data if p["trajectory_state"] == "strengthening"]
+        if strengthening:
+            top = max(strengthening, key=lambda x: x["confidence_score"])
+            return f"Pattern: {top['pattern']}\nTrajectory: {top['trajectory_state']}\nConfidence: {top['confidence_score']:.2f}"
+
+        # Priority 2: highest confidence
+        top_conf = max(patterns.data, key=lambda x: x["confidence_score"])
+        return f"Pattern: {top_conf['pattern']}\nTrajectory: {top_conf['trajectory_state']}\nConfidence: {top_conf['confidence_score']:.2f}"
+    except Exception:
         return "No current pattern detected."
-
-    # Priority 1: any strengthening patterns
-    strengthening = [p for p in patterns.data if p["trajectory_state"] == "strengthening"]
-    if strengthening:
-        top = max(strengthening, key=lambda x: x["confidence_score"])
-        return f"Pattern: {top['pattern']}\nTrajectory: {top['trajectory_state']}\nConfidence: {top['confidence_score']:.2f}"
-
-    # Priority 2: highest confidence
-    top_conf = max(patterns.data, key=lambda x: x["confidence_score"])
-    return f"Pattern: {top_conf['pattern']}\nTrajectory: {top_conf['trajectory_state']}\nConfidence: {top_conf['confidence_score']:.2f}"
 
 # ==================================================
 # FETCH LATEST DOCTRINE & MILESTONE
@@ -371,7 +373,7 @@ with tab_train:
     with st.container():
         st.markdown("### Dojo Awareness")
         current_pattern_mem = get_current_pattern_memory()
-        st.write(f"**Current Pattern Memory:**\n{current_pattern_mem}")
+        st.markdown(f"**Current Pattern Memory:**  \n{current_pattern_mem}")
         if latest_doctrine:
             st.write(f"**Recent Doctrine:** {latest_doctrine}")
         if latest_milestone:
