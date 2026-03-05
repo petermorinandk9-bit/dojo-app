@@ -163,36 +163,14 @@ tab_train, tab_history = st.tabs(["Training","History"])
 # TRAINING
 # ==================================================
 with tab_train:
-    # ===============================
-    # DOJO AWARENESS BANNER
-    # ===============================
-    with st.container():
-        st.markdown("### Dojo Awareness")
-        if latest_pattern:
-            st.write(f"**Current Pattern:** {latest_pattern}")
-        if latest_doctrine:
-            st.write(f"**Recent Doctrine:** {latest_doctrine}")
-        if latest_milestone:
-            st.write(f"**Recent Milestone:** {latest_milestone}")
-        st.write(f"**Current Phase:** {PHASE_SETS[rank][st.session_state.phase]}")
-        st.divider()
-
-    # ===============================
-    # CHAT HISTORY
-    # ===============================
-    for msg in st.session_state.msgs[-10:]:
-        with st.chat_message(msg["role"]):
-            st.markdown(msg["content"])
-
-    # ===============================
-    # USER INPUT & PROCESSING
-    # ===============================
+    # Input at very top of tab (common pattern – stays visible during processing)
     prompt = st.chat_input("Speak from center...")
 
     if prompt:
+        # append user message immediately
         st.session_state.msgs.append({
-            "role":"user",
-            "content":prompt
+            "role": "user",
+            "content": prompt
         })
 
         session_summary = " ".join(
@@ -291,3 +269,20 @@ Phase: {PHASE_SETS[rank][st.session_state.phase]}
             st.session_state.phase += 1
 
         st.rerun()
+
+    # Awareness banner
+    with st.container():
+        st.markdown("### Dojo Awareness")
+        if latest_pattern:
+            st.write(f"**Current Pattern:** {latest_pattern}")
+        if latest_doctrine:
+            st.write(f"**Recent Doctrine:** {latest_doctrine}")
+        if latest_milestone:
+            st.write(f"**Recent Milestone:** {latest_milestone}")
+        st.write(f"**Current Phase:** {PHASE_SETS[rank][st.session_state.phase]}")
+        st.divider()
+
+    # History (now appears below the fixed input box)
+    for msg in st.session_state.msgs[-10:]:
+        with st.chat_message(msg["role"]):
+            st.markdown(msg["content"])
