@@ -232,7 +232,6 @@ Reflections (most recent first):
                 }).execute()
 
         # Simple cluster detection (run after individual patterns)
-        # Fetch recent patterns for clustering
         recent_patterns = supabase.table("dojo_patterns")\
             .select("pattern")\
             .eq("user_id", user_id)\
@@ -242,7 +241,6 @@ Reflections (most recent first):
 
         if len(recent_patterns.data) >= 4:
             pattern_list = [p["pattern"] for p in recent_patterns.data]
-            # Very simple co-occurrence check: look for pairs that appear frequently
             from collections import Counter
             pairs = Counter()
             for i in range(len(pattern_list)):
@@ -255,7 +253,6 @@ Reflections (most recent first):
                     cluster_name = f"{p1.split('.')[0].strip()} + {p2.split('.')[0].strip()}"
                     cluster_conf = min(0.9, 0.4 + count * 0.1)
 
-                    # Check if cluster already exists
                     existing_cluster = supabase.table("dojo_pattern_clusters")\
                         .select("*")\
                         .eq("user_id", user_id)\
@@ -283,20 +280,19 @@ Reflections (most recent first):
         pass  # silent fail
 
 # ==================================================
-# ENHANCED PATTERN MEMORY FETCH (includes trajectory & confidence)
+# ENHANCED PATTERN MEMORY FETCH
 # ==================================================
 def get_current_pattern_memory():
-    # Fetch the most important pattern using priority rules
+    # Fetch patterns with priority: strengthening > highest confidence > most recent
     patterns = supabase.table("dojo_patterns")\
         .select("pattern, trajectory_state, confidence_score")\
         .eq("user_id", USER_ID)\
-        .order("timestamp", desc=True)\
         .execute()
 
     if not patterns.data:
         return "No current pattern detected."
 
-    # Priority 1: strengthening patterns
+    # Priority 1: any strengthening patterns
     strengthening = [p for p in patterns.data if p["trajectory_state"] == "strengthening"]
     if strengthening:
         top = max(strengthening, key=lambda x: x["confidence_score"])
@@ -307,7 +303,7 @@ def get_current_pattern_memory():
     return f"Pattern: {top_conf['pattern']}\nTrajectory: {top_conf['trajectory_state']}\nConfidence: {top_conf['confidence_score']:.2f}"
 
 # ==================================================
-# FETCH LATEST DOCTRINE & MILESTONE (unchanged)
+# FETCH LATEST DOCTRINE & MILESTONE
 # ==================================================
 def fetch_latest(table, field):
     try:
