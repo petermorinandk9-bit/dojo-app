@@ -2,6 +2,8 @@ import streamlit as st
 import requests
 import time
 import random
+import json
+from datetime import datetime
 from supabase import create_client, Client
 
 # ==================================================
@@ -99,7 +101,213 @@ if "history_loaded" not in st.session_state:
 rank = compute_rank(st.session_state.records_count)
 
 # ==================================================
-# FETCH DOJO MEMORY
+# PATTERN DETECTION ENGINE
+# ==================================================
+def detect_patterns(user_id):
+    # Fetch recent user messages (last 50)
+    recent_msgs = supabase.table("records")\
+        .select("content")\
+        .eq("user_id", user_id)\
+        .eq("role", "user")\
+        .order("timestamp", desc=True)\
+        .limit(50)\
+        .execute()
+
+    if not recent_msgs.data or len(recent_msgs.data) < 10:
+        return  # too few messages to detect patterns
+
+    reflections = [row["content"] for row in recent_msgs.data]
+
+    pattern_prompt = f"""
+You are a perceptive pattern analyst. Review the user's recent reflections below.
+
+Prioritize detecting NEGATIVE recurring patterns (highest priority):
+- avoidant behavior / procrastination
+- hesitation or overanalysis before decisions
+- chronic self-criticism / negative self-talk loops
+- abandonment of projects or commitments
+- impulsive decisions followed by regret
+- blame shifting or externalizing responsibility
+
+Also detect positive patterns (secondary):
+- growing discipline / consistency
+- sustained curiosity / exploration
+- reflective self-awareness
+
+Only report patterns that clearly appear at least 3 times across messages.
+Use neutral, observational language — no judgments or labels like "you are avoidant".
+
+For each detected pattern, provide:
+- pattern: short, precise, neutral description (do NOT include trajectory words like strengthening/weakening)
+- confidence: float between 0.0 and 1.0 (higher = stronger repetition & clarity)
+
+Return ONLY valid JSON — no extra text, no explanations:
+
+{{
+  "patterns": [
+    {{"pattern": "Recurring hesitation before committing to decisions.", "confidence": 0.78}},
+    {{"pattern": "Repeated self-critical evaluation of progress.", "confidence": 0.65}}
+  ]
+}}
+
+Reflections (most recent first):
+{chr(10).join(f"- {r}" for r in reflections)}
+"""
+
+    headers = {"Authorization": f"Bearer {st.secrets['GROQ_API_KEY']}"}
+    res = requests.post(
+        "https://api.groq.com/openai/v1/chat/completions",
+        json={
+            "model": "llama-3.3-70b-versatile",
+            "messages": [{"role": "system", "content": pattern_prompt}],
+            "temperature": 0.15,
+            "max_tokens": 400
+        },
+        headers=headers
+    )
+
+    try:
+        content = res.json()["choices"][0]["message"]["content"].strip()
+        if content.startswith("```json"):
+            content = content.split("```json")[1].split("```")[0].strip()
+        data = json.loads(content)
+        detected_patterns = data.get("patterns", [])
+
+        for p in detected_patterns:
+            pattern_text = p.get("pattern")
+            new_confidence = float(p.get("confidence", 0.5))
+
+            if not pattern_text or new_confidence < 0.4:
+                continue
+
+            # Check for similar existing pattern
+            existing = supabase.table("dojo_patterns")\
+                .select("id, pattern, confidence_score")\
+                .eq("user_id", user_id)\
+                .ilike("pattern", f"%{pattern_text.split(' —')[0].strip()}%")\
+                .order("timestamp", desc=True)\
+                .limit(1)\
+                .execute()
+
+            now_iso = datetime.utcnow().isoformat()
+
+            if existing.data:
+                # Update existing pattern
+                old_confidence = existing.data[0]["confidence_score"]
+                diff = new_confidence - old_confidence
+
+                if diff > 0.05:
+                    trajectory = "strengthening"
+                elif diff < -0.05:
+                    trajectory = "weakening"
+                else:
+                    trajectory = "stable"
+
+                # Check for reversal (simple heuristic: new pattern sentiment opposite to old)
+                old_text = existing.data[0]["pattern"].lower()
+                new_text = pattern_text.lower()
+                negative_words = ["hesitation", "avoid", "self-critical", "abandon", "impulsive", "blame"]
+                if any(w in old_text for w in negative_words) and not any(w in new_text for w in negative_words):
+                    trajectory = "reversing"
+                elif any(w in new_text for w in negative_words) and not any(w in old_text for w in negative_words):
+                    trajectory = "reversing"
+
+                supabase.table("dojo_patterns")\
+                    .update({
+                        "pattern": pattern_text,
+                        "confidence_score": new_confidence,
+                        "trajectory_state": trajectory,
+                        "timestamp": now_iso
+                    })\
+                    .eq("id", existing.data[0]["id"])\
+                    .execute()
+            else:
+                # Insert new pattern
+                supabase.table("dojo_patterns").insert({
+                    "user_id": user_id,
+                    "pattern": pattern_text,
+                    "confidence_score": new_confidence,
+                    "trajectory_state": "emerging",
+                    "timestamp": now_iso
+                }).execute()
+
+        # Simple cluster detection (run after individual patterns)
+        # Fetch recent patterns for clustering
+        recent_patterns = supabase.table("dojo_patterns")\
+            .select("pattern")\
+            .eq("user_id", user_id)\
+            .order("timestamp", desc=True)\
+            .limit(20)\
+            .execute()
+
+        if len(recent_patterns.data) >= 4:
+            pattern_list = [p["pattern"] for p in recent_patterns.data]
+            # Very simple co-occurrence check: look for pairs that appear frequently
+            from collections import Counter
+            pairs = Counter()
+            for i in range(len(pattern_list)):
+                for j in range(i+1, len(pattern_list)):
+                    pair = tuple(sorted([pattern_list[i], pattern_list[j]]))
+                    pairs[pair] += 1
+
+            for (p1, p2), count in pairs.items():
+                if count >= 3:  # appeared together at least 3 times in recent history
+                    cluster_name = f"{p1.split('.')[0].strip()} + {p2.split('.')[0].strip()}"
+                    cluster_conf = min(0.9, 0.4 + count * 0.1)
+
+                    # Check if cluster already exists
+                    existing_cluster = supabase.table("dojo_pattern_clusters")\
+                        .select("*")\
+                        .eq("user_id", user_id)\
+                        .eq("cluster_name", cluster_name)\
+                        .execute()
+
+                    if existing_cluster.data:
+                        supabase.table("dojo_pattern_clusters")\
+                            .update({
+                                "confidence_score": cluster_conf,
+                                "timestamp": now_iso
+                            })\
+                            .eq("id", existing_cluster.data[0]["id"])\
+                            .execute()
+                    else:
+                        supabase.table("dojo_pattern_clusters").insert({
+                            "user_id": user_id,
+                            "cluster_name": cluster_name,
+                            "patterns": f"{p1} | {p2}",
+                            "confidence_score": cluster_conf,
+                            "timestamp": now_iso
+                        }).execute()
+
+    except Exception:
+        pass  # silent fail
+
+# ==================================================
+# ENHANCED PATTERN MEMORY FETCH (includes trajectory & confidence)
+# ==================================================
+def get_current_pattern_memory():
+    # Fetch the most important pattern using priority rules
+    patterns = supabase.table("dojo_patterns")\
+        .select("pattern, trajectory_state, confidence_score")\
+        .eq("user_id", USER_ID)\
+        .order("timestamp", desc=True)\
+        .execute()
+
+    if not patterns.data:
+        return "No current pattern detected."
+
+    # Priority 1: strengthening patterns
+    strengthening = [p for p in patterns.data if p["trajectory_state"] == "strengthening"]
+    if strengthening:
+        top = max(strengthening, key=lambda x: x["confidence_score"])
+        return f"Pattern: {top['pattern']}\nTrajectory: {top['trajectory_state']}\nConfidence: {top['confidence_score']:.2f}"
+
+    # Priority 2: highest confidence
+    top_conf = max(patterns.data, key=lambda x: x["confidence_score"])
+    return f"Pattern: {top_conf['pattern']}\nTrajectory: {top_conf['trajectory_state']}\nConfidence: {top_conf['confidence_score']:.2f}"
+
+# ==================================================
+# FETCH LATEST DOCTRINE & MILESTONE (unchanged)
 # ==================================================
 def fetch_latest(table, field):
     try:
@@ -114,10 +322,8 @@ def fetch_latest(table, field):
             return r.data[0][field]
     except:
         pass
-
     return None
 
-latest_pattern = fetch_latest("dojo_patterns", "pattern")
 latest_doctrine = fetch_latest("dojo_doctrine", "doctrine")
 latest_milestone = fetch_latest("dojo_milestones", "milestone")
 
@@ -168,8 +374,8 @@ with tab_train:
     # ===============================
     with st.container():
         st.markdown("### Dojo Awareness")
-        if latest_pattern:
-            st.write(f"**Current Pattern:** {latest_pattern}")
+        current_pattern_mem = get_current_pattern_memory()
+        st.write(f"**Current Pattern Memory:**\n{current_pattern_mem}")
         if latest_doctrine:
             st.write(f"**Recent Doctrine:** {latest_doctrine}")
         if latest_milestone:
@@ -194,9 +400,16 @@ with tab_train:
             "role":"user",
             "content":prompt
         })
+
+        # Run pattern detection roughly every 6–8 user messages
+        user_msg_count = len([m for m in st.session_state.msgs if m["role"] == "user"])
+        if user_msg_count % 7 == 0 and user_msg_count >= 10:
+            detect_patterns(USER_ID)
+
         session_summary = " ".join(
             [m["content"] for m in st.session_state.msgs if m["role"]=="user"][-3:]
         )
+
         # ===============================
         # RANK STYLE
         # ===============================
@@ -206,21 +419,28 @@ with tab_train:
             "Sentinel":"reflective strategist who points out patterns",
             "Sovereign":"minimalist mentor who guides through questions"
         }
+
         # ===============================
-        # MASTER PROMPT
+        # MASTER PROMPT with upgraded pattern memory
         # ===============================
+        current_pattern_mem = get_current_pattern_memory()
+
         MASTER_PROMPT = f"""
 You are a calm, grounded, perceptive human mentor speaking to {USER_NAME}.
 Mentor style: {rank_style[rank]}
+
 LONG-TERM MEMORY:
-Pattern: {latest_pattern}
+{current_pattern_mem}
 Doctrine: {latest_doctrine}
 Milestone: {latest_milestone}
 (Weave these quietly into your understanding. Never name or point to them directly.)
+
 RECENT CONTEXT:
 Session summary: {session_summary}
+
 YOUR OBJECTIVE:
 Offer a steady, outside perspective that helps the person notice what they may not yet see clearly — without praising, fixing, or directing.
+
 STRICT COMMUNICATION RULES:
 • Look past the surface story to the underlying tension, hesitation, or quiet assumption.
 • Never repeat, mirror, echo, or rephrase anything the user said.
@@ -229,10 +449,12 @@ STRICT COMMUNICATION RULES:
 • No martial arts imagery, dojo references, or teacher–student posturing.
 • Speak like a thoughtful, experienced adult — plain, calm, direct, human.
 • Match response length to the depth and weight of what the user shared: brief and light for casual or surface-level inputs, longer and more considered (up to 10–12 sentences) only when the reflection is deeper, more personal, or carries real emotional or existential weight. Avoid unnecessary length. Let proportion guide you.
+
 CURRENT STATE:
 Rank: {rank}
 Phase: {PHASE_SETS[rank][st.session_state.phase]}
 """
+
         headers = {"Authorization": f"Bearer {st.secrets['GROQ_API_KEY']}"}
         res = requests.post(
             "https://api.groq.com/openai/v1/chat/completions",
@@ -243,6 +465,7 @@ Phase: {PHASE_SETS[rank][st.session_state.phase]}
             headers=headers
         )
         reply = res.json()["choices"][0]["message"]["content"]
+
         thinking_phrases = [
             "Let me think a moment…",
             "Give me a moment to consider this…",
@@ -251,15 +474,19 @@ Phase: {PHASE_SETS[rank][st.session_state.phase]}
             "Let me consider that carefully…"
         ]
         selected_phrase = random.choice(thinking_phrases)
+
         # Gradual reveal with contemplation first
         with st.chat_message("assistant"):
             message_placeholder = st.empty()
             message_placeholder.markdown(selected_phrase)
+
             # Initial contemplation delay
             time.sleep(2.0)
+
             # Dynamic thinking pause
             char_delay = min(len(reply) / 120, 4)
             time.sleep(char_delay)
+
             # Reveal response sentence by sentence
             current_text = ""
             sentences = reply.split(". ")
@@ -272,10 +499,13 @@ Phase: {PHASE_SETS[rank][st.session_state.phase]}
                 message_placeholder.markdown(current_text)
                 if i < len(sentences) - 1:
                     time.sleep(0.6)
+
         st.session_state.msgs.append({
             "role":"assistant",
             "content":reply
         })
+
         if len(st.session_state.msgs) % 4 == 0 and st.session_state.phase < 3:
             st.session_state.phase += 1
+
         st.rerun()
