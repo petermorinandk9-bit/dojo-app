@@ -185,9 +185,11 @@ with tab_train:
             st.markdown(msg["content"])
 
     # ===============================
-    # ASSISTANT RESPONSE (when processing)
+    # USER INPUT & PROCESSING
     # ===============================
-    if prompt := st.chat_input("Speak from center..."):
+    prompt = st.chat_input("Speak from center...")
+
+    if prompt:
         st.session_state.msgs.append({
             "role":"user",
             "content":prompt
