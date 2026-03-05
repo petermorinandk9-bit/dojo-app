@@ -1,6 +1,7 @@
 import streamlit as st
 import requests
 import time
+import random
 from supabase import create_client, Client
 # ==================================================
 # CONFIG
@@ -211,6 +212,42 @@ Phase: {PHASE_SETS[rank][st.session_state.phase]}
             headers=headers
         )
         reply = res.json()["choices"][0]["message"]["content"]
+
+        thinking_phrases = [
+            "Let me think a moment…",
+            "Give me a moment to consider this…",
+            "Let me reflect on that for a second…",
+            "One moment while I think about that…",
+            "Let me consider that carefully…"
+        ]
+        selected_phrase = random.choice(thinking_phrases)
+
+        # Gradual reveal with contemplation first
+        with st.chat_message("assistant"):
+            message_placeholder = st.empty()
+            message_placeholder.markdown(selected_phrase)
+
+            # Initial contemplation delay (while showing the phrase)
+            time.sleep(2.0)
+
+            # Dynamic thinking pause (still showing the phrase)
+            char_delay = min(len(reply) / 120, 4)
+            time.sleep(char_delay)
+
+            # Now start revealing the actual response
+            current_text = ""
+            sentences = reply.split(". ")
+            for i, sentence in enumerate(sentences):
+                if i > 0:
+                    current_text += ". "
+                current_text += sentence
+                # Add final period only to the last sentence if needed
+                if i == len(sentences) - 1 and not sentence.endswith("."):
+                    current_text += "."
+                message_placeholder.markdown(current_text)
+                if i < len(sentences) - 1:
+                    time.sleep(0.6)
+
         st.session_state.msgs.append({
             "role":"assistant",
             "content":reply
