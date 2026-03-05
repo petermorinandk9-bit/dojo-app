@@ -163,20 +163,40 @@ tab_train, tab_history = st.tabs(["Training","History"])
 # TRAINING
 # ==================================================
 with tab_train:
-    # Input at very top of tab (common pattern – stays visible during processing)
+    # ===============================
+    # DOJO AWARENESS BANNER
+    # ===============================
+    with st.container():
+        st.markdown("### Dojo Awareness")
+        if latest_pattern:
+            st.write(f"**Current Pattern:** {latest_pattern}")
+        if latest_doctrine:
+            st.write(f"**Recent Doctrine:** {latest_doctrine}")
+        if latest_milestone:
+            st.write(f"**Recent Milestone:** {latest_milestone}")
+        st.write(f"**Current Phase:** {PHASE_SETS[rank][st.session_state.phase]}")
+        st.divider()
+
+    # ===============================
+    # CHAT HISTORY
+    # ===============================
+    for msg in st.session_state.msgs[-10:]:
+        with st.chat_message(msg["role"]):
+            st.markdown(msg["content"])
+
+    # ===============================
+    # USER INPUT (placed last so it appears at bottom)
+    # ===============================
     prompt = st.chat_input("Speak from center...")
 
     if prompt:
-        # append user message immediately
         st.session_state.msgs.append({
-            "role": "user",
-            "content": prompt
+            "role":"user",
+            "content":prompt
         })
-
         session_summary = " ".join(
             [m["content"] for m in st.session_state.msgs if m["role"]=="user"][-3:]
         )
-
         # ===============================
         # RANK STYLE
         # ===============================
@@ -186,7 +206,6 @@ with tab_train:
             "Sentinel":"reflective strategist who points out patterns",
             "Sovereign":"minimalist mentor who guides through questions"
         }
-
         # ===============================
         # MASTER PROMPT
         # ===============================
@@ -214,7 +233,6 @@ CURRENT STATE:
 Rank: {rank}
 Phase: {PHASE_SETS[rank][st.session_state.phase]}
 """
-
         headers = {"Authorization": f"Bearer {st.secrets['GROQ_API_KEY']}"}
         res = requests.post(
             "https://api.groq.com/openai/v1/chat/completions",
@@ -225,7 +243,6 @@ Phase: {PHASE_SETS[rank][st.session_state.phase]}
             headers=headers
         )
         reply = res.json()["choices"][0]["message"]["content"]
-
         thinking_phrases = [
             "Let me think a moment…",
             "Give me a moment to consider this…",
@@ -234,19 +251,15 @@ Phase: {PHASE_SETS[rank][st.session_state.phase]}
             "Let me consider that carefully…"
         ]
         selected_phrase = random.choice(thinking_phrases)
-
         # Gradual reveal with contemplation first
         with st.chat_message("assistant"):
             message_placeholder = st.empty()
             message_placeholder.markdown(selected_phrase)
-
             # Initial contemplation delay
             time.sleep(2.0)
-
             # Dynamic thinking pause
             char_delay = min(len(reply) / 120, 4)
             time.sleep(char_delay)
-
             # Reveal response sentence by sentence
             current_text = ""
             sentences = reply.split(". ")
@@ -259,30 +272,10 @@ Phase: {PHASE_SETS[rank][st.session_state.phase]}
                 message_placeholder.markdown(current_text)
                 if i < len(sentences) - 1:
                     time.sleep(0.6)
-
         st.session_state.msgs.append({
             "role":"assistant",
             "content":reply
         })
-
         if len(st.session_state.msgs) % 4 == 0 and st.session_state.phase < 3:
             st.session_state.phase += 1
-
         st.rerun()
-
-    # Awareness banner
-    with st.container():
-        st.markdown("### Dojo Awareness")
-        if latest_pattern:
-            st.write(f"**Current Pattern:** {latest_pattern}")
-        if latest_doctrine:
-            st.write(f"**Recent Doctrine:** {latest_doctrine}")
-        if latest_milestone:
-            st.write(f"**Recent Milestone:** {latest_milestone}")
-        st.write(f"**Current Phase:** {PHASE_SETS[rank][st.session_state.phase]}")
-        st.divider()
-
-    # History (now appears below the fixed input box)
-    for msg in st.session_state.msgs[-10:]:
-        with st.chat_message(msg["role"]):
-            st.markdown(msg["content"])
