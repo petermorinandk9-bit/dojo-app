@@ -185,19 +185,9 @@ with tab_train:
             st.markdown(msg["content"])
 
     # ===============================
-    # INPUT PLACEHOLDER
+    # ASSISTANT RESPONSE (when processing)
     # ===============================
-    input_placeholder = st.empty()
-
-    # ===============================
-    # USER INPUT – always render at bottom
-    # ===============================
-    prompt = input_placeholder.chat_input("Speak from center...")
-
-    if prompt:
-        # Immediately clear the input field so user can't type during processing
-        input_placeholder.empty()
-
+    if prompt := st.chat_input("Speak from center..."):
         st.session_state.msgs.append({
             "role":"user",
             "content":prompt
@@ -270,21 +260,20 @@ Phase: {PHASE_SETS[rank][st.session_state.phase]}
             message_placeholder = st.empty()
             message_placeholder.markdown(selected_phrase)
 
-            # Initial contemplation delay (while showing the phrase)
+            # Initial contemplation delay
             time.sleep(2.0)
 
-            # Dynamic thinking pause (still showing the phrase)
+            # Dynamic thinking pause
             char_delay = min(len(reply) / 120, 4)
             time.sleep(char_delay)
 
-            # Now start revealing the actual response
+            # Reveal response sentence by sentence
             current_text = ""
             sentences = reply.split(". ")
             for i, sentence in enumerate(sentences):
                 if i > 0:
                     current_text += ". "
                 current_text += sentence
-                # Add final period only to the last sentence if needed
                 if i == len(sentences) - 1 and not sentence.endswith("."):
                     current_text += "."
                 message_placeholder.markdown(current_text)
