@@ -35,6 +35,34 @@ if "phase" not in st.session_state:
     st.session_state.phase = 0
 
 # ==================================================
+# PATTERN LIBRARY
+# ==================================================
+PATTERN_LIBRARY = [
+    "overthinking",
+    "avoidance",
+    "self_doubt",
+    "clarity",
+    "momentum",
+    "discipline",
+    "frustration",
+    "creative_flow"
+]
+
+NEGATIVE_PATTERNS = [
+    "overthinking",
+    "avoidance",
+    "self_doubt",
+    "frustration"
+]
+
+POSITIVE_PATTERNS = [
+    "clarity",
+    "momentum",
+    "discipline",
+    "creative_flow"
+]
+
+# ==================================================
 # AUTH SYSTEM
 # ==================================================
 if st.session_state.user is None:
@@ -155,55 +183,36 @@ USER_ID = st.session_state.user["id"]
 USER_NAME = st.session_state.user["display_name"]
 
 # ==================================================
-# RANK SYSTEM
+# MOMENTUM SCORE
 # ==================================================
-def compute_rank(count):
+def compute_momentum():
 
-    if count < 15:
-        return "Student"
+    try:
 
-    if count < 40:
-        return "Practitioner"
+        r = supabase.table("dojo_patterns") \
+            .select("pattern") \
+            .eq("user_id", USER_ID) \
+            .order("timestamp", desc=True) \
+            .limit(10) \
+            .execute()
 
-    if count < 80:
-        return "Sentinel"
+        if not r.data:
+            return 0
 
-    return "Sovereign"
+        score = 0
 
-# ==================================================
-# LOAD HISTORY
-# ==================================================
-if "history_loaded" not in st.session_state:
+        for p in r.data:
 
-    r = supabase.table("records") \
-        .select("*", count="exact") \
-        .eq("user_id", USER_ID) \
-        .order("timestamp") \
-        .execute()
+            if p["pattern"] in POSITIVE_PATTERNS:
+                score += 1
 
-    if r.data:
+            if p["pattern"] in NEGATIVE_PATTERNS:
+                score -= 1
 
-        for row in r.data:
+        return score / 10
 
-            st.session_state.msgs.append({
-                "role": row["role"],
-                "content": row["content"]
-            })
-
-    st.session_state.records_count = r.count if r.count else 0
-    st.session_state.history_loaded = True
-
-rank = compute_rank(st.session_state.records_count)
-
-# ==================================================
-# PHASES
-# ==================================================
-PHASE_SETS = {
-    "Student":["Welcome","Warm-Up","Training","Cool Down"],
-    "Practitioner":["Welcome","Warm-Up","Training","Cool Down"],
-    "Sentinel":["Welcome","Warm-Up","Training","Cool Down"],
-    "Sovereign":["Welcome","Warm-Up","Training","Cool Down"]
-}
+    except:
+        return 0
 
 # ==================================================
 # PATTERN DETECTION
@@ -224,13 +233,15 @@ def detect_patterns(user_id):
     reflections = [row["content"] for row in recent_msgs.data]
 
     pattern_prompt = f"""
-Analyze reflections for recurring thinking patterns.
+Choose the best matching pattern from this list:
+
+{PATTERN_LIBRARY}
 
 Return JSON only:
 
 {{
 "patterns":[
-{{"pattern":"short description","confidence":0.0}}
+{{"pattern":"pattern_name","confidence":0.0}}
 ]
 }}
 
@@ -284,52 +295,22 @@ def get_current_pattern_memory():
             .limit(1) \
             .execute()
 
+        momentum = compute_momentum()
+
         if r.data:
 
             p = r.data[0]
 
-            return f"Pattern: {p['pattern']} (confidence {p['confidence_score']:.2f})"
+            return f"""
+Pattern: {p['pattern']} (confidence {p['confidence_score']:.2f})
+
+Momentum Score: {momentum:.2f}
+"""
 
     except:
         pass
 
     return "No pattern detected."
-
-# ==================================================
-# SIDEBAR
-# ==================================================
-with st.sidebar:
-
-    st.markdown("### The-Dojo")
-    st.markdown(f"**{rank} · {USER_NAME}**")
-
-    st.divider()
-
-    for i, phase in enumerate(PHASE_SETS[rank]):
-
-        if i == st.session_state.phase:
-            st.markdown(f"**🟢 {phase}**")
-        else:
-            st.markdown(phase)
-
-    st.divider()
-
-    if st.button("Bow Out"):
-
-        st.session_state.phase = 0
-        st.session_state.msgs = []
-
-        st.success("You bow out from the mat. Training continues tomorrow.")
-
-        time.sleep(1)
-        st.rerun()
-
-    if st.button("Log Out"):
-
-        for key in list(st.session_state.keys()):
-            del st.session_state[key]
-
-        st.rerun()
 
 # ==================================================
 # CHAT
@@ -365,7 +346,7 @@ with tab_train:
         mentor_prompt = f"""
 You are a calm reflective mentor.
 
-Current detected thinking pattern:
+Current pattern state:
 {pattern_memory}
 
 Guide the user constructively.
