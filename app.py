@@ -24,7 +24,7 @@ def init_supabase():
 supabase: Client = init_supabase()
 
 # ==================================================
-# SESSION SAFETY
+# SESSION STATE
 # ==================================================
 if "user" not in st.session_state:
     st.session_state.user = None
@@ -51,7 +51,7 @@ if st.session_state.user is None:
     st.markdown('<p class="login-header">The-Dojo</p>', unsafe_allow_html=True)
     st.markdown('<p class="login-sub">Forge your discipline. Step onto the mat.</p>', unsafe_allow_html=True)
 
-    login_tab, register_tab = st.tabs(["Enter Dojo", "Create Account"])
+    login_tab, register_tab = st.tabs(["Enter Dojo","Create Account"])
 
     # ===============================
     # LOGIN
@@ -77,7 +77,32 @@ if st.session_state.user is None:
                     user = res.data[0]
                     stored_hash = user["password"]
 
-                    if bcrypt.checkpw(password.encode(), stored_hash.encode()):
+                    login_success = False
+
+                    # bcrypt attempt
+                    try:
+                        if bcrypt.checkpw(password.encode(), stored_hash.encode()):
+                            login_success = True
+                    except ValueError:
+                        pass
+
+                    # legacy plaintext fallback
+                    if not login_success and password == stored_hash:
+
+                        new_hash = bcrypt.hashpw(
+                            password.encode(),
+                            bcrypt.gensalt()
+                        ).decode()
+
+                        supabase.table("users") \
+                            .update({"password": new_hash}) \
+                            .eq("id", user["id"]) \
+                            .execute()
+
+                        login_success = True
+                        st.info("Password upgraded to secure format.")
+
+                    if login_success:
 
                         st.session_state.user = user
                         st.success("Welcome back.")
@@ -100,10 +125,15 @@ if st.session_state.user is None:
             new_user = st.text_input("Username").lower().strip()
             display_name = st.text_input("Display Name")
             new_pass = st.text_input("Password", type="password")
+            invite_code = st.text_input("Dojo Entry Code", type="password")
 
             register_btn = st.form_submit_button("Create Account")
 
             if register_btn:
+
+                if invite_code != st.secrets["DOJO_ENTRY_CODE"]:
+                    st.error("Invalid dojo entry code.")
+                    st.stop()
 
                 existing = supabase.table("users") \
                     .select("username") \
@@ -126,7 +156,7 @@ if st.session_state.user is None:
                         "password": hashed_pw
                     }).execute()
 
-                    st.success("Account created. You may now enter the dojo.")
+                    st.success("Account created. Welcome to the dojo.")
 
     st.stop()
 
@@ -175,14 +205,14 @@ if "history_loaded" not in st.session_state:
 rank = compute_rank(st.session_state.records_count)
 
 # ==================================================
-# PATTERN DETECTION ENGINE
+# PATTERN DETECTION
 # ==================================================
 def detect_patterns(user_id):
 
     recent_msgs = supabase.table("records") \
         .select("content") \
         .eq("user_id", user_id) \
-        .eq("role", "user") \
+        .eq("role","user") \
         .order("timestamp", desc=True) \
         .limit(50) \
         .execute()
@@ -229,10 +259,10 @@ Reflections:
 
             supabase.table("dojo_patterns").insert({
 
-                "user_id": user_id,
-                "pattern": p["pattern"],
-                "confidence_score": p["confidence"],
-                "timestamp": datetime.utcnow().isoformat()
+                "user_id":user_id,
+                "pattern":p["pattern"],
+                "confidence_score":p["confidence"],
+                "timestamp":datetime.utcnow().isoformat()
 
             }).execute()
 
@@ -335,7 +365,7 @@ with tab_train:
 
             for s in reply.split(". "):
 
-                text+=s+". "
+                text += s + ". "
                 placeholder.markdown(text)
                 time.sleep(.5)
 
