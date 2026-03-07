@@ -1,7 +1,6 @@
 import streamlit as st
 import requests
 import time
-import random
 import json
 import bcrypt
 from datetime import datetime
@@ -79,14 +78,12 @@ if st.session_state.user is None:
 
                     login_success = False
 
-                    # bcrypt attempt
                     try:
                         if bcrypt.checkpw(password.encode(), stored_hash.encode()):
                             login_success = True
                     except ValueError:
                         pass
 
-                    # legacy plaintext fallback
                     if not login_success and password == stored_hash:
 
                         new_hash = bcrypt.hashpw(
@@ -100,7 +97,7 @@ if st.session_state.user is None:
                             .execute()
 
                         login_success = True
-                        st.info("Password upgraded to secure format.")
+                        st.info("Password upgraded.")
 
                     if login_success:
 
@@ -205,6 +202,16 @@ if "history_loaded" not in st.session_state:
 rank = compute_rank(st.session_state.records_count)
 
 # ==================================================
+# PHASES
+# ==================================================
+PHASE_SETS = {
+    "Student":["Welcome","Warm-Up","Training","Cool Down"],
+    "Practitioner":["Welcome","Warm-Up","Training","Cool Down"],
+    "Sentinel":["Welcome","Warm-Up","Training","Cool Down"],
+    "Sovereign":["Welcome","Warm-Up","Training","Cool Down"]
+}
+
+# ==================================================
 # PATTERN DETECTION
 # ==================================================
 def detect_patterns(user_id):
@@ -303,6 +310,25 @@ with st.sidebar:
     st.markdown(f"**{rank} · {USER_NAME}**")
 
     st.divider()
+
+    for i, phase in enumerate(PHASE_SETS[rank]):
+
+        if i == st.session_state.phase:
+            st.markdown(f"**🟢 {phase}**")
+        else:
+            st.markdown(phase)
+
+    st.divider()
+
+    if st.button("Bow Out"):
+
+        st.session_state.phase = 0
+        st.session_state.msgs = []
+
+        st.success("You bow out from the mat. Training continues tomorrow.")
+
+        time.sleep(1)
+        st.rerun()
 
     if st.button("Log Out"):
 
