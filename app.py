@@ -1,3 +1,4 @@
+```python
 import streamlit as st
 import requests
 import time
@@ -6,7 +7,7 @@ import bcrypt
 import random
 import pandas as pd
 import matplotlib.pyplot as plt
-from datetime import datetime
+from datetime import datetime, UTC
 from supabase import create_client, Client
 
 # ==================================================
@@ -36,7 +37,7 @@ By continuing to use The Dojo, you acknowledge that you understand these limitat
 """
 
 # ==================================================
-# SUPABASE
+# SUPABASE CONNECTION
 # ==================================================
 
 @st.cache_resource
@@ -333,7 +334,7 @@ Reflections:
                 "user_id":user_id,
                 "pattern":p["pattern"],
                 "confidence_score":p["confidence"],
-                "timestamp":datetime.utcnow().isoformat()
+                "timestamp":datetime.now(UTC).isoformat()
 
             }).execute()
 
@@ -348,10 +349,10 @@ def get_doctrine():
 
     try:
 
-        r = supabase.table("dojo_doctrine").select("text").execute()
+        r = supabase.table("dojo_doctrine").select("*").execute()
 
         if r.data:
-            return random.choice(r.data)["text"]
+            return random.choice(r.data).get("text") or random.choice(r.data).get("doctrine")
 
     except:
         pass
@@ -379,14 +380,14 @@ def check_milestones():
 
             "user_id":USER_ID,
             "milestone":milestones[count],
-            "timestamp":datetime.utcnow().isoformat()
+            "timestamp":datetime.now(UTC).isoformat()
 
         }).execute()
 
         st.session_state.milestone_message = milestones[count]
 
 # ==================================================
-# SIDEBAR DASHBOARD
+# SIDEBAR
 # ==================================================
 
 with st.sidebar:
@@ -400,73 +401,6 @@ with st.sidebar:
 
     st.markdown("**Momentum**")
     st.progress((momentum+1)/2)
-
-    r = supabase.table("dojo_patterns") \
-        .select("pattern,timestamp") \
-        .eq("user_id",USER_ID) \
-        .order("timestamp",desc=True) \
-        .limit(50) \
-        .execute()
-
-    if r.data:
-
-        df = pd.DataFrame(r.data)
-
-        xs=[]
-        ys=[]
-
-        for p in df["pattern"]:
-
-            coord = PATTERN_COORDS.get(p,(0,0))
-            xs.append(coord[0])
-            ys.append(coord[1])
-
-        fig, ax = plt.subplots()
-
-        ax.scatter(xs,ys)
-
-        ax.axhline(0)
-        ax.axvline(0)
-
-        ax.set_title("Mental State Map")
-        ax.set_xlim(-1,1)
-        ax.set_ylim(-1,1)
-
-        st.pyplot(fig)
-
-        st.markdown("**Pattern Timeline**")
-
-        timeline=df["pattern"].value_counts()
-
-        st.bar_chart(timeline)
-
-    st.divider()
-
-    for i, phase in enumerate(PHASE_SETS[rank]):
-
-        if i == st.session_state.phase:
-            st.markdown(f"**🟢 {phase}**")
-        else:
-            st.markdown(phase)
-
-    st.divider()
-
-    if st.button("Bow Out"):
-
-        st.session_state.phase = 0
-        st.session_state.msgs = []
-
-        st.success("You bow out from the mat.")
-
-        time.sleep(1)
-        st.rerun()
-
-    if st.button("Log Out"):
-
-        for key in list(st.session_state.keys()):
-            del st.session_state[key]
-
-        st.rerun()
 
 # ==================================================
 # CHAT
@@ -502,7 +436,7 @@ with tab_train:
             "user_id":USER_ID,
             "role":"user",
             "content":prompt,
-            "timestamp":datetime.utcnow().isoformat()
+            "timestamp":datetime.now(UTC).isoformat()
         }).execute()
 
         user_count = len([m for m in st.session_state.msgs if m["role"]=="user"])
@@ -555,7 +489,7 @@ If appropriate weave this teaching naturally:
             "user_id":USER_ID,
             "role":"assistant",
             "content":reply,
-            "timestamp":datetime.utcnow().isoformat()
+            "timestamp":datetime.now(UTC).isoformat()
         }).execute()
 
         st.rerun()
@@ -576,6 +510,5 @@ with tab_history:
         for row in r.data:
 
             with st.chat_message(row["role"]):
-                st.markdown(row["content"]) 
-
-
+                st.markdown(row["content"])
+```
