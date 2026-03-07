@@ -105,9 +105,10 @@ if st.session_state.user is None:
                 if r.data:
                     user=r.data[0]
                     stored_hash = user["password"]
+                    # Safe handling: ensure stored_hash is bytes
                     if isinstance(stored_hash, str):
-                        stored_hash = stored_hash.encode()
-                    if bcrypt.checkpw(password.encode(), stored_hash):
+                        stored_hash = stored_hash.encode('utf-8')
+                    if bcrypt.checkpw(password.encode('utf-8'), stored_hash):
                         st.session_state.user=user
                         st.rerun()
                     else:
@@ -128,7 +129,7 @@ if st.session_state.user is None:
                 if invite!=st.secrets["DOJO_ENTRY_CODE"]:
                     st.error("Invalid code")
                     st.stop()
-                hashed=bcrypt.hashpw(password.encode(),bcrypt.gensalt()).decode()
+                hashed=bcrypt.hashpw(password.encode('utf-8'),bcrypt.gensalt()).decode('utf-8')
                 supabase.table("users").insert({
                     "username":username,
                     "display_name":display,
