@@ -3,3 +3,5 @@ requests
 supabase
 bcrypt
 python-dotenv
+matplotlib
+pandas
