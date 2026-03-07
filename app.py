@@ -99,30 +99,48 @@ if st.session_state.user is None:
     with login_tab:
         with st.form("login"):
             username = st.text_input("Username")
-            password = st.text_input("Password",type="password")
+            password = st.text_input("Password", type="password")
             if st.form_submit_button("Enter"):
-                r = supabase.table("users").select("*").eq("username",username).execute()
+                r = supabase.table("users").select("*").eq("username", username).execute()
                 if r.data:
                     user = r.data[0]
-                    stored_hash = user["password"]
-                    # Fix: make sure stored_hash is always bytes
-                    if isinstance(stored_hash, str):
-                        stored_hash = stored_hash.encode('utf-8')
-                    elif not isinstance(stored_hash, bytes):
-                        st.error("Invalid password hash format in database")
+                    stored_hash = user.get("password")
+
+                    # Bulletproof hash normalization
+                    if stored_hash is None:
+                        st.error("No password hash found for this user")
                         st.stop()
-                    if bcrypt.checkpw(password.encode('utf-8'), stored_hash):
-                        st.session_state.user = user
-                        st.rerun()
-                    else:
-                        st.error("Wrong password")
+
+                    # Convert to bytes safely
+                    if isinstance(stored_hash, str):
+                        try:
+                            stored_hash = stored_hash.encode('utf-8')
+                        except Exception as e:
+                            st.error(f"Stored password hash is corrupted (cannot encode): {str(e)}")
+                            st.stop()
+                    elif not isinstance(stored_hash, bytes):
+                        st.error("Unexpected password hash type in database")
+                        st.stop()
+
+                    try:
+                        if bcrypt.checkpw(password.encode('utf-8'), stored_hash):
+                            st.session_state.user = user
+                            st.rerun()
+                        else:
+                            st.error("Wrong password")
+                    except ValueError as ve:
+                        st.error(f"Password verification error: {str(ve)}")
+                        st.stop()
+                    except Exception as e:
+                        st.error(f"Unexpected error during login: {str(e)}")
+                        st.stop()
                 else:
                     st.error("User not found")
     with register_tab:
         with st.form("register"):
             username = st.text_input("Username")
             display = st.text_input("Display Name")
-            password = st.text_input("Password",type="password")
+            password = st.text_input("Password", type="password")
             invite = st.text_input("Dojo Entry Code")
             agree = st.checkbox("I understand this is not a medical service.")
             if st.form_submit_button("Create"):
@@ -387,15 +405,15 @@ with tab_train:
         st.session_state.msgs.append({"role":"user","content":prompt})
         check_milestones()
         supabase.table("records").insert({
-            "user_id":USER_ID,
-            "role":"user",
-            "content":prompt,
-            "timestamp":datetime.now(UTC).isoformat()
+        "user_id":USER_ID,
+        "role":"user",
+        "content":prompt,
+        "timestamp":datetime.now(UTC).isoformat()
         }).execute()
-        user_count = len([m for m in st.session_state.msgs if m["role"]=="user"])
-        if user_count % 7 == 0:
+        user_count=len([m for m in st.session_state.msgs if m["role"]=="user"])
+        if user_count%7==0:
             detect_patterns(USER_ID)
-        doctrine = get_doctrine()
+        doctrine=get_doctrine()
         recent_pattern = None
         try:
             rp = supabase.table("dojo_patterns") \
@@ -422,45 +440,45 @@ with tab_train:
             tone_instruction += "Encourage stabilization and awareness.\n\n"
         elif evolution == "Rising":
             tone_instruction += "Encourage continued discipline and clarity.\n\n"
-        mentor_prompt = f"""
+        mentor_prompt=f"""
 Respond as a calm reflective mentor.
 
 {tone_instruction}{mirror}If appropriate weave this teaching naturally:
 
 {doctrine}
 """
-        headers = {"Authorization":f"Bearer {st.secrets['GROQ_API_KEY']}"}
-        res = requests.post(
-            "https://api.groq.com/openai/v1/chat/completions",
-            json={
-                "model":"llama-3.3-70b-versatile",
-                "messages":[{"role":"system","content":mentor_prompt}]
-                + st.session_state.msgs[-10:]
-            },
-            headers=headers
+        headers={"Authorization":f"Bearer {st.secrets['GROQ_API_KEY']}"}
+        res=requests.post(
+        "https://api.groq.com/openai/v1/chat/completions",
+        json={
+        "model":"llama-3.3-70b-versatile",
+        "messages":[{"role":"system","content":mentor_prompt}]
+        + st.session_state.msgs[-10:]
+        },
+        headers=headers
         )
-        reply = res.json()["choices"][0]["message"]["content"]
+        reply=res.json()["choices"][0]["message"]["content"]
         with st.chat_message("assistant"):
-            placeholder = st.empty()
+            placeholder=st.empty()
             placeholder.markdown("Thinking...")
             time.sleep(2)
-            text = ""
+            text=""
             for s in reply.split(". "):
-                text += s + ". "
+                text+=s+". "
                 placeholder.markdown(text)
                 time.sleep(.4)
         st.session_state.msgs.append({"role":"assistant","content":reply})
         supabase.table("records").insert({
-            "user_id":USER_ID,
-            "role":"assistant",
-            "content":reply,
-            "timestamp":datetime.now(UTC).isoformat()
+        "user_id":USER_ID,
+        "role":"assistant",
+        "content":reply,
+        "timestamp":datetime.now(UTC).isoformat()
         }).execute()
         st.rerun()
 
 with tab_history:
     st.markdown("### Training History")
-    r = supabase.table("records") \
+    r=supabase.table("records") \
         .select("*") \
         .eq("user_id",USER_ID) \
         .order("timestamp",desc=True) \
