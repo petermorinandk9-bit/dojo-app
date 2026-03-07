@@ -52,9 +52,6 @@ if st.session_state.user is None:
 
     login_tab, register_tab = st.tabs(["Enter Dojo","Create Account"])
 
-    # ===============================
-    # LOGIN
-    # ===============================
     with login_tab:
 
         with st.form("login_form"):
@@ -112,9 +109,6 @@ if st.session_state.user is None:
                 else:
                     st.error("User not found")
 
-    # ===============================
-    # REGISTER
-    # ===============================
     with register_tab:
 
         with st.form("register_form"):
@@ -212,40 +206,27 @@ PHASE_SETS = {
 }
 
 # ==================================================
-# PATTERN DETECTION ENGINE
+# PATTERN DETECTION
 # ==================================================
 def detect_patterns(user_id):
 
-    try:
+    recent_msgs = supabase.table("records") \
+        .select("content") \
+        .eq("user_id", user_id) \
+        .eq("role","user") \
+        .order("timestamp", desc=True) \
+        .limit(50) \
+        .execute()
 
-        recent_msgs = supabase.table("records") \
-            .select("content") \
-            .eq("user_id", user_id) \
-            .eq("role","user") \
-            .order("timestamp", desc=True) \
-            .limit(50) \
-            .execute()
+    if not recent_msgs.data or len(recent_msgs.data) < 10:
+        return
 
-        if not recent_msgs.data or len(recent_msgs.data) < 10:
-            return
+    reflections = [row["content"] for row in recent_msgs.data]
 
-        reflections = [row["content"] for row in recent_msgs.data]
+    pattern_prompt = f"""
+Analyze reflections for recurring thinking patterns.
 
-        pattern_prompt = f"""
-You are a behavioral pattern detection engine.
-
-Analyze the reflections below and detect recurring thinking patterns.
-
-Examples include:
-- overthinking
-- self doubt
-- avoidance
-- clarity
-- momentum
-- frustration
-- discipline growth
-
-Return JSON only.
+Return JSON only:
 
 {{
 "patterns":[
@@ -257,21 +238,22 @@ Reflections:
 {chr(10).join(reflections)}
 """
 
-        headers = {"Authorization": f"Bearer {st.secrets['GROQ_API_KEY']}"}
+    headers = {"Authorization": f"Bearer {st.secrets['GROQ_API_KEY']}"}
 
-        res = requests.post(
-            "https://api.groq.com/openai/v1/chat/completions",
-            json={
-                "model":"llama-3.3-70b-versatile",
-                "messages":[{"role":"system","content":pattern_prompt}],
-                "temperature":0.2,
-                "max_tokens":200
-            },
-            headers=headers
-        )
+    res = requests.post(
+        "https://api.groq.com/openai/v1/chat/completions",
+        json={
+            "model":"llama-3.3-70b-versatile",
+            "messages":[{"role":"system","content":pattern_prompt}],
+            "temperature":0.2,
+            "max_tokens":200
+        },
+        headers=headers
+    )
+
+    try:
 
         content = res.json()["choices"][0]["message"]["content"]
-
         data = json.loads(content)
 
         for p in data["patterns"]:
@@ -358,7 +340,9 @@ with tab_train:
 
     st.markdown("### Dojo Awareness")
 
-    st.markdown(get_current_pattern_memory())
+    pattern_memory = get_current_pattern_memory()
+
+    st.markdown(pattern_memory)
 
     st.divider()
 
@@ -378,13 +362,22 @@ with tab_train:
         if user_count % 7 == 0:
             detect_patterns(USER_ID)
 
+        mentor_prompt = f"""
+You are a calm reflective mentor.
+
+Current detected thinking pattern:
+{pattern_memory}
+
+Guide the user constructively.
+"""
+
         headers = {"Authorization": f"Bearer {st.secrets['GROQ_API_KEY']}"}
 
         res = requests.post(
             "https://api.groq.com/openai/v1/chat/completions",
             json={
                 "model":"llama-3.3-70b-versatile",
-                "messages":[{"role":"system","content":"Respond as a calm reflective mentor."}]
+                "messages":[{"role":"system","content":mentor_prompt}]
                 + st.session_state.msgs[-10:]
             },
             headers=headers
