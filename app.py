@@ -423,4 +423,3 @@ with tab_history:
 
                 st.markdown(row["content"])
 
-
