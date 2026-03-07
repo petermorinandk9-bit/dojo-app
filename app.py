@@ -3,6 +3,7 @@ import requests
 import time
 import json
 import bcrypt
+import random
 from datetime import datetime
 from supabase import create_client, Client
 
@@ -13,7 +14,7 @@ from supabase import create_client, Client
 st.set_page_config(page_title="The-Dojo", layout="wide")
 
 # ==================================================
-# SUPABASE CONNECTION
+# SUPABASE
 # ==================================================
 
 @st.cache_resource
@@ -39,6 +40,9 @@ if "phase" not in st.session_state:
 
 if "history_loaded" not in st.session_state:
     st.session_state.history_loaded = False
+
+if "milestone_message" not in st.session_state:
+    st.session_state.milestone_message = None
 
 # ==================================================
 # PATTERN LIBRARY
@@ -77,7 +81,6 @@ if st.session_state.user is None:
 
     st.markdown("""
     <style>
-    .stApp {background:#ffffff;}
     .login-header{text-align:center;font-style:italic;font-weight:800;font-size:3.5rem;}
     .login-sub{text-align:center;color:#666;margin-bottom:30px;}
     </style>
@@ -104,9 +107,8 @@ if st.session_state.user is None:
                 if res.data:
 
                     user = res.data[0]
-                    stored_hash = user["password"]
 
-                    if bcrypt.checkpw(password.encode(), stored_hash.encode()):
+                    if bcrypt.checkpw(password.encode(), user["password"].encode()):
 
                         st.session_state.user = user
                         st.success("Welcome back.")
@@ -152,20 +154,17 @@ USER_ID = st.session_state.user["id"]
 USER_NAME = st.session_state.user["display_name"]
 
 # ==================================================
-# RANK SYSTEM
+# RANK
 # ==================================================
 
 def compute_rank(count):
 
     if count < 15:
         return "Student"
-
     if count < 40:
         return "Practitioner"
-
     if count < 80:
         return "Sentinel"
-
     return "Sovereign"
 
 # ==================================================
@@ -181,9 +180,7 @@ if not st.session_state.history_loaded:
         .execute()
 
     if r.data:
-
         for row in r.data:
-
             st.session_state.msgs.append({
                 "role": row["role"],
                 "content": row["content"]
@@ -195,7 +192,7 @@ if not st.session_state.history_loaded:
 rank = compute_rank(st.session_state.records_count)
 
 # ==================================================
-# PHASE SYSTEM
+# PHASES
 # ==================================================
 
 PHASE_SETS = {
@@ -204,6 +201,53 @@ PHASE_SETS = {
     "Sentinel":["Welcome","Warm-Up","Training","Cool Down"],
     "Sovereign":["Welcome","Warm-Up","Training","Cool Down"]
 }
+
+# ==================================================
+# DOCTRINE ENGINE
+# ==================================================
+
+def get_doctrine():
+
+    try:
+
+        r = supabase.table("dojo_doctrine") \
+            .select("text") \
+            .execute()
+
+        if r.data:
+            return random.choice(r.data)["text"]
+
+    except:
+        pass
+
+    return ""
+
+# ==================================================
+# MILESTONE ENGINE
+# ==================================================
+
+def check_milestones():
+
+    count = len([m for m in st.session_state.msgs if m["role"]=="user"])
+
+    milestones = {
+        1:"First step onto the mat.",
+        7:"Consistency begins to form.",
+        30:"Discipline is taking root.",
+        60:"Your reflections are deepening."
+    }
+
+    if count in milestones:
+
+        supabase.table("dojo_milestones").insert({
+
+            "user_id":USER_ID,
+            "milestone":milestones[count],
+            "timestamp":datetime.utcnow().isoformat()
+
+        }).execute()
+
+        st.session_state.milestone_message = milestones[count]
 
 # ==================================================
 # PATTERN DETECTION
@@ -269,64 +313,6 @@ Reflections:
         pass
 
 # ==================================================
-# WISDOM ENGINE
-# ==================================================
-
-def detect_wisdom(user_id):
-
-    recent_msgs = supabase.table("records") \
-        .select("content") \
-        .eq("user_id", user_id) \
-        .eq("role","user") \
-        .order("timestamp", desc=True) \
-        .limit(30) \
-        .execute()
-
-    if not recent_msgs.data:
-        return
-
-    reflections = [row["content"] for row in recent_msgs.data]
-
-    prompt = f"""
-Extract one durable insight from these reflections.
-
-Return JSON:
-
-{{"wisdom":"lesson"}}
-
-Reflections:
-{chr(10).join(reflections)}
-"""
-
-    headers = {"Authorization": f"Bearer {st.secrets['GROQ_API_KEY']}"}
-
-    res = requests.post(
-        "https://api.groq.com/openai/v1/chat/completions",
-        json={
-            "model":"llama-3.3-70b-versatile",
-            "messages":[{"role":"system","content":prompt}],
-            "temperature":0.3
-        },
-        headers=headers
-    )
-
-    try:
-
-        content = res.json()["choices"][0]["message"]["content"]
-        data = json.loads(content)
-
-        supabase.table("ledger_wisdom").insert({
-
-            "user_id":user_id,
-            "wisdom":data["wisdom"],
-            "timestamp":datetime.utcnow().isoformat()
-
-        }).execute()
-
-    except:
-        pass
-
-# ==================================================
 # SIDEBAR
 # ==================================================
 
@@ -369,10 +355,14 @@ with st.sidebar:
 
 tab_train, tab_history = st.tabs(["Training","History"])
 
-# TRAINING TAB
 with tab_train:
 
     st.markdown("### Dojo Awareness")
+
+    if st.session_state.milestone_message:
+
+        st.success(st.session_state.milestone_message)
+        st.session_state.milestone_message = None
 
     st.divider()
 
@@ -387,6 +377,8 @@ with tab_train:
 
         st.session_state.msgs.append({"role":"user","content":prompt})
 
+        check_milestones()
+
         supabase.table("records").insert({
             "user_id":USER_ID,
             "role":"user",
@@ -399,8 +391,15 @@ with tab_train:
         if user_count % 7 == 0:
             detect_patterns(USER_ID)
 
-        if user_count % 21 == 0:
-            detect_wisdom(USER_ID)
+        doctrine = get_doctrine()
+
+        mentor_prompt = f"""
+Respond as a calm reflective mentor.
+
+If appropriate weave this teaching naturally:
+
+{doctrine}
+"""
 
         headers = {"Authorization": f"Bearer {st.secrets['GROQ_API_KEY']}"}
 
@@ -408,7 +407,7 @@ with tab_train:
             "https://api.groq.com/openai/v1/chat/completions",
             json={
                 "model":"llama-3.3-70b-versatile",
-                "messages":[{"role":"system","content":"Respond as a calm reflective mentor."}]
+                "messages":[{"role":"system","content":mentor_prompt}]
                 + st.session_state.msgs[-10:]
             },
             headers=headers
@@ -443,6 +442,7 @@ with tab_train:
         st.rerun()
 
 # HISTORY TAB
+
 with tab_history:
 
     st.markdown("### Training History")
@@ -458,8 +458,5 @@ with tab_history:
 
         for row in r.data:
 
-            role = row["role"]
-            content = row["content"]
-
-            with st.chat_message(role):
-                st.markdown(content)
+            with st.chat_message(row["role"]):
+                st.markdown(row["content"])
