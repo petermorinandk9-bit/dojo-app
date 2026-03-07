@@ -259,42 +259,26 @@ def compute_evolution():
     return "Stable"
 
 # ==================================================
-# PATTERN GRAPH & LOOP DETECTION
+# PATTERN TRANSITION TRACKING
 # ==================================================
-def compute_pattern_graph():
-    r = supabase.table("dojo_patterns") \
+def track_pattern_transition(user_id, new_pattern):
+    # Get the most recent previous pattern
+    prev = supabase.table("dojo_patterns") \
         .select("pattern") \
-        .eq("user_id", USER_ID) \
-        .order("timestamp") \
-        .limit(50) \
+        .eq("user_id", user_id) \
+        .order("timestamp", desc=True) \
+        .limit(1) \
         .execute()
     
-    if not r.data or len(r.data) < 2:
-        return {}
-    
-    patterns = [row["pattern"] for row in r.data[::-1]]  # oldest to newest
-    graph = {}
-    
-    for i in range(len(patterns) - 1):
-        from_p = patterns[i]
-        to_p = patterns[i + 1]
-        key = (from_p, to_p)
-        graph[key] = graph.get(key, 0) + 1
-    
-    return graph
-
-def detect_pattern_loop(graph):
-    if not graph:
-        return None
-    
-    # Find the strongest transition (highest count)
-    strongest = max(graph.items(), key=lambda x: x[1])
-    (from_p, to_p), count = strongest
-    
-    if count >= 3:
-        return (from_p, to_p, count)
-    
-    return None
+    if prev.data:
+        prev_pattern = prev.data[0]["pattern"]
+        if prev_pattern != new_pattern:
+            supabase.table("dojo_pattern_transitions").insert({
+                "user_id": user_id,
+                "from_pattern": prev_pattern,
+                "to_pattern": new_pattern,
+                "timestamp": datetime.now(UTC).isoformat()
+            }).execute()
 
 # ==================================================
 # PATTERN DETECTION
@@ -333,12 +317,16 @@ Return JSON only
             return
         data = json.loads(content[start:end])
         for p in data["patterns"]:
+            pattern_name = p["pattern"]
+            confidence = p["confidence"]
             supabase.table("dojo_patterns").insert({
                 "user_id":user_id,
-                "pattern":p["pattern"],
-                "confidence_score":p["confidence"],
+                "pattern":pattern_name,
+                "confidence_score":confidence,
                 "timestamp":datetime.now(UTC).isoformat()
             }).execute()
+            # Track transition after each successful insert
+            track_pattern_transition(user_id, pattern_name)
     except:
         pass
 
@@ -461,37 +449,22 @@ with tab_train:
         user_count=len([m for m in st.session_state.msgs if m["role"]=="user"])
         if user_count%7==0:
             detect_patterns(USER_ID)
-        
-        # ===============================
-        # PRIORITIZED PATTERN LOGIC
-        # ===============================
-        graph = compute_pattern_graph()
-        loop = detect_pattern_loop(graph)
-        loop_message = ""
-        mirror = ""
-        
-        if loop:
-            from_p, to_p, count = loop
-            loop_message = f"I notice that {from_p.replace('_',' ')} often leads into {to_p.replace('_',' ')} for you (seen {count} times).\n\n"
-        else:
-            # Only check for single patterns if no loop is currently dominating
-            recent_pattern = None
-            try:
-                rp = supabase.table("dojo_patterns") \
-                    .select("pattern") \
-                    .eq("user_id",USER_ID) \
-                    .order("timestamp",desc=True) \
-                    .limit(1) \
-                    .execute()
-                if rp.data:
-                    recent_pattern = rp.data[0]["pattern"]
-            except:
-                pass
-            
-            if recent_pattern and random.random() < 0.3:
-                mirror = f"I notice a pattern of {recent_pattern.replace('_',' ')} appearing in your reflections.\n\n"
-        
         doctrine=get_doctrine()
+        recent_pattern = None
+        try:
+            rp = supabase.table("dojo_patterns") \
+                .select("pattern") \
+                .eq("user_id",USER_ID) \
+                .order("timestamp",desc=True) \
+                .limit(1) \
+                .execute()
+            if rp.data:
+                recent_pattern = rp.data[0]["pattern"]
+        except:
+            pass
+        mirror = ""
+        if recent_pattern and random.random() < 0.3:
+            mirror = f"I notice a pattern of {recent_pattern.replace('_',' ')} appearing in your reflections.\n\n"
         tone_instruction = ""
         momentum = compute_momentum()
         if momentum < -0.3:
@@ -506,7 +479,7 @@ with tab_train:
         mentor_prompt=f"""
 Respond as a calm reflective mentor.
 
-{tone_instruction}{loop_message}{mirror}If appropriate weave this teaching naturally:
+{tone_instruction}{mirror}If appropriate weave this teaching naturally:
 
 {doctrine}
 """
