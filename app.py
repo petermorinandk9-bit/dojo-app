@@ -1,3 +1,4 @@
+```python
 import streamlit as st
 import requests
 import time
@@ -16,7 +17,27 @@ from supabase import create_client, Client
 st.set_page_config(page_title="The-Dojo", layout="wide")
 
 # ==================================================
-# SUPABASE CONNECTION
+# IMPORTANT NOTICE
+# ==================================================
+
+IMPORTANT_NOTICE = """
+### Important Notice
+
+The Dojo is a reflection and personal development tool designed to support mindfulness, discipline, and self-awareness.
+
+It is **not a medical or mental health service**, and the guidance provided by the system should not be considered professional advice, diagnosis, or treatment.
+
+If you are experiencing severe emotional distress or thoughts of self-harm, please seek support from a qualified professional or contact your local crisis service.
+
+**United States:** Call or text **988** (Suicide & Crisis Lifeline)
+
+If you are outside the U.S., please contact your country's local crisis hotline or emergency services.
+
+By continuing to use The Dojo, you acknowledge that you understand these limitations and accept responsibility for how you use the system.
+"""
+
+# ==================================================
+# SUPABASE
 # ==================================================
 
 @st.cache_resource
@@ -102,8 +123,11 @@ if st.session_state.user is None:
     st.markdown('<p class="login-header">The-Dojo</p>', unsafe_allow_html=True)
     st.markdown('<p class="login-sub">Forge your discipline. Step onto the mat.</p>', unsafe_allow_html=True)
 
+    st.info(IMPORTANT_NOTICE)
+
     login_tab, register_tab = st.tabs(["Enter Dojo","Create Account"])
 
+    # LOGIN
     with login_tab:
 
         with st.form("login_form"):
@@ -134,6 +158,7 @@ if st.session_state.user is None:
                 else:
                     st.error("User not found")
 
+    # REGISTER
     with register_tab:
 
         with st.form("register_form"):
@@ -143,9 +168,19 @@ if st.session_state.user is None:
             new_pass = st.text_input("Password", type="password")
             invite_code = st.text_input("Dojo Entry Code", type="password")
 
+            st.markdown("### Acknowledgement Required")
+
+            agree = st.checkbox(
+                "I understand that The Dojo is not a medical or mental health service and I accept responsibility for how I use the system."
+            )
+
             register_btn = st.form_submit_button("Create Account")
 
             if register_btn:
+
+                if not agree:
+                    st.error("You must acknowledge the notice before creating an account.")
+                    st.stop()
 
                 if invite_code != st.secrets["DOJO_ENTRY_CODE"]:
                     st.error("Invalid dojo entry code.")
@@ -362,12 +397,11 @@ with st.sidebar:
 
     st.divider()
 
-    # Momentum Gauge
     momentum = compute_momentum()
+
     st.markdown("**Momentum**")
     st.progress((momentum+1)/2)
 
-    # Load patterns
     r = supabase.table("dojo_patterns") \
         .select("pattern,timestamp") \
         .eq("user_id",USER_ID) \
@@ -401,8 +435,8 @@ with st.sidebar:
 
         st.pyplot(fig)
 
-        # Timeline
         st.markdown("**Pattern Timeline**")
+
         timeline=df["pattern"].value_counts()
 
         st.bar_chart(timeline)
@@ -446,6 +480,7 @@ with tab_train:
     st.markdown("### Dojo Awareness")
 
     if st.session_state.milestone_message:
+
         st.success(st.session_state.milestone_message)
         st.session_state.milestone_message=None
 
@@ -543,3 +578,4 @@ with tab_history:
 
             with st.chat_message(row["role"]):
                 st.markdown(row["content"])
+```
