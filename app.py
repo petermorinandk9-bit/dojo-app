@@ -576,6 +576,6 @@ with tab_history:
         for row in r.data:
 
             with st.chat_message(row["role"]):
-                st.markdown(row["content"])
-```
+                st.markdown(row["content"]) 
+
 
