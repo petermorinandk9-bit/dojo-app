@@ -259,6 +259,44 @@ def compute_evolution():
     return "Stable"
 
 # ==================================================
+# PATTERN GRAPH & LOOP DETECTION
+# ==================================================
+def compute_pattern_graph():
+    r = supabase.table("dojo_patterns") \
+        .select("pattern") \
+        .eq("user_id", USER_ID) \
+        .order("timestamp") \
+        .limit(50) \
+        .execute()
+    
+    if not r.data or len(r.data) < 2:
+        return {}
+    
+    patterns = [row["pattern"] for row in r.data[::-1]]  # oldest to newest
+    graph = {}
+    
+    for i in range(len(patterns) - 1):
+        from_p = patterns[i]
+        to_p = patterns[i + 1]
+        key = (from_p, to_p)
+        graph[key] = graph.get(key, 0) + 1
+    
+    return graph
+
+def detect_pattern_loop(graph):
+    if not graph:
+        return None
+    
+    # Find the strongest transition (highest count)
+    strongest = max(graph.items(), key=lambda x: x[1])
+    (from_p, to_p), count = strongest
+    
+    if count >= 3:
+        return (from_p, to_p, count)
+    
+    return None
+
+# ==================================================
 # PATTERN DETECTION
 # ==================================================
 def detect_patterns(user_id):
@@ -423,6 +461,15 @@ with tab_train:
         user_count=len([m for m in st.session_state.msgs if m["role"]=="user"])
         if user_count%7==0:
             detect_patterns(USER_ID)
+        
+        # Pattern Graph & Loop integration
+        graph = compute_pattern_graph()
+        loop = detect_pattern_loop(graph)
+        loop_message = ""
+        if loop:
+            from_p, to_p, count = loop
+            loop_message = f"I notice that {from_p.replace('_',' ')} often leads into {to_p.replace('_',' ')} for you (seen {count} times).\n\n"
+        
         doctrine=get_doctrine()
         recent_pattern = None
         try:
@@ -453,7 +500,7 @@ with tab_train:
         mentor_prompt=f"""
 Respond as a calm reflective mentor.
 
-{tone_instruction}{mirror}If appropriate weave this teaching naturally:
+{tone_instruction}{mirror}{loop_message}If appropriate weave this teaching naturally:
 
 {doctrine}
 """
