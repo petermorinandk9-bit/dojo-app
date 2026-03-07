@@ -1,4 +1,3 @@
-```python
 import streamlit as st
 import requests
 import time
@@ -423,4 +422,5 @@ with tab_history:
             with st.chat_message(row["role"]):
 
                 st.markdown(row["content"])
-```
+
+
