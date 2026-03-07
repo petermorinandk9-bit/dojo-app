@@ -212,27 +212,40 @@ PHASE_SETS = {
 }
 
 # ==================================================
-# PATTERN DETECTION
+# PATTERN DETECTION ENGINE
 # ==================================================
 def detect_patterns(user_id):
 
-    recent_msgs = supabase.table("records") \
-        .select("content") \
-        .eq("user_id", user_id) \
-        .eq("role","user") \
-        .order("timestamp", desc=True) \
-        .limit(50) \
-        .execute()
+    try:
 
-    if not recent_msgs.data or len(recent_msgs.data) < 10:
-        return
+        recent_msgs = supabase.table("records") \
+            .select("content") \
+            .eq("user_id", user_id) \
+            .eq("role","user") \
+            .order("timestamp", desc=True) \
+            .limit(50) \
+            .execute()
 
-    reflections = [row["content"] for row in recent_msgs.data]
+        if not recent_msgs.data or len(recent_msgs.data) < 10:
+            return
 
-    pattern_prompt = f"""
-Analyze reflections for recurring thinking patterns.
+        reflections = [row["content"] for row in recent_msgs.data]
 
-Return JSON only:
+        pattern_prompt = f"""
+You are a behavioral pattern detection engine.
+
+Analyze the reflections below and detect recurring thinking patterns.
+
+Examples include:
+- overthinking
+- self doubt
+- avoidance
+- clarity
+- momentum
+- frustration
+- discipline growth
+
+Return JSON only.
 
 {{
 "patterns":[
@@ -244,22 +257,21 @@ Reflections:
 {chr(10).join(reflections)}
 """
 
-    headers = {"Authorization": f"Bearer {st.secrets['GROQ_API_KEY']}"}
+        headers = {"Authorization": f"Bearer {st.secrets['GROQ_API_KEY']}"}
 
-    res = requests.post(
-        "https://api.groq.com/openai/v1/chat/completions",
-        json={
-            "model":"llama-3.3-70b-versatile",
-            "messages":[{"role":"system","content":pattern_prompt}],
-            "temperature":0.2,
-            "max_tokens":200
-        },
-        headers=headers
-    )
-
-    try:
+        res = requests.post(
+            "https://api.groq.com/openai/v1/chat/completions",
+            json={
+                "model":"llama-3.3-70b-versatile",
+                "messages":[{"role":"system","content":pattern_prompt}],
+                "temperature":0.2,
+                "max_tokens":200
+            },
+            headers=headers
+        )
 
         content = res.json()["choices"][0]["message"]["content"]
+
         data = json.loads(content)
 
         for p in data["patterns"]:
