@@ -106,34 +106,43 @@ if st.session_state.user is None:
                     user = r.data[0]
                     stored_hash = user.get("password")
 
-                    # Bulletproof hash normalization
                     if stored_hash is None:
-                        st.error("No password hash found for this user")
+                        st.error("No password set for this account. Please contact support.")
                         st.stop()
 
-                    # Convert to bytes safely
+                    # Normalize to bytes safely
                     if isinstance(stored_hash, str):
+                        # Clean any weird characters that might have crept in
+                        cleaned = ''.join(c for c in stored_hash if c.isprintable())
                         try:
-                            stored_hash = stored_hash.encode('utf-8')
-                        except Exception as e:
-                            st.error(f"Stored password hash is corrupted (cannot encode): {str(e)}")
+                            stored_hash_bytes = cleaned.encode('utf-8')
+                        except Exception:
+                            st.error("Stored password hash is corrupted (encoding issue). Please reset your password.")
                             st.stop()
-                    elif not isinstance(stored_hash, bytes):
-                        st.error("Unexpected password hash type in database")
+                    elif isinstance(stored_hash, bytes):
+                        stored_hash_bytes = stored_hash
+                    else:
+                        st.error("Unexpected password hash type in database. Please contact support.")
+                        st.stop()
+
+                    # Quick bcrypt format check
+                    if not stored_hash_bytes.startswith(b'$2') or len(stored_hash_bytes) < 59:
+                        st.error("Stored password is not a valid bcrypt hash. Please reset your password or contact support.")
                         st.stop()
 
                     try:
-                        if bcrypt.checkpw(password.encode('utf-8'), stored_hash):
+                        if bcrypt.checkpw(password.encode('utf-8'), stored_hash_bytes):
                             st.session_state.user = user
                             st.rerun()
                         else:
-                            st.error("Wrong password")
+                            st.error("Incorrect password")
                     except ValueError as ve:
-                        st.error(f"Password verification error: {str(ve)}")
-                        st.stop()
+                        if "Invalid salt" in str(ve):
+                            st.error("Password hash is corrupted or invalid (invalid salt). Please reset your password.")
+                        else:
+                            st.error(f"Password verification failed: {str(ve)}")
                     except Exception as e:
-                        st.error(f"Unexpected error during login: {str(e)}")
-                        st.stop()
+                        st.error(f"Unexpected login error: {str(e)}")
                 else:
                     st.error("User not found")
     with register_tab:
@@ -150,13 +159,14 @@ if st.session_state.user is None:
                 if invite != st.secrets["DOJO_ENTRY_CODE"]:
                     st.error("Invalid code")
                     st.stop()
-                hashed = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+                hashed_bytes = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
+                hashed_str = hashed_bytes.decode('utf-8')
                 supabase.table("users").insert({
                     "username": username,
                     "display_name": display,
-                    "password": hashed
+                    "password": hashed_str
                 }).execute()
-                st.success("Account created")
+                st.success("Account created — please log in")
     st.stop()
 
 USER_ID = st.session_state.user["id"]
