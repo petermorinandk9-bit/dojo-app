@@ -4,6 +4,8 @@ import time
 import json
 import bcrypt
 import random
+import pandas as pd
+import matplotlib.pyplot as plt
 from datetime import datetime
 from supabase import create_client, Client
 
@@ -14,7 +16,7 @@ from supabase import create_client, Client
 st.set_page_config(page_title="The-Dojo", layout="wide")
 
 # ==================================================
-# SUPABASE
+# SUPABASE CONNECTION
 # ==================================================
 
 @st.cache_resource
@@ -72,6 +74,17 @@ POSITIVE_PATTERNS = [
     "discipline",
     "creative_flow"
 ]
+
+PATTERN_COORDS = {
+    "overthinking":(-0.4,0.6),
+    "avoidance":(-0.8,-0.4),
+    "self_doubt":(-0.3,0.4),
+    "clarity":(0.6,0.6),
+    "momentum":(0.8,0.2),
+    "discipline":(0.5,0.2),
+    "frustration":(-0.4,0.2),
+    "creative_flow":(0.9,0.7)
+}
 
 # ==================================================
 # AUTH SYSTEM
@@ -192,7 +205,7 @@ if not st.session_state.history_loaded:
 rank = compute_rank(st.session_state.records_count)
 
 # ==================================================
-# PHASES
+# PHASE SYSTEM
 # ==================================================
 
 PHASE_SETS = {
@@ -203,51 +216,32 @@ PHASE_SETS = {
 }
 
 # ==================================================
-# DOCTRINE ENGINE
+# MOMENTUM
 # ==================================================
 
-def get_doctrine():
+def compute_momentum():
 
-    try:
+    r = supabase.table("dojo_patterns") \
+        .select("pattern") \
+        .eq("user_id", USER_ID) \
+        .order("timestamp", desc=True) \
+        .limit(10) \
+        .execute()
 
-        r = supabase.table("dojo_doctrine") \
-            .select("text") \
-            .execute()
+    if not r.data:
+        return 0
 
-        if r.data:
-            return random.choice(r.data)["text"]
+    score = 0
 
-    except:
-        pass
+    for p in r.data:
 
-    return ""
+        if p["pattern"] in POSITIVE_PATTERNS:
+            score += 1
 
-# ==================================================
-# MILESTONE ENGINE
-# ==================================================
+        if p["pattern"] in NEGATIVE_PATTERNS:
+            score -= 1
 
-def check_milestones():
-
-    count = len([m for m in st.session_state.msgs if m["role"]=="user"])
-
-    milestones = {
-        1:"First step onto the mat.",
-        7:"Consistency begins to form.",
-        30:"Discipline is taking root.",
-        60:"Your reflections are deepening."
-    }
-
-    if count in milestones:
-
-        supabase.table("dojo_milestones").insert({
-
-            "user_id":USER_ID,
-            "milestone":milestones[count],
-            "timestamp":datetime.utcnow().isoformat()
-
-        }).execute()
-
-        st.session_state.milestone_message = milestones[count]
+    return score/10
 
 # ==================================================
 # PATTERN DETECTION
@@ -313,13 +307,105 @@ Reflections:
         pass
 
 # ==================================================
-# SIDEBAR
+# DOCTRINE
+# ==================================================
+
+def get_doctrine():
+
+    try:
+
+        r = supabase.table("dojo_doctrine").select("text").execute()
+
+        if r.data:
+            return random.choice(r.data)["text"]
+
+    except:
+        pass
+
+    return ""
+
+# ==================================================
+# MILESTONES
+# ==================================================
+
+def check_milestones():
+
+    count = len([m for m in st.session_state.msgs if m["role"]=="user"])
+
+    milestones = {
+        1:"First step onto the mat.",
+        7:"Consistency begins to form.",
+        30:"Discipline is taking root.",
+        60:"Your reflections are deepening."
+    }
+
+    if count in milestones:
+
+        supabase.table("dojo_milestones").insert({
+
+            "user_id":USER_ID,
+            "milestone":milestones[count],
+            "timestamp":datetime.utcnow().isoformat()
+
+        }).execute()
+
+        st.session_state.milestone_message = milestones[count]
+
+# ==================================================
+# SIDEBAR DASHBOARD
 # ==================================================
 
 with st.sidebar:
 
     st.markdown("### The-Dojo")
     st.markdown(f"**{rank} · {USER_NAME}**")
+
+    st.divider()
+
+    # Momentum Gauge
+    momentum = compute_momentum()
+    st.markdown("**Momentum**")
+    st.progress((momentum+1)/2)
+
+    # Load patterns
+    r = supabase.table("dojo_patterns") \
+        .select("pattern,timestamp") \
+        .eq("user_id",USER_ID) \
+        .order("timestamp",desc=True) \
+        .limit(50) \
+        .execute()
+
+    if r.data:
+
+        df = pd.DataFrame(r.data)
+
+        xs=[]
+        ys=[]
+
+        for p in df["pattern"]:
+
+            coord = PATTERN_COORDS.get(p,(0,0))
+            xs.append(coord[0])
+            ys.append(coord[1])
+
+        fig, ax = plt.subplots()
+
+        ax.scatter(xs,ys)
+
+        ax.axhline(0)
+        ax.axvline(0)
+
+        ax.set_title("Mental State Map")
+        ax.set_xlim(-1,1)
+        ax.set_ylim(-1,1)
+
+        st.pyplot(fig)
+
+        # Timeline
+        st.markdown("**Pattern Timeline**")
+        timeline=df["pattern"].value_counts()
+
+        st.bar_chart(timeline)
 
     st.divider()
 
@@ -360,9 +446,8 @@ with tab_train:
     st.markdown("### Dojo Awareness")
 
     if st.session_state.milestone_message:
-
         st.success(st.session_state.milestone_message)
-        st.session_state.milestone_message = None
+        st.session_state.milestone_message=None
 
     st.divider()
 
@@ -393,7 +478,7 @@ with tab_train:
 
         doctrine = get_doctrine()
 
-        mentor_prompt = f"""
+        mentor_prompt=f"""
 Respond as a calm reflective mentor.
 
 If appropriate weave this teaching naturally:
@@ -401,9 +486,9 @@ If appropriate weave this teaching naturally:
 {doctrine}
 """
 
-        headers = {"Authorization": f"Bearer {st.secrets['GROQ_API_KEY']}"}
+        headers={"Authorization":f"Bearer {st.secrets['GROQ_API_KEY']}"}
 
-        res = requests.post(
+        res=requests.post(
             "https://api.groq.com/openai/v1/chat/completions",
             json={
                 "model":"llama-3.3-70b-versatile",
@@ -413,11 +498,11 @@ If appropriate weave this teaching naturally:
             headers=headers
         )
 
-        reply = res.json()["choices"][0]["message"]["content"]
+        reply=res.json()["choices"][0]["message"]["content"]
 
         with st.chat_message("assistant"):
 
-            placeholder = st.empty()
+            placeholder=st.empty()
             placeholder.markdown("Thinking...")
 
             time.sleep(2)
@@ -426,7 +511,7 @@ If appropriate weave this teaching naturally:
 
             for s in reply.split(". "):
 
-                text += s + ". "
+                text+=s+". "
                 placeholder.markdown(text)
                 time.sleep(.4)
 
@@ -441,16 +526,14 @@ If appropriate weave this teaching naturally:
 
         st.rerun()
 
-# HISTORY TAB
-
 with tab_history:
 
     st.markdown("### Training History")
 
-    r = supabase.table("records") \
+    r=supabase.table("records") \
         .select("*") \
-        .eq("user_id", USER_ID) \
-        .order("timestamp", desc=True) \
+        .eq("user_id",USER_ID) \
+        .order("timestamp",desc=True) \
         .limit(50) \
         .execute()
 
