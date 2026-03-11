@@ -115,7 +115,6 @@ if st.session_state.user is None:
                         st.error("Incorrect password")
                 else:
                     st.error("User not found")
-
     with register_tab:
         with st.form("register"):
             username = st.text_input("Username")
@@ -130,19 +129,15 @@ if st.session_state.user is None:
                 if invite != st.secrets["DOJO_ENTRY_CODE"]:
                     st.error("Invalid code")
                     st.stop()
-
                 hashed_bytes = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
                 hashed_str = hashed_bytes.decode('utf-8')
-
                 supabase.table("users").insert({
                     "username": username,
                     "display_name": display,
                     "password": hashed_str,
                     "subscription_status":"free"
                 }).execute()
-
                 st.success("Account created — please log in")
-
     st.stop()
 
 USER_ID = st.session_state.user["id"]
@@ -157,14 +152,12 @@ if not st.session_state.history_loaded:
         .eq("user_id",USER_ID) \
         .order("timestamp") \
         .execute()
-
     if r.data:
         for row in r.data:
             st.session_state.msgs.append({
                 "role":row["role"],
                 "content":row["content"]
             })
-
     st.session_state.records_count = r.count if r.count else 0
     st.session_state.history_loaded = True
 
@@ -224,14 +217,12 @@ def compute_evolution():
         .execute()
     if not r.data:
         return "Unknown"
-
     score=0
     for p in r.data:
         if p["pattern"] in POSITIVE_PATTERNS:
             score+=1
         if p["pattern"] in NEGATIVE_PATTERNS:
             score-=1
-
     if score>3:
         return "Rising"
     if score<-3:
@@ -242,7 +233,6 @@ def compute_evolution():
 # PATTERN DETECTION
 # ==================================================
 def detect_patterns(user_id):
-
     recent = supabase.table("records") \
         .select("content") \
         .eq("user_id",user_id) \
@@ -250,30 +240,21 @@ def detect_patterns(user_id):
         .order("timestamp",desc=True) \
         .limit(50) \
         .execute()
-
     if not recent.data or len(recent.data)<10:
         return
-
     reflections=[row["content"] for row in recent.data]
     reflection_text="\n".join(reflections)
-
     prompt=f"""
 You are analyzing reflection entries from a practitioner.
-
 Recent reflections:
 {reflection_text}
-
 Choose the SINGLE most relevant behavioral pattern from this list:
 {PATTERN_LIBRARY}
-
 Focus on behavioral patterns rather than temporary emotions.
-
 Return JSON only in this format:
 {{"patterns":[{{"pattern":"name","confidence":0.0}}]}}
 """
-
     headers={"Authorization":f"Bearer {st.secrets['GROQ_API_KEY']}"}
-
     res=requests.post(
         "https://api.groq.com/openai/v1/chat/completions",
         json={
@@ -282,13 +263,11 @@ Return JSON only in this format:
         },
         headers=headers
     )
-
     try:
         content=res.json()["choices"][0]["message"]["content"]
         start=content.find("{")
         end=content.rfind("}")+1
         data=json.loads(content[start:end])
-
         for p in data["patterns"]:
             supabase.table("dojo_patterns").insert({
                 "user_id":user_id,
@@ -303,42 +282,31 @@ Return JSON only in this format:
 # SIDEBAR
 # ==================================================
 with st.sidebar:
-
     st.markdown("### The-Dojo")
     st.markdown(f"**{rank} · {USER_NAME}**")
-
     subscription = st.session_state.user.get("subscription_status","free")
-
     if subscription not in ["paid","beta","admin"]:
         remaining=max(0,15-st.session_state.records_count)
         st.caption(f"Free reflections remaining: {remaining}")
-
     st.divider()
-
     momentum=compute_momentum()
     evolution=compute_evolution()
-
     st.markdown(f"Momentum: **{momentum:+.2f}**")
     st.markdown(f"Evolution: **{evolution}**")
     st.progress((momentum+1)/2)
-
     st.divider()
-
     for i,phase in enumerate(PHASE_SETS[rank]):
         if i==st.session_state.phase:
             st.markdown(f"**🟢 {phase}**")
         else:
             st.markdown(phase)
-
     st.divider()
-
     if st.button("Bow Out"):
         st.session_state.phase=0
         st.session_state.msgs=[]
         st.success("You bow out from the mat.")
         time.sleep(1)
         st.rerun()
-
     if st.button("Log Out"):
         for key in list(st.session_state.keys()):
             del st.session_state[key]
@@ -348,56 +316,39 @@ with st.sidebar:
 # CHAT
 # ==================================================
 tab_train,tab_history=st.tabs(["Training","History"])
-
 with tab_train:
-
     st.markdown("### Dojo Awareness")
-
     if st.session_state.milestone_message:
         st.success(st.session_state.milestone_message)
         st.session_state.milestone_message=None
-
     st.divider()
-
     for msg in st.session_state.msgs[-10:]:
         with st.chat_message(msg["role"]):
             st.markdown(msg["content"])
-
     prompt=st.chat_input("Speak from center...")
-
     if prompt:
-
         subscription = st.session_state.user.get("subscription_status","free")
-
         if subscription not in ["paid","beta","admin"]:
-
             r=supabase.table("records") \
                 .select("id",count="exact") \
                 .eq("user_id",USER_ID) \
                 .eq("role","user") \
                 .execute()
-
             user_count=r.count if r.count else 0
-
             if user_count>=15:
                 st.warning("You have reached the free training limit of 15 reflections.")
                 st.info("Join the Dojo to continue your practice.")
                 st.stop()
-
         st.session_state.msgs.append({"role":"user","content":prompt})
-
         supabase.table("records").insert({
             "user_id":USER_ID,
             "role":"user",
             "content":prompt,
             "timestamp":datetime.now(UTC).isoformat()
         }).execute()
-
         if len([m for m in st.session_state.msgs if m["role"]=="user"])%7==0:
             detect_patterns(USER_ID)
-
         doctrine="Discipline begins with attention."
-
         # ================================
         # PATTERN PERSISTENCE DETECTION
         # ================================
@@ -409,34 +360,24 @@ with tab_train:
                 .order("timestamp",desc=True) \
                 .limit(3) \
                 .execute()
-
             if r.data and len(r.data)==3:
                 if r.data[0]["pattern"]==r.data[1]["pattern"]==r.data[2]["pattern"]:
                     persistent_pattern=r.data[0]["pattern"]
         except:
             pass
-
         mirror=""
         if persistent_pattern and random.random()<0.4:
             mirror=f"I notice **{persistent_pattern.replace('_',' ')}** appearing repeatedly in your reflections.\n\n"
-
         mentor_prompt=f"""
 You are a calm and disciplined mentor guiding a practitioner.
-
 Your role is to help them observe patterns in their thinking and behavior.
-
 Avoid giving direct advice. Guide through reflection, clarity, and discipline.
-
 {mirror}
-
 If appropriate weave this teaching naturally:
-
 {doctrine}
 """
-
-        headers={"Authorization":f"Bearer {st.secrets['GROQ_API_KEY']}"}
-
         try:
+            headers={"Authorization":f"Bearer {st.secrets['GROQ_API_KEY']}"}
             res=requests.post(
                 "https://api.groq.com/openai/v1/chat/completions",
                 json={
@@ -446,45 +387,34 @@ If appropriate weave this teaching naturally:
                 },
                 headers=headers
             )
-
             reply=res.json()["choices"][0]["message"]["content"]
-
-        except:
+        except Exception:
             reply="The mentor pauses for a moment. Please try again."
-
         with st.chat_message("assistant"):
             placeholder=st.empty()
             placeholder.markdown("The mentor reflects...")
             time.sleep(2)
-
             text=""
             for s in reply.split(". "):
                 text+=s+". "
                 placeholder.markdown(text)
                 time.sleep(.4)
-
         st.session_state.msgs.append({"role":"assistant","content":reply})
-
         supabase.table("records").insert({
             "user_id":USER_ID,
             "role":"assistant",
             "content":reply,
             "timestamp":datetime.now(UTC).isoformat()
         }).execute()
-
         st.rerun()
-
 with tab_history:
-
     st.markdown("### Training History")
-
     r=supabase.table("records") \
         .select("*") \
         .eq("user_id",USER_ID) \
         .order("timestamp",desc=True) \
         .limit(50) \
         .execute()
-
     if r.data:
         for row in r.data:
             with st.chat_message(row["role"]):
