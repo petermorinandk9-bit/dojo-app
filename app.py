@@ -111,11 +111,24 @@ if st.session_state.user is None:
                     user = r.data[0]
                     stored_hash = user.get("password")
 
-                    if bcrypt.checkpw(password.encode('utf-8'), stored_hash.encode('utf-8')):
-                        st.session_state.user = user
-                        st.rerun()
+                    if stored_hash is None:
+                        st.error("No password set for this account. Please contact support.")
+                        st.stop()
+
+                    if isinstance(stored_hash, str):
+                        cleaned = ''.join(c for c in stored_hash if c.isprintable())
+                        stored_hash_bytes = cleaned.encode('utf-8')
                     else:
-                        st.error("Incorrect password")
+                        stored_hash_bytes = stored_hash
+
+                    try:
+                        if bcrypt.checkpw(password.encode('utf-8'), stored_hash_bytes):
+                            st.session_state.user = user
+                            st.rerun()
+                        else:
+                            st.error("Incorrect password")
+                    except Exception as e:
+                        st.error(f"Unexpected login error: {str(e)}")
 
                 else:
                     st.error("User not found")
@@ -158,7 +171,6 @@ USER_NAME = st.session_state.user["display_name"]
 # LOAD HISTORY
 # ==================================================
 if not st.session_state.history_loaded:
-
     r = supabase.table("records") \
         .select("*",count="exact") \
         .eq("user_id",USER_ID) \
@@ -213,24 +225,21 @@ with tab_train:
     if not st.session_state.msgs:
         st.info("Welcome to the Dojo. Speak from center and begin your reflection.")
 
+    for msg in st.session_state.msgs[-10:]:
+        with st.chat_message(msg["role"]):
+            st.markdown(msg["content"])
+
     prompt = st.chat_input("Speak from center...")
 
     if prompt:
 
-        # ==========================================
-        # RATE LIMIT (protect API credits)
-        # ==========================================
+        # reflection cooldown
         now = time.time()
-
         if now - st.session_state.last_reflection_time < 5:
             st.warning("Take a breath before the next reflection.")
             st.stop()
-
         st.session_state.last_reflection_time = now
 
-        # ==========================================
-        # PAYWALL CHECK
-        # ==========================================
         subscription = st.session_state.user.get("subscription_status", "free")
 
         if subscription == "free":
@@ -238,7 +247,7 @@ with tab_train:
             r = supabase.table("records") \
                 .select("id", count="exact") \
                 .eq("user_id", USER_ID) \
-                .eq("role","user") \
+                .eq("role", "user") \
                 .execute()
 
             user_count = r.count if r.count else 0
@@ -248,35 +257,28 @@ with tab_train:
                 st.info("Join the Dojo to continue your practice.")
                 st.stop()
 
-        # ==========================================
-        # STORE USER MESSAGE
-        # ==========================================
         st.session_state.msgs.append({"role":"user","content":prompt})
 
         supabase.table("records").insert({
-        "user_id":USER_ID,
-        "role":"user",
-        "content":prompt,
-        "timestamp":datetime.now(UTC).isoformat()
+            "user_id":USER_ID,
+            "role":"user",
+            "content":prompt,
+            "timestamp":datetime.now(UTC).isoformat()
         }).execute()
 
-        # ==========================================
-        # CALL GROQ
-        # ==========================================
         mentor_prompt="Respond as a calm reflective mentor."
 
         try:
-
             headers={"Authorization":f"Bearer {st.secrets['GROQ_API_KEY']}"}
 
             res=requests.post(
-            "https://api.groq.com/openai/v1/chat/completions",
-            json={
-            "model":"llama-3.3-70b-versatile",
-            "messages":[{"role":"system","content":mentor_prompt}]
-            + st.session_state.msgs[-10:]
-            },
-            headers=headers
+                "https://api.groq.com/openai/v1/chat/completions",
+                json={
+                    "model":"llama-3.3-70b-versatile",
+                    "messages":[{"role":"system","content":mentor_prompt}]
+                    + st.session_state.msgs[-10:]
+                },
+                headers=headers
             )
 
             reply=res.json()["choices"][0]["message"]["content"]
@@ -292,7 +294,6 @@ with tab_train:
             time.sleep(2)
 
             text=""
-
             for s in reply.split(". "):
                 text+=s+". "
                 placeholder.markdown(text)
@@ -301,10 +302,10 @@ with tab_train:
         st.session_state.msgs.append({"role":"assistant","content":reply})
 
         supabase.table("records").insert({
-        "user_id":USER_ID,
-        "role":"assistant",
-        "content":reply,
-        "timestamp":datetime.now(UTC).isoformat()
+            "user_id":USER_ID,
+            "role":"assistant",
+            "content":reply,
+            "timestamp":datetime.now(UTC).isoformat()
         }).execute()
 
         st.rerun()
