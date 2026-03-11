@@ -297,10 +297,10 @@ with st.sidebar:
         else:
             st.markdown(phase)
     st.divider()
-    if st.button("Bow Out"):
+    if st.button("Clear Session (Bow Out)", help="Clears current chat but keeps your full history in Training tab"):
         st.session_state.phase=0
         st.session_state.msgs=[]
-        st.success("You bow out from the mat.")
+        st.success("Session cleared. You bow out from the mat.")
         time.sleep(1)
         st.rerun()
     if st.button("Log Out"):
@@ -346,25 +346,41 @@ with tab_train:
             detect_patterns(USER_ID)
         doctrine="Discipline begins with attention."
         # ================================
-        # PATTERN PERSISTENCE DETECTION
+        # CRISIS DETECTION
         # ================================
-        persistent_pattern=None
-        try:
-            r=supabase.table("dojo_patterns") \
-                .select("pattern") \
-                .eq("user_id",USER_ID) \
-                .order("timestamp",desc=True) \
-                .limit(3) \
-                .execute()
-            if r.data and len(r.data)==3:
-                if r.data[0]["pattern"]==r.data[1]["pattern"]==r.data[2]["pattern"]:
-                    persistent_pattern=r.data[0]["pattern"]
-        except:
-            pass
-        mirror=""
-        if persistent_pattern and random.random()<0.4:
-            mirror=f"I notice **{persistent_pattern.replace('_',' ')}** appearing repeatedly in your reflections.\n\n"
-        mentor_prompt=f"""
+        crisis_keywords = ["suicide", "kill myself", "want to die", "hopeless", "end it", "hurt myself", "self harm"]
+        if any(word in prompt.lower() for word in crisis_keywords):
+            reply = """
+I'm stopping here.
+
+What you're describing is serious and needs real support right now.
+
+Call or text **988** (US Suicide & Crisis Lifeline, 24/7)
+Or text HOME to **741741** (Crisis Text Line)
+
+The mat will still be here when you're ready. Please reach out to someone.
+"""
+        else:
+            # ================================
+            # PATTERN PERSISTENCE DETECTION
+            # ================================
+            persistent_pattern=None
+            try:
+                r=supabase.table("dojo_patterns") \
+                    .select("pattern") \
+                    .eq("user_id",USER_ID) \
+                    .order("timestamp",desc=True) \
+                    .limit(3) \
+                    .execute()
+                if r.data and len(r.data)==3:
+                    if r.data[0]["pattern"]==r.data[1]["pattern"]==r.data[2]["pattern"]:
+                        persistent_pattern=r.data[0]["pattern"]
+            except:
+                pass
+            mirror=""
+            if persistent_pattern:
+                mirror=f"I notice **{persistent_pattern.replace('_',' ')}** appearing repeatedly in your reflections.\n\n"
+            mentor_prompt=f"""
 You are a calm and disciplined mentor guiding a practitioner.
 Your role is to help them observe patterns in their thinking and behavior.
 Avoid giving direct advice. Guide through reflection, clarity, and discipline.
@@ -372,29 +388,30 @@ Avoid giving direct advice. Guide through reflection, clarity, and discipline.
 If appropriate weave this teaching naturally:
 {doctrine}
 """
-        headers={"Authorization":f"Bearer {st.secrets['GROQ_API_KEY']}"}
-        try:
-            res=requests.post(
-                "https://api.groq.com/openai/v1/chat/completions",
-                json={
-                    "model":"llama-3.3-70b-versatile",
-                    "messages":[{"role":"system","content":mentor_prompt}]
-                    + st.session_state.msgs[-10:]
-                },
-                headers=headers
-            )
-            reply=res.json()["choices"][0]["message"]["content"]
-        except Exception:
-            reply="The mentor pauses for a moment. Please try again."
+            try:
+                headers={"Authorization":f"Bearer {st.secrets['GROQ_API_KEY']}"}
+                res=requests.post(
+                    "https://api.groq.com/openai/v1/chat/completions",
+                    json={
+                        "model":"llama-3.3-70b-versatile",
+                        "messages":[{"role":"system","content":mentor_prompt}]
+                        + st.session_state.msgs[-10:]
+                    },
+                    headers=headers
+                )
+                reply=res.json()["choices"][0]["message"]["content"]
+            except Exception:
+                reply="The mentor pauses for a moment. Please try again."
+
         with st.chat_message("assistant"):
             placeholder=st.empty()
             placeholder.markdown("The mentor reflects...")
-            time.sleep(2)
+            time.sleep(1.5)
             text=""
             for s in reply.split(". "):
                 text+=s+". "
                 placeholder.markdown(text)
-                time.sleep(.4)
+                time.sleep(0.2)
         st.session_state.msgs.append({"role":"assistant","content":reply})
         supabase.table("records").insert({
             "user_id":USER_ID,
@@ -402,6 +419,19 @@ If appropriate weave this teaching naturally:
             "content":reply,
             "timestamp":datetime.now(UTC).isoformat()
         }).execute()
+
+        # ================================
+        # RANK PROGRESSION CHECK
+        # ================================
+        old_rank = st.session_state.get("last_rank", "Unknown")
+        new_rank = compute_rank(st.session_state.records_count)
+        if new_rank != old_rank:
+            st.session_state.last_rank = new_rank
+            st.balloons()
+            st.session_state.milestone_message = f"🥋 Rank Advanced: {new_rank}"
+            # Optional: save to DB if desired
+            # supabase.table("users").update({"rank": new_rank}).eq("id", USER_ID).execute()
+
         st.rerun()
 with tab_history:
     st.markdown("### Training History")
