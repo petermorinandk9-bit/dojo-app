@@ -49,6 +49,8 @@ if "history_loaded" not in st.session_state:
     st.session_state.history_loaded = False
 if "milestone_message" not in st.session_state:
     st.session_state.milestone_message = None
+if "last_rank" not in st.session_state:
+    st.session_state.last_rank = "Student"
 
 # ==================================================
 # PATTERN LIBRARY
@@ -342,9 +344,13 @@ with tab_train:
             "content":prompt,
             "timestamp":datetime.now(UTC).isoformat()
         }).execute()
-        if len([m for m in st.session_state.msgs if m["role"]=="user"])%7==0:
+        st.session_state.records_count += 1  # Live update count
+
+        if len([m for m in st.session_state.msgs if m["role"]=="user"])%3==0:
             detect_patterns(USER_ID)
+
         doctrine="Discipline begins with attention."
+
         # ================================
         # CRISIS DETECTION
         # ================================
@@ -412,6 +418,7 @@ If appropriate weave this teaching naturally:
                 text+=s+". "
                 placeholder.markdown(text)
                 time.sleep(0.2)
+
         st.session_state.msgs.append({"role":"assistant","content":reply})
         supabase.table("records").insert({
             "user_id":USER_ID,
@@ -419,20 +426,29 @@ If appropriate weave this teaching naturally:
             "content":reply,
             "timestamp":datetime.now(UTC).isoformat()
         }).execute()
+        st.session_state.records_count += 1  # Live update after assistant reply
+
+        # ================================
+        # PHASE ADVANCEMENT
+        # ================================
+        user_msgs_in_session = len([m for m in st.session_state.msgs if m["role"]=="user"])
+        if user_msgs_in_session % 3 == 0 and user_msgs_in_session > 0:
+            st.session_state.phase = (st.session_state.phase + 1) % 4
+            phase_name = PHASE_SETS[rank][st.session_state.phase]
+            st.session_state.milestone_message = f"→ Moving to {phase_name}"
 
         # ================================
         # RANK PROGRESSION CHECK
         # ================================
-        old_rank = st.session_state.get("last_rank", "Unknown")
+        old_rank = st.session_state.get("last_rank", "Student")
         new_rank = compute_rank(st.session_state.records_count)
         if new_rank != old_rank:
             st.session_state.last_rank = new_rank
             st.balloons()
             st.session_state.milestone_message = f"🥋 Rank Advanced: {new_rank}"
-            # Optional: save to DB if desired
-            # supabase.table("users").update({"rank": new_rank}).eq("id", USER_ID).execute()
 
         st.rerun()
+
 with tab_history:
     st.markdown("### Training History")
     r=supabase.table("records") \
