@@ -111,24 +111,11 @@ if st.session_state.user is None:
                     user = r.data[0]
                     stored_hash = user.get("password")
 
-                    if stored_hash is None:
-                        st.error("No password set for this account. Please contact support.")
-                        st.stop()
-
-                    if isinstance(stored_hash, str):
-                        cleaned = ''.join(c for c in stored_hash if c.isprintable())
-                        stored_hash_bytes = cleaned.encode('utf-8')
+                    if bcrypt.checkpw(password.encode('utf-8'), stored_hash.encode('utf-8')):
+                        st.session_state.user = user
+                        st.rerun()
                     else:
-                        stored_hash_bytes = stored_hash
-
-                    try:
-                        if bcrypt.checkpw(password.encode('utf-8'), stored_hash_bytes):
-                            st.session_state.user = user
-                            st.rerun()
-                        else:
-                            st.error("Incorrect password")
-                    except Exception as e:
-                        st.error(f"Unexpected login error: {str(e)}")
+                        st.error("Incorrect password")
 
                 else:
                     st.error("User not found")
@@ -171,6 +158,7 @@ USER_NAME = st.session_state.user["display_name"]
 # LOAD HISTORY
 # ==================================================
 if not st.session_state.history_loaded:
+
     r = supabase.table("records") \
         .select("*",count="exact") \
         .eq("user_id",USER_ID) \
@@ -202,6 +190,83 @@ def compute_rank(count):
 rank = compute_rank(st.session_state.records_count)
 
 # ==================================================
+# PHASES
+# ==================================================
+PHASE_SETS={
+"Student":["Welcome","Warm-Up","Training","Cool Down"],
+"Practitioner":["Welcome","Warm-Up","Training","Cool Down"],
+"Sentinel":["Welcome","Warm-Up","Training","Cool Down"],
+"Sovereign":["Welcome","Warm-Up","Training","Cool Down"]
+}
+
+# ==================================================
+# MOMENTUM
+# ==================================================
+def compute_momentum():
+    r = supabase.table("dojo_patterns") \
+        .select("pattern") \
+        .eq("user_id",USER_ID) \
+        .order("timestamp",desc=True) \
+        .limit(10) \
+        .execute()
+    if not r.data:
+        return 0
+    score = 0
+    for p in r.data:
+        if p["pattern"] in POSITIVE_PATTERNS:
+            score += 1
+        if p["pattern"] in NEGATIVE_PATTERNS:
+            score -= 1
+    return score / 10
+
+# ==================================================
+# EVOLUTION ENGINE
+# ==================================================
+def compute_evolution():
+    r = supabase.table("dojo_patterns") \
+        .select("pattern") \
+        .eq("user_id",USER_ID) \
+        .order("timestamp",desc=True) \
+        .limit(20) \
+        .execute()
+    if not r.data:
+        return "Unknown"
+    score = 0
+    for p in r.data:
+        if p["pattern"] in POSITIVE_PATTERNS:
+            score += 1
+        if p["pattern"] in NEGATIVE_PATTERNS:
+            score -= 1
+    if score > 3:
+        return "Rising"
+    if score < -3:
+        return "Declining"
+    return "Stable"
+
+# ==================================================
+# PATTERN TRANSITION TRACKING
+# ==================================================
+def track_pattern_transition(user_id, new_pattern):
+
+    prev = supabase.table("dojo_patterns") \
+        .select("pattern") \
+        .eq("user_id", user_id) \
+        .order("timestamp", desc=True) \
+        .limit(1) \
+        .execute()
+
+    if prev.data:
+        prev_pattern = prev.data[0]["pattern"]
+
+        if prev_pattern != new_pattern:
+            supabase.table("dojo_pattern_transitions").insert({
+                "user_id": user_id,
+                "from_pattern": prev_pattern,
+                "to_pattern": new_pattern,
+                "timestamp": datetime.now(UTC).isoformat()
+            }).execute()
+
+# ==================================================
 # SIDEBAR
 # ==================================================
 with st.sidebar:
@@ -212,6 +277,40 @@ with st.sidebar:
     if st.session_state.user.get("subscription_status","free") == "free":
         remaining = max(0, 15 - st.session_state.records_count)
         st.caption(f"Free reflections remaining: {remaining}")
+
+    st.divider()
+
+    momentum = compute_momentum()
+    evolution = compute_evolution()
+
+    st.markdown(f"Momentum: **{momentum:+.2f}**")
+    st.markdown(f"Evolution: **{evolution}**")
+
+    st.progress((momentum+1)/2)
+
+    st.divider()
+
+    # PHASE INDICATOR RESTORED
+    for i,phase in enumerate(PHASE_SETS[rank]):
+        if i == st.session_state.phase:
+            st.markdown(f"**🟢 {phase}**")
+        else:
+            st.markdown(phase)
+
+    st.divider()
+
+    # BOW OUT BUTTON RESTORED
+    if st.button("Bow Out"):
+        st.session_state.phase = 0
+        st.session_state.msgs = []
+        st.success("You bow out from the mat.")
+        time.sleep(1)
+        st.rerun()
+
+    if st.button("Log Out"):
+        for key in list(st.session_state.keys()):
+            del st.session_state[key]
+        st.rerun()
 
 # ==================================================
 # CHAT
@@ -225,6 +324,8 @@ with tab_train:
     if not st.session_state.msgs:
         st.info("Welcome to the Dojo. Speak from center and begin your reflection.")
 
+    st.divider()
+
     for msg in st.session_state.msgs[-10:]:
         with st.chat_message(msg["role"]):
             st.markdown(msg["content"])
@@ -233,13 +334,16 @@ with tab_train:
 
     if prompt:
 
-        # reflection cooldown
+        # REFLECTION COOLDOWN
         now = time.time()
+
         if now - st.session_state.last_reflection_time < 5:
             st.warning("Take a breath before the next reflection.")
             st.stop()
+
         st.session_state.last_reflection_time = now
 
+        # DATABASE PAYWALL
         subscription = st.session_state.user.get("subscription_status", "free")
 
         if subscription == "free":
@@ -260,10 +364,10 @@ with tab_train:
         st.session_state.msgs.append({"role":"user","content":prompt})
 
         supabase.table("records").insert({
-            "user_id":USER_ID,
-            "role":"user",
-            "content":prompt,
-            "timestamp":datetime.now(UTC).isoformat()
+        "user_id":USER_ID,
+        "role":"user",
+        "content":prompt,
+        "timestamp":datetime.now(UTC).isoformat()
         }).execute()
 
         mentor_prompt="Respond as a calm reflective mentor."
@@ -302,10 +406,10 @@ with tab_train:
         st.session_state.msgs.append({"role":"assistant","content":reply})
 
         supabase.table("records").insert({
-            "user_id":USER_ID,
-            "role":"assistant",
-            "content":reply,
-            "timestamp":datetime.now(UTC).isoformat()
+        "user_id":USER_ID,
+        "role":"assistant",
+        "content":reply,
+        "timestamp":datetime.now(UTC).isoformat()
         }).execute()
 
         st.rerun()
