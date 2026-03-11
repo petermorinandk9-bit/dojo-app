@@ -120,14 +120,10 @@ if st.session_state.user is None:
             username = st.text_input("Username")
             display = st.text_input("Display Name")
             password = st.text_input("Password", type="password")
-            invite = st.text_input("Dojo Entry Code")
             agree = st.checkbox("I understand this is not a medical service.")
             if st.form_submit_button("Create"):
                 if not agree:
                     st.error("You must acknowledge the notice")
-                    st.stop()
-                if invite != st.secrets["DOJO_ENTRY_CODE"]:
-                    st.error("Invalid code")
                     st.stop()
                 hashed_bytes = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
                 hashed_str = hashed_bytes.decode('utf-8')
@@ -376,8 +372,8 @@ Avoid giving direct advice. Guide through reflection, clarity, and discipline.
 If appropriate weave this teaching naturally:
 {doctrine}
 """
+        headers={"Authorization":f"Bearer {st.secrets['GROQ_API_KEY']}"}
         try:
-            headers={"Authorization":f"Bearer {st.secrets['GROQ_API_KEY']}"}
             res=requests.post(
                 "https://api.groq.com/openai/v1/chat/completions",
                 json={
