@@ -239,7 +239,7 @@ def compute_evolution():
     return "Stable"
 
 # ==================================================
-# PATTERN DETECTION (FIXED)
+# PATTERN DETECTION
 # ==================================================
 def detect_patterns(user_id):
 
@@ -398,12 +398,36 @@ with tab_train:
 
         doctrine="Discipline begins with attention."
 
+        # ================================
+        # PATTERN PERSISTENCE DETECTION
+        # ================================
+        persistent_pattern=None
+        try:
+            r=supabase.table("dojo_patterns") \
+                .select("pattern") \
+                .eq("user_id",USER_ID) \
+                .order("timestamp",desc=True) \
+                .limit(3) \
+                .execute()
+
+            if r.data and len(r.data)==3:
+                if r.data[0]["pattern"]==r.data[1]["pattern"]==r.data[2]["pattern"]:
+                    persistent_pattern=r.data[0]["pattern"]
+        except:
+            pass
+
+        mirror=""
+        if persistent_pattern and random.random()<0.4:
+            mirror=f"I notice **{persistent_pattern.replace('_',' ')}** appearing repeatedly in your reflections.\n\n"
+
         mentor_prompt=f"""
 You are a calm and disciplined mentor guiding a practitioner.
 
 Your role is to help them observe patterns in their thinking and behavior.
 
 Avoid giving direct advice. Guide through reflection, clarity, and discipline.
+
+{mirror}
 
 If appropriate weave this teaching naturally:
 
