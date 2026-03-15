@@ -159,7 +159,6 @@ if not st.session_state.history_loaded:
                 "role": row["role"],
                 "content": row["content"]
             })
-    st.session_state.records_count = r.count if r.count else 0
     st.session_state.history_loaded = True
 
 # ==================================================
@@ -174,7 +173,14 @@ def compute_rank(count):
         return "Sentinel"
     return "Sovereign"
 
-rank = compute_rank(st.session_state.records_count)
+# Count real user reflections from Supabase for rank
+user_reflection_count = supabase.table("records") \
+    .select("id", count="exact") \
+    .eq("user_id", USER_ID) \
+    .eq("role", "user") \
+    .execute().count or 0
+
+rank = compute_rank(user_reflection_count)
 
 # ==================================================
 # PHASES
@@ -287,8 +293,9 @@ with st.sidebar:
     st.markdown(f"**{rank} · {USER_NAME}**")
     subscription = st.session_state.user.get("subscription_status", "free")
     if subscription not in ["paid", "beta", "admin"]:
-        remaining = max(0, 15 - st.session_state.records_count)
-        st.caption(f"Free reflections remaining: {remaining}")
+        # Real-time count for remaining free reflections
+        free_remaining = max(0, 15 - user_reflection_count)
+        st.caption(f"Free reflections remaining: {free_remaining}")
     st.divider()
     momentum = compute_momentum()
     evolution = compute_evolution()
@@ -330,12 +337,13 @@ with tab_train:
     if prompt:
         subscription = st.session_state.user.get("subscription_status", "free")
         if subscription not in ["paid", "beta", "admin"]:
+            # Real-time count check
             r = supabase.table("records") \
                 .select("id", count="exact") \
                 .eq("user_id", USER_ID) \
                 .eq("role", "user") \
                 .execute()
-            user_count = r.count if r.count else 0
+            user_count = r.count or 0
             if user_count >= 15:
                 st.warning("You have reached the free training limit of 15 reflections.")
                 st.info("Join the Dojo to continue your practice.")
@@ -354,7 +362,6 @@ with tab_train:
             "content": prompt,
             "timestamp": datetime.now(UTC).isoformat()
         }).execute()
-        st.session_state.records_count += 1  # Live update count
 
         if len([m for m in st.session_state.msgs if m["role"] == "user"]) % 3 == 0:
             detect_patterns(USER_ID)
@@ -458,7 +465,6 @@ RESPONSE LENGTH & STRUCTURE RULES — FOLLOW EXACTLY:
                 "content": reply,
                 "timestamp": datetime.now(UTC).isoformat()
             }).execute()
-            st.session_state.records_count += 1
 
         # PHASE ADVANCEMENT
         user_msgs_in_session = len([m for m in st.session_state.msgs if m["role"] == "user"])
@@ -469,7 +475,7 @@ RESPONSE LENGTH & STRUCTURE RULES — FOLLOW EXACTLY:
 
         # RANK PROGRESSION CHECK
         old_rank = st.session_state.get("last_rank", "Student")
-        new_rank = compute_rank(st.session_state.records_count)
+        new_rank = compute_rank(user_reflection_count + 1)  # approximate for display
         if new_rank != old_rank:
             st.session_state.last_rank = new_rank
             st.balloons()
