@@ -51,6 +51,9 @@ if "milestone_message" not in st.session_state:
     st.session_state.milestone_message = None
 if "last_rank" not in st.session_state:
     st.session_state.last_rank = "Student"
+# Guard to prevent double processing of the same user input
+if "last_processed_prompt" not in st.session_state:
+    st.session_state.last_processed_prompt = None
 
 # ==================================================
 # PATTERN LIBRARY
@@ -337,6 +340,13 @@ with tab_train:
                 st.warning("You have reached the free training limit of 15 reflections.")
                 st.info("Join the Dojo to continue your practice.")
                 st.stop()
+
+        # Only process this exact prompt once
+        if prompt == st.session_state.last_processed_prompt:
+            st.stop()  # already handled this input → skip
+
+        st.session_state.last_processed_prompt = prompt
+
         st.session_state.msgs.append({"role": "user", "content": prompt})
         supabase.table("records").insert({
             "user_id": USER_ID,
@@ -351,9 +361,7 @@ with tab_train:
 
         doctrine = "Discipline begins with attention."
 
-        # ================================
         # CRISIS DETECTION
-        # ================================
         crisis_keywords = ["suicide", "kill myself", "want to die", "hopeless", "end it", "hurt myself", "self harm"]
         if any(word in prompt.lower() for word in crisis_keywords):
             reply = """
@@ -367,9 +375,7 @@ Or text HOME to **741741** (Crisis Text Line)
 The mat will still be here when you're ready. Please reach out to someone.
 """
         else:
-            # ================================
             # PATTERN PERSISTENCE DETECTION
-            # ================================
             persistent_pattern = None
             try:
                 r = supabase.table("dojo_patterns") \
@@ -387,9 +393,7 @@ The mat will still be here when you're ready. Please reach out to someone.
             if persistent_pattern:
                 mirror = f"I notice **{persistent_pattern.replace('_', ' ')}** appearing repeatedly in your reflections.\n\n"
 
-            # ================================
             # UPDATED MENTOR PROMPT WITH LENGTH SCALING
-            # ================================
             mentor_prompt = f"""
 You are a calm, disciplined mentor guiding a practitioner through reflection.
 Your role: help them observe patterns in thinking and behavior.
@@ -421,57 +425,49 @@ RESPONSE LENGTH & STRUCTURE RULES — FOLLOW EXACTLY:
             except Exception:
                 reply = "The mentor pauses for a moment. Please try again."
 
-        # ================================
         # HARD WORD CAP (250 words max)
-        # ================================
         words = reply.split()
         if len(words) > 250:
             reply = ' '.join(words[:250]) + "… (mentor pauses — reflect before continuing)"
 
-        # Optional: also limit to ~3–4 paragraphs
         lines = reply.split('\n')
         reply = '\n'.join(lines[:8])  # rough 3–4 paragraph cap
 
-        # ================================
-        # SINGLE ASSISTANT MESSAGE – FIXED
-        # ================================
-        with st.chat_message("assistant"):
-            placeholder = st.empty()
-            placeholder.markdown("The mentor reflects...")
-            time.sleep(1.5)
+        # SINGLE ASSISTANT MESSAGE – with duplicate guard
+        if st.session_state.msgs and st.session_state.msgs[-1]["role"] == "assistant" and st.session_state.msgs[-1]["content"] == reply:
+            # Already appended this exact reply → skip to prevent double
+            pass
+        else:
+            with st.chat_message("assistant"):
+                placeholder = st.empty()
+                placeholder.markdown("The mentor reflects...")
+                time.sleep(1.5)
 
-            text = ""
-            # Stream sentence-by-sentence into ONE placeholder
-            for sentence in reply.split(". "):
-                text += sentence + ". "
-                placeholder.markdown(text)
-                time.sleep(0.2)
+                text = ""
+                for sentence in reply.split(". "):
+                    text += sentence + ". "
+                    placeholder.markdown(text)
+                    time.sleep(0.2)
 
-            # Final clean version
-            placeholder.markdown(reply)
+                placeholder.markdown(reply)
 
-        # Append the SINGLE response to history
-        st.session_state.msgs.append({"role": "assistant", "content": reply})
-        supabase.table("records").insert({
-            "user_id": USER_ID,
-            "role": "assistant",
-            "content": reply,
-            "timestamp": datetime.now(UTC).isoformat()
-        }).execute()
-        st.session_state.records_count += 1  # Live update after assistant reply
+            st.session_state.msgs.append({"role": "assistant", "content": reply})
+            supabase.table("records").insert({
+                "user_id": USER_ID,
+                "role": "assistant",
+                "content": reply,
+                "timestamp": datetime.now(UTC).isoformat()
+            }).execute()
+            st.session_state.records_count += 1
 
-        # ================================
         # PHASE ADVANCEMENT
-        # ================================
         user_msgs_in_session = len([m for m in st.session_state.msgs if m["role"] == "user"])
         if user_msgs_in_session % 3 == 0 and user_msgs_in_session > 0:
             st.session_state.phase = (st.session_state.phase + 1) % 4
             phase_name = PHASE_SETS[rank][st.session_state.phase]
             st.session_state.milestone_message = f"→ Moving to {phase_name}"
 
-        # ================================
         # RANK PROGRESSION CHECK
-        # ================================
         old_rank = st.session_state.get("last_rank", "Student")
         new_rank = compute_rank(st.session_state.records_count)
         if new_rank != old_rank:
