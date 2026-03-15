@@ -432,16 +432,25 @@ RESPONSE LENGTH & STRUCTURE RULES — FOLLOW EXACTLY:
         lines = reply.split('\n')
         reply = '\n'.join(lines[:8])  # rough 3–4 paragraph cap
 
+        # ================================
+        # SINGLE ASSISTANT MESSAGE – FIXED
+        # ================================
         with st.chat_message("assistant"):
             placeholder = st.empty()
             placeholder.markdown("The mentor reflects...")
             time.sleep(1.5)
+
             text = ""
-            for s in reply.split(". "):
-                text += s + ". "
+            # Stream sentence-by-sentence into ONE placeholder
+            for sentence in reply.split(". "):
+                text += sentence + ". "
                 placeholder.markdown(text)
                 time.sleep(0.2)
 
+            # Final clean version
+            placeholder.markdown(reply)
+
+        # Append the SINGLE response to history
         st.session_state.msgs.append({"role": "assistant", "content": reply})
         supabase.table("records").insert({
             "user_id": USER_ID,
