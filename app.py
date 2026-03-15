@@ -286,16 +286,13 @@ Return JSON only in this format:
         pass
 
 # ==================================================
-# SIDEBAR
+# SIDEBAR – removed remaining count display
 # ==================================================
 with st.sidebar:
     st.markdown("### The-Dojo")
     st.markdown(f"**{rank} · {USER_NAME}**")
     subscription = st.session_state.user.get("subscription_status", "free")
-    if subscription not in ["paid", "beta", "admin"]:
-        # Real-time count for remaining free reflections
-        free_remaining = max(0, 15 - user_reflection_count)
-        st.caption(f"Free reflections remaining: {free_remaining}")
+    # Removed: free reflections remaining caption
     st.divider()
     momentum = compute_momentum()
     evolution = compute_evolution()
@@ -337,7 +334,7 @@ with tab_train:
     if prompt:
         subscription = st.session_state.user.get("subscription_status", "free")
         if subscription not in ["paid", "beta", "admin"]:
-            # Real-time count check
+            # Still enforce the 15 limit with real-time Supabase count
             r = supabase.table("records") \
                 .select("id", count="exact") \
                 .eq("user_id", USER_ID) \
