@@ -12,8 +12,7 @@ from collections import Counter
 
 def inject_dojo_styling():
     """
-    The Digital Zendo - Final Polished Weld
-    Sidebar collapsible again, but toggle button ALWAYS visible & functional
+    The Digital Zendo - Sidebar collapsible + toggle always visible
     """
     st.markdown("""
     <style>
@@ -94,24 +93,29 @@ def inject_dojo_styling():
             display: block !important;
             visibility: visible !important;
             opacity: 1 !important;
-            background-color: rgba(178, 34, 34, 0.2) !important;
+            background-color: rgba(178, 34, 34, 0.25) !important;
             color: #b22222 !important;
-            border: none !important;
-            z-index: 999 !important; /* Stay on top */
-            pointer-events: auto !important;
-            cursor: pointer !important;
-        }
-
-        /* Make sure the button stays visible even when sidebar is collapsed */
-        [data-testid="stSidebarCollapsedControl"] {
+            border: 1px solid rgba(178, 34, 34, 0.4) !important;
+            border-radius: 6px !important;
+            padding: 8px 12px !important;
+            z-index: 9999 !important;
             position: fixed !important;
-            top: 10px !important;
-            right: 10px !important;
+            top: 12px !important;
+            right: 16px !important;
+            cursor: pointer !important;
+            pointer-events: auto !important;
+            transition: all 0.2s ease !important;
         }
 
-        /* Optional: subtle hover feedback */
+        /* Hover feedback */
         [data-testid="stSidebarCollapsedControl"]:hover {
-            background-color: rgba(178, 34, 34, 0.4) !important;
+            background-color: rgba(178, 34, 34, 0.45) !important;
+            box-shadow: 0 0 12px rgba(178, 34, 34, 0.3) !important;
+        }
+
+        /* When sidebar is open, make toggle button less prominent but still visible */
+        [data-testid="stSidebar"][aria-expanded="true"] ~ div [data-testid="stSidebarCollapsedControl"] {
+            opacity: 0.85 !important;
         }
 
         /* HIDE STREAMLIT CHROME */
@@ -164,7 +168,6 @@ if "milestone_message" not in st.session_state:
     st.session_state.milestone_message = None
 if "last_rank" not in st.session_state:
     st.session_state.last_rank = "Student"
-# Guard to prevent double processing of the same user input
 if "last_processed_prompt" not in st.session_state:
     st.session_state.last_processed_prompt = None
 
@@ -195,17 +198,6 @@ POSITIVE_PATTERNS = [
     "discipline",
     "creative_flow"
 ]
-
-PATTERN_COORDS = {
-    "overthinking": (-0.4, 0.6),
-    "avoidance": (-0.8, -0.4),
-    "self_doubt": (-0.3, 0.4),
-    "clarity": (0.6, 0.6),
-    "momentum": (0.8, 0.2),
-    "discipline": (0.5, 0.2),
-    "frustration": (-0.4, 0.2),
-    "creative_flow": (0.9, 0.7)
-}
 
 # ==================================================
 # AUTH SYSTEM
