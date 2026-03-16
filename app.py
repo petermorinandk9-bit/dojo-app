@@ -88,6 +88,12 @@ def inject_dojo_styling():
             color: #f0f0f0 !important; /* Ensure all sidebar elements are brighter */
         }
 
+        /* Sidebar Trigger Fix - Red Glow */
+        [data-testid="stSidebarCollapsedControl"] {
+            background-color: rgba(178, 34, 34, 0.2) !important;
+            color: #b22222 !important;
+        }
+
         /* HIDE STREAMLIT CHROME */
         header, footer, #MainMenu {visibility: hidden;}
     </style>
