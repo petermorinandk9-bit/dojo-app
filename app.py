@@ -12,7 +12,7 @@ from collections import Counter
 
 def inject_dojo_styling():
     """
-    The Digital Zendo - Sidebar collapsible + toggle ALWAYS visible & clickable
+    The Digital Zendo - Sidebar collapsible + toggle button ALWAYS visible & clickable
     """
     st.markdown("""
     <style>
@@ -88,37 +88,45 @@ def inject_dojo_styling():
             color: #f0f0f0 !important;
         }
 
-        /* Sidebar toggle button - ALWAYS visible, top-right, high z-index, clickable */
+        /* Sidebar toggle button - ALWAYS visible, top-right, extremely high z-index */
         [data-testid="stSidebarCollapsedControl"] {
             display: block !important;
             visibility: visible !important;
             opacity: 1 !important;
-            background-color: rgba(178, 34, 34, 0.3) !important;
+            background-color: rgba(178, 34, 34, 0.35) !important;
             color: #b22222 !important;
-            border: 1px solid rgba(178, 34, 34, 0.5) !important;
+            border: 1px solid rgba(178, 34, 34, 0.6) !important;
             border-radius: 8px !important;
-            padding: 10px 14px !important;
-            font-size: 20px !important;
-            z-index: 99999 !important;
+            padding: 12px 16px !important;
+            font-size: 24px !important;
+            line-height: 1 !important;
+            z-index: 100000 !important;
             position: fixed !important;
             top: 16px !important;
             right: 20px !important;
             cursor: pointer !important;
             pointer-events: auto !important;
             transition: all 0.2s ease !important;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.5) !important;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.6) !important;
+            transform: none !important;
         }
 
-        /* Hover effect for better feedback */
+        /* Strong hover feedback */
         [data-testid="stSidebarCollapsedControl"]:hover {
-            background-color: rgba(178, 34, 34, 0.5) !important;
-            transform: scale(1.05) !important;
-            box-shadow: 0 4px 15px rgba(178, 34, 34, 0.4) !important;
+            background-color: rgba(178, 34, 34, 0.55) !important;
+            transform: scale(1.08) !important;
+            box-shadow: 0 6px 20px rgba(178, 34, 34, 0.5) !important;
         }
 
-        /* Slightly dim when sidebar is open (still visible & clickable) */
+        /* Slightly dim when sidebar is expanded (still fully visible & clickable) */
         [data-testid="stSidebar"][aria-expanded="true"] ~ * [data-testid="stSidebarCollapsedControl"] {
-            opacity: 0.9 !important;
+            opacity: 0.92 !important;
+        }
+
+        /* Fallback visible symbol if icon fails */
+        [data-testid="stSidebarCollapsedControl"]::before {
+            content: "☰" !important;
+            font-weight: bold !important;
         }
 
         /* HIDE STREAMLIT CHROME */
