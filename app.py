@@ -629,4 +629,5 @@ with tab_history:
     if r.data:
         for row in r.data:
             avatar = "🧑‍🎓" if row["role"] == "user" else "🧘‍♂️"  # Customize here: emoji or URL
-            with st.chat_message(row["role"], avatar=avatar
+            with st.chat_message(row["role"], avatar=avatar):
+                st.markdown(row["content"])
