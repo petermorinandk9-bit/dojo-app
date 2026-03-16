@@ -452,7 +452,8 @@ with tab_train:
         st.session_state.milestone_message = None
     st.divider()
     for msg in st.session_state.msgs[-10:]:
-        with st.chat_message(msg["role"]):
+        avatar = "🧑‍🎓" if msg["role"] == "user" else "🧘‍♂️"  # Customize here: emoji or URL
+        with st.chat_message(msg["role"], avatar=avatar):
             st.markdown(msg["content"])
     prompt = st.chat_input("Speak from center...")
     if prompt:
@@ -572,7 +573,7 @@ End in a way that invites continuation unless resolved.
         if st.session_state.msgs and st.session_state.msgs[-1]["role"] == "assistant" and st.session_state.msgs[-1]["content"] == reply:
             pass
         else:
-            with st.chat_message("assistant"):
+            with st.chat_message("assistant", avatar="🧘‍♂️"):
                 placeholder = st.empty()
                 placeholder.markdown("The mentor reflects...")
                 time.sleep(1.5)
@@ -618,5 +619,6 @@ with tab_history:
         .execute()
     if r.data:
         for row in r.data:
-            with st.chat_message(row["role"]):
+            avatar = "🧑‍🎓" if row["role"] == "user" else "🧘‍♂️"  # Customize here: emoji or URL
+            with st.chat_message(row["role"], avatar=avatar):
                 st.markdown(row["content"])
