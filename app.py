@@ -8,6 +8,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from datetime import datetime, UTC
 from supabase import create_client, Client
+from collections import Counter
 
 # ==================================================
 # CONFIG
@@ -51,6 +52,9 @@ if "milestone_message" not in st.session_state:
     st.session_state.milestone_message = None
 if "last_rank" not in st.session_state:
     st.session_state.last_rank = "Student"
+# Guard to prevent double processing of the same user input
+if "last_processed_prompt" not in st.session_state:
+    st.session_state.last_processed_prompt = None
 
 # ==================================================
 # PATTERN LIBRARY
@@ -234,66 +238,109 @@ def compute_evolution():
     return "Stable"
 
 # ==================================================
-# PATTERN DETECTION
+# PATTERN DETECTION (Upgrade 1: per reflection, after crisis check)
 # ==================================================
-def detect_patterns(user_id):
-    recent = supabase.table("records") \
-        .select("content") \
-        .eq("user_id", user_id) \
-        .eq("role", "user") \
-        .order("timestamp", desc=True) \
-        .limit(50) \
-        .execute()
-    if not recent.data or len(recent.data) < 10:
-        return
-    reflections = [row["content"] for row in recent.data]
-    reflection_text = "\n".join(reflections)
+def detect_pattern_for_message(user_id, message):
     prompt = f"""
-You are analyzing reflection entries from a practitioner.
-Recent reflections:
-{reflection_text}
+You are analyzing a practitioner reflection.
+
+Reflection:
+{message}
+
 Choose the SINGLE most relevant behavioral pattern from this list:
 {PATTERN_LIBRARY}
-Focus on behavioral patterns rather than temporary emotions.
-Return JSON only in this format:
-{{"patterns":[{{"pattern":"name","confidence":0.0}}]}}
+
+Focus on behavior patterns rather than temporary emotions.
+
+Return JSON only:
+{{"pattern":"name","confidence":0.0}}
 """
+
     headers = {"Authorization": f"Bearer {st.secrets['GROQ_API_KEY']}"}
-    res = requests.post(
-        "https://api.groq.com/openai/v1/chat/completions",
-        json={
-            "model": "llama-3.3-70b-versatile",
-            "messages": [{"role": "system", "content": prompt}]
-        },
-        headers=headers
-    )
+
     try:
+        res = requests.post(
+            "https://api.groq.com/openai/v1/chat/completions",
+            json={
+                "model": "llama-3.3-70b-versatile",
+                "messages": [{"role": "system", "content": prompt}]
+            },
+            headers=headers
+        )
+
         content = res.json()["choices"][0]["message"]["content"]
         start = content.find("{")
         end = content.rfind("}") + 1
         data = json.loads(content[start:end])
-        for p in data["patterns"]:
-            supabase.table("dojo_patterns").insert({
-                "user_id": user_id,
-                "pattern": p["pattern"],
-                "confidence_score": p["confidence"],
-                "timestamp": datetime.now(UTC).isoformat()
-            }).execute()
-    except:
-        pass
+
+        pattern = data["pattern"]
+        confidence = data["confidence"]
+
+        supabase.table("dojo_patterns").insert({
+            "user_id": user_id,
+            "pattern": pattern,
+            "confidence_score": confidence,
+            "timestamp": datetime.now(UTC).isoformat()
+        }).execute()
+
+        return pattern, confidence
+
+    except Exception as e:
+        print(f"Pattern detection error: {e}")
+        return None, 0.0
 
 # ==================================================
-# SIDEBAR
+# TOP PATTERN FREQUENCY (Upgrade 5)
+# ==================================================
+def compute_top_pattern():
+    r = supabase.table("dojo_patterns") \
+        .select("pattern") \
+        .eq("user_id", USER_ID) \
+        .order("timestamp", desc=True) \
+        .limit(50) \
+        .execute()
+    
+    if not r.data or len(r.data) < 5:
+        return "Calibrating..."
+    
+    patterns = [p["pattern"] for p in r.data]
+    counts = Counter(patterns)
+    
+    if not counts:
+        return "Calibrating..."
+    
+    top_pattern, top_count = counts.most_common(1)[0]
+    percentage = int((top_count / len(patterns)) * 100)
+    
+    return f"{top_pattern.replace('_', ' ').title()} ({percentage}%)"
+
+# ==================================================
+# SIDEBAR (with free reflections urgency + top pattern)
 # ==================================================
 with st.sidebar:
     st.markdown("### The-Dojo")
     st.markdown(f"**{rank} · {USER_NAME}**")
     subscription = st.session_state.user.get("subscription_status", "free")
+    if subscription not in ["paid", "beta", "admin"]:
+        user_msg_count = supabase.table("records") \
+            .select("id", count="exact") \
+            .eq("user_id", USER_ID) \
+            .eq("role", "user") \
+            .execute().count or 0
+        remaining = max(0, 15 - user_msg_count)
+        if remaining <= 3:
+            st.error(f"⚠️ {remaining} reflections left")
+        elif remaining <= 7:
+            st.warning(f"{remaining} reflections remaining")
+        else:
+            st.caption(f"✓ {remaining} free reflections")
     st.divider()
     momentum = compute_momentum()
     evolution = compute_evolution()
+    top_pattern = compute_top_pattern()
     st.markdown(f"Momentum: **{momentum:+.2f}**")
     st.markdown(f"Evolution: **{evolution}**")
+    st.markdown(f"**Top Pattern:** {top_pattern}")
     st.progress((momentum + 1) / 2)
     st.divider()
     for i, phase in enumerate(PHASE_SETS[rank]):
@@ -341,6 +388,11 @@ with tab_train:
                 st.info("Join the Dojo to continue your practice.")
                 st.stop()
 
+        if prompt == st.session_state.last_processed_prompt:
+            st.stop()
+
+        st.session_state.last_processed_prompt = prompt
+
         st.session_state.msgs.append({"role": "user", "content": prompt})
         supabase.table("records").insert({
             "user_id": USER_ID,
@@ -348,9 +400,6 @@ with tab_train:
             "content": prompt,
             "timestamp": datetime.now(UTC).isoformat()
         }).execute()
-
-        if len([m for m in st.session_state.msgs if m["role"] == "user"]) % 3 == 0:
-            detect_patterns(USER_ID)
 
         doctrine = "Discipline begins with attention."
 
@@ -366,7 +415,12 @@ Or text HOME to **741741** (Crisis Text Line)
 
 The mat will still be here when you're ready. Please reach out to someone.
 """
+            detected_pattern = None
+            confidence = 0.0
         else:
+            # Detect pattern only if not crisis
+            detected_pattern, confidence = detect_pattern_for_message(USER_ID, prompt)
+
             persistent_pattern = None
             try:
                 r = supabase.table("dojo_patterns") \
@@ -392,12 +446,25 @@ Never give direct advice. Guide with questions, clarity, and grounded insight.
 If appropriate, weave in this teaching naturally:
 {doctrine}
 
-RESPONSE LENGTH & STRUCTURE RULES — FOLLOW EXACTLY:
-- Light, calm, or neutral user message (low emotional weight): 1–3 short sentences only. Be concise, direct, and encouraging.
-- Moderate emotion, mild frustration, or emerging pattern: 3–6 sentences, 1 short paragraph. Offer gentle reflection without overwhelming.
-- High emotional weight, stuck in a loop, deep self-doubt, or major breakthrough: 1–3 full paragraphs (max 250 words total). Go deeper, slower, more layered — but still concise and focused. Never ramble or exceed 250 words.
-- Always prioritize quality over quantity. End responses in a way that invites continuation unless the user seems resolved.
-- Tone: grounded, non-judgmental, quietly supportive. No fluff, no lectures.
+CRITICAL LENGTH RULES — FOLLOW EXACTLY OR RESPONSE WILL BE REJECTED:
+
+1. LIGHT/NEUTRAL INPUT (casual check-in, simple question, brief share):
+   → 1-2 sentences max
+   → Example: "Good to see you here. What's on your mind today?"
+
+2. MODERATE INPUT (mild frustration, exploring an idea, noticing a pattern):
+   → 3-5 sentences, single paragraph
+   → Example: "That awareness is the first step. What happens right before you avoid the task?"
+
+3. HEAVY INPUT (deep struggle, breakthrough moment, stuck in loop):
+   → 2 short paragraphs max (100-150 words total)
+   → Example: "This loop has deep roots. Notice how it begins... [short reflection]. What small step feels possible right now?"
+
+When uncertain, choose shorter. Default to brevity.
+NEVER exceed 150 words under any circumstance.
+
+Tone: grounded, non-judgmental, quietly supportive. No fluff, no lectures.
+End in a way that invites continuation unless resolved.
 """
 
             try:
@@ -415,33 +482,35 @@ RESPONSE LENGTH & STRUCTURE RULES — FOLLOW EXACTLY:
             except Exception:
                 reply = "The mentor pauses for a moment. Please try again."
 
+        # HARD WORD CAP (150 words max - stricter)
         words = reply.split()
-        if len(words) > 250:
-            reply = ' '.join(words[:250]) + "… (mentor pauses — reflect before continuing)"
+        if len(words) > 150:
+            reply = ' '.join(words[:150]) + "… (mentor pauses — reflect before continuing)"
 
-        lines = reply.split('\n')
-        reply = '\n'.join(lines[:8])
+        # SINGLE ASSISTANT MESSAGE
+        if st.session_state.msgs and st.session_state.msgs[-1]["role"] == "assistant" and st.session_state.msgs[-1]["content"] == reply:
+            pass
+        else:
+            with st.chat_message("assistant"):
+                placeholder = st.empty()
+                placeholder.markdown("The mentor reflects...")
+                time.sleep(1.5)
 
-        with st.chat_message("assistant"):
-            placeholder = st.empty()
-            placeholder.markdown("The mentor reflects...")
-            time.sleep(1.5)
+                text = ""
+                for sentence in reply.split(". "):
+                    text += sentence + ". "
+                    placeholder.markdown(text)
+                    time.sleep(0.2)
 
-            text = ""
-            for sentence in reply.split(". "):
-                text += sentence + ". "
-                placeholder.markdown(text)
-                time.sleep(0.2)
+                placeholder.markdown(reply)
 
-            placeholder.markdown(reply)
-
-        st.session_state.msgs.append({"role": "assistant", "content": reply})
-        supabase.table("records").insert({
-            "user_id": USER_ID,
-            "role": "assistant",
-            "content": reply,
-            "timestamp": datetime.now(UTC).isoformat()
-        }).execute()
+            st.session_state.msgs.append({"role": "assistant", "content": reply})
+            supabase.table("records").insert({
+                "user_id": USER_ID,
+                "role": "assistant",
+                "content": reply,
+                "timestamp": datetime.now(UTC).isoformat()
+            }).execute()
 
         user_msgs_in_session = len([m for m in st.session_state.msgs if m["role"] == "user"])
         if user_msgs_in_session % 3 == 0 and user_msgs_in_session > 0:
