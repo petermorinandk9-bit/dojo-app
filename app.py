@@ -72,6 +72,11 @@ def inject_dojo_styling():
             color: #f0f0f0 !important;
         }
 
+        /* Darker grey avatar backgrounds (matching chat bar tones) */
+        div[data-testid^="stChatMessageAvatar"] {
+            background-color: #1a1a1a !important; /* Dark grey like sidebar/chat elements */
+        }
+
         /* STONE TABLET SIDEBAR */
         [data-testid="stSidebar"] {
             background-color: #1a1a1a !important;
