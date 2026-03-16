@@ -12,7 +12,8 @@ from collections import Counter
 
 def inject_dojo_styling():
     """
-    The Digital Zendo - Sidebar collapsible + toggle button ALWAYS visible & clickable
+    The Digital Zendo - Sidebar PERMANENTLY visible (no collapse)
+    Toggle button removed / disabled for simplicity
     """
     st.markdown("""
     <style>
@@ -77,56 +78,31 @@ def inject_dojo_styling():
             background-color: #1a1a1a !important;
         }
 
-        /* SIDEBAR styling (normal collapsible behavior) */
+        /* SIDEBAR - Permanently visible & expanded */
         [data-testid="stSidebar"] {
             background-color: #1a1a1a !important;
             border-right: 1px solid #2a2a2a !important;
             color: #f0f0f0 !important;
+            visibility: visible !important;
+            display: block !important;
+            width: 300px !important;
+            min-width: 300px !important;
+            max-width: 300px !important;
+            transform: none !important;
+            transition: none !important;
+            position: relative !important;
         }
 
         [data-testid="stSidebar"] * {
             color: #f0f0f0 !important;
         }
 
-        /* Sidebar toggle button - ALWAYS visible, top-right, extremely high z-index */
+        /* Completely hide / disable the collapse toggle button */
         [data-testid="stSidebarCollapsedControl"] {
-            display: block !important;
-            visibility: visible !important;
-            opacity: 1 !important;
-            background-color: rgba(178, 34, 34, 0.35) !important;
-            color: #b22222 !important;
-            border: 1px solid rgba(178, 34, 34, 0.6) !important;
-            border-radius: 8px !important;
-            padding: 12px 16px !important;
-            font-size: 24px !important;
-            line-height: 1 !important;
-            z-index: 100000 !important;
-            position: fixed !important;
-            top: 16px !important;
-            right: 20px !important;
-            cursor: pointer !important;
-            pointer-events: auto !important;
-            transition: all 0.2s ease !important;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.6) !important;
-            transform: none !important;
-        }
-
-        /* Strong hover feedback */
-        [data-testid="stSidebarCollapsedControl"]:hover {
-            background-color: rgba(178, 34, 34, 0.55) !important;
-            transform: scale(1.08) !important;
-            box-shadow: 0 6px 20px rgba(178, 34, 34, 0.5) !important;
-        }
-
-        /* Slightly dim when sidebar is expanded (still fully visible & clickable) */
-        [data-testid="stSidebar"][aria-expanded="true"] ~ * [data-testid="stSidebarCollapsedControl"] {
-            opacity: 0.92 !important;
-        }
-
-        /* Fallback visible symbol if icon fails */
-        [data-testid="stSidebarCollapsedControl"]::before {
-            content: "☰" !important;
-            font-weight: bold !important;
+            display: none !important;
+            visibility: hidden !important;
+            opacity: 0 !important;
+            pointer-events: none !important;
         }
 
         /* HIDE STREAMLIT CHROME */
@@ -429,7 +405,7 @@ def compute_top_pattern():
     return f"{top_pattern.replace('_', ' ').title()} ({percentage}%)"
 
 # ==================================================
-# SIDEBAR
+# SIDEBAR - Now permanently visible
 # ==================================================
 with st.sidebar:
     st.markdown("### The-Dojo")
