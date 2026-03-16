@@ -82,6 +82,8 @@ def inject_dojo_styling():
             background-color: #1a1a1a !important;
             border-right: 1px solid #2a2a2a !important;
             color: #f0f0f0 !important; /* Brighter sidebar text for visibility */
+            visibility: visible !important; /* Ensure sidebar is visible */
+            display: block !important; /* Force display if hidden */
         }
 
         [data-testid="stSidebar"] * {
