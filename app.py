@@ -28,7 +28,7 @@ def inject_dojo_styling():
         .dojo-title {
             font-family: 'Ma Shan Zheng', cursive !important;
             font-size: 20vw !important; /* Responsive large size */
-            color: rgba(178, 34, 34, 0.1) !important; /* Very faded for background effect */
+            color: rgba(178, 34, 34, 0.3) !important; /* Slightly less faded for visibility */
             text-align: center !important;
             position: fixed !important;
             top: 50% !important;
@@ -629,5 +629,4 @@ with tab_history:
     if r.data:
         for row in r.data:
             avatar = "🧑‍🎓" if row["role"] == "user" else "🧘‍♂️"  # Customize here: emoji or URL
-            with st.chat_message(row["role"], avatar=avatar):
-                st.markdown(row["content"])
+            with st.chat_message(row["role"], avatar=avatar
