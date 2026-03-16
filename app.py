@@ -237,53 +237,56 @@ def compute_evolution():
     return "Stable"
 
 # ==================================================
-# PATTERN DETECTION
+# PATTERN DETECTION (called per reflection, after crisis check)
 # ==================================================
-def detect_patterns(user_id):
-    recent = supabase.table("records") \
-        .select("content") \
-        .eq("user_id", user_id) \
-        .eq("role", "user") \
-        .order("timestamp", desc=True) \
-        .limit(50) \
-        .execute()
-    if not recent.data or len(recent.data) < 10:
-        return
-    reflections = [row["content"] for row in recent.data]
-    reflection_text = "\n".join(reflections)
+def detect_pattern_for_message(user_id, message):
     prompt = f"""
-You are analyzing reflection entries from a practitioner.
-Recent reflections:
-{reflection_text}
+You are analyzing a practitioner reflection.
+
+Reflection:
+{message}
+
 Choose the SINGLE most relevant behavioral pattern from this list:
 {PATTERN_LIBRARY}
-Focus on behavioral patterns rather than temporary emotions.
-Return JSON only in this format:
-{{"patterns":[{{"pattern":"name","confidence":0.0}}]}}
+
+Focus on behavior patterns rather than temporary emotions.
+
+Return JSON only:
+{{"pattern":"name","confidence":0.0}}
 """
+
     headers = {"Authorization": f"Bearer {st.secrets['GROQ_API_KEY']}"}
-    res = requests.post(
-        "https://api.groq.com/openai/v1/chat/completions",
-        json={
-            "model": "llama-3.3-70b-versatile",
-            "messages": [{"role": "system", "content": prompt}]
-        },
-        headers=headers
-    )
+
     try:
+        res = requests.post(
+            "https://api.groq.com/openai/v1/chat/completions",
+            json={
+                "model": "llama-3.3-70b-versatile",
+                "messages": [{"role": "system", "content": prompt}]
+            },
+            headers=headers
+        )
+
         content = res.json()["choices"][0]["message"]["content"]
         start = content.find("{")
         end = content.rfind("}") + 1
         data = json.loads(content[start:end])
-        for p in data["patterns"]:
-            supabase.table("dojo_patterns").insert({
-                "user_id": user_id,
-                "pattern": p["pattern"],
-                "confidence_score": p["confidence"],
-                "timestamp": datetime.now(UTC).isoformat()
-            }).execute()
-    except:
-        pass
+
+        pattern = data["pattern"]
+        confidence = data["confidence"]
+
+        supabase.table("dojo_patterns").insert({
+            "user_id": user_id,
+            "pattern": pattern,
+            "confidence_score": confidence,
+            "timestamp": datetime.now(UTC).isoformat()
+        }).execute()
+
+        return pattern, confidence
+
+    except Exception as e:
+        print(f"Pattern detection error: {e}")
+        return None, 0.0
 
 # ==================================================
 # SIDEBAR
@@ -359,7 +362,6 @@ with tab_train:
 
         doctrine = "Discipline begins with attention."
 
-        # CRISIS DETECTION FIRST
         crisis_keywords = ["suicide", "kill myself", "want to die", "hopeless", "end it", "hurt myself", "self harm"]
         if any(word in prompt.lower() for word in crisis_keywords):
             reply = """
@@ -391,7 +393,7 @@ The mat will still be here when you're ready. Please reach out to someone.
             if persistent_pattern:
                 mirror = f"I notice **{persistent_pattern.replace('_', ' ')}** appearing repeatedly in your reflections.\n\n"
 
-            # UPDATED MENTOR PROMPT
+            # UPDATED MENTOR PROMPT WITH LENGTH SCALING
             mentor_prompt = f"""
 You are a calm, disciplined mentor guiding a practitioner through reflection.
 Your role: help them observe patterns in thinking and behavior.
@@ -465,7 +467,7 @@ RESPONSE LENGTH & STRUCTURE RULES — FOLLOW EXACTLY:
 
         # RANK PROGRESSION CHECK
         old_rank = st.session_state.get("last_rank", "Student")
-        new_rank = compute_rank(user_reflection_count + 1)
+        new_rank = compute_rank(user_reflection_count + 1)  # approximate for display
         if new_rank != old_rank:
             st.session_state.last_rank = new_rank
             st.balloons()
