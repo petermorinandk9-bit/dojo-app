@@ -13,7 +13,7 @@ from collections import Counter
 def inject_dojo_styling():
     """
     The Digital Zendo - Final Polished Weld
-    Sidebar always visible, buttons fully clickable
+    Sidebar collapsible again, but toggle button ALWAYS visible & functional
     """
     st.markdown("""
     <style>
@@ -78,49 +78,40 @@ def inject_dojo_styling():
             background-color: #1a1a1a !important;
         }
 
-        /* SIDEBAR - Always visible & expanded */
+        /* SIDEBAR styling (normal collapsible behavior) */
         [data-testid="stSidebar"] {
             background-color: #1a1a1a !important;
             border-right: 1px solid #2a2a2a !important;
             color: #f0f0f0 !important;
-            visibility: visible !important;
-            display: block !important;
-            width: 300px !important;
-            min-width: 300px !important;
-            max-width: 300px !important;
-            transform: none !important;
-            transition: none !important;
         }
 
         [data-testid="stSidebar"] * {
             color: #f0f0f0 !important;
         }
 
-        /* Sidebar toggle button - visible red glow, but sidebar stays open */
+        /* Sidebar toggle button - ALWAYS visible, red glow, functional */
         [data-testid="stSidebarCollapsedControl"] {
-            background-color: rgba(178, 34, 34, 0.2) !important;
-            color: #b22222 !important;
+            display: block !important;
             visibility: visible !important;
             opacity: 1 !important;
-        }
-
-        /* Restore full button interactivity - critical fix */
-        .stButton,
-        .stButton > button,
-        [data-testid="stSidebar"] button,
-        [data-testid="stSidebar"] .stButton > button {
+            background-color: rgba(178, 34, 34, 0.2) !important;
+            color: #b22222 !important;
+            border: none !important;
+            z-index: 999 !important; /* Stay on top */
             pointer-events: auto !important;
             cursor: pointer !important;
-            user-select: auto !important;
-            -webkit-user-select: auto !important;
-            touch-action: manipulation !important;
         }
 
-        /* Optional: subtle hover effect for feedback */
-        [data-testid="stSidebar"] button:hover,
-        [data-testid="stSidebar"] .stButton > button:hover {
-            background-color: rgba(178, 34, 34, 0.15) !important;
-            border-color: #b22222 !important;
+        /* Make sure the button stays visible even when sidebar is collapsed */
+        [data-testid="stSidebarCollapsedControl"] {
+            position: fixed !important;
+            top: 10px !important;
+            right: 10px !important;
+        }
+
+        /* Optional: subtle hover feedback */
+        [data-testid="stSidebarCollapsedControl"]:hover {
+            background-color: rgba(178, 34, 34, 0.4) !important;
         }
 
         /* HIDE STREAMLIT CHROME */
