@@ -13,7 +13,7 @@ from collections import Counter
 def inject_dojo_styling():
     """
     The Digital Zendo - Final Polished Weld
-    Sidebar forced always visible & non-collapsible
+    Sidebar always visible, buttons fully clickable
     """
     st.markdown("""
     <style>
@@ -22,14 +22,14 @@ def inject_dojo_styling():
 
         .stApp {
             background-color: #0a0a0a !important;
-            color: #f0f0f0 !important; /* Brighter text for better visibility */
+            color: #f0f0f0 !important;
         }
 
         /* THE ALTAR (Title) */
         .dojo-title {
             font-family: 'Ma Shan Zheng', cursive !important;
-            font-size: 150px !important; /* Massive 2-inch punch */
-            color: rgba(178, 34, 34, 0.6) !important; /* Faded Cinnabar Red */
+            font-size: 150px !important;
+            color: rgba(178, 34, 34, 0.6) !important;
             text-align: center !important;
             margin-top: -20px !important;
             margin-bottom: 40px !important;
@@ -40,7 +40,7 @@ def inject_dojo_styling():
         [data-testid="stChatMessage"] {
             background-color: transparent !important;
             animation: fadeIn 2s ease-in !important;
-            color: #f0f0f0 !important; /* Ensure chat text is brighter */
+            color: #f0f0f0 !important;
         }
 
         @keyframes fadeIn {
@@ -54,7 +54,7 @@ def inject_dojo_styling():
             background-color: rgba(47, 79, 79, 0.05) !important;
             border-radius: 15px !important;
             margin: 10px 10% !important;
-            color: #f0f0f0 !important; /* Brighter mentor text */
+            color: #f0f0f0 !important;
         }
 
         /* STUDENT (Right Aligned & Grounded) */
@@ -63,7 +63,7 @@ def inject_dojo_styling():
             background-color: rgba(20, 20, 20, 0.6) !important;
             margin-left: 20% !important;
             border-radius: 15px 0 0 15px !important;
-            color: #f0f0f0 !important; /* Brighter user text */
+            color: #f0f0f0 !important;
         }
 
         /* Enforce brighter text in chat markdown */
@@ -73,19 +73,18 @@ def inject_dojo_styling():
             color: #f0f0f0 !important;
         }
 
-        /* Darker grey avatar backgrounds (matching chat bar tones) */
+        /* Avatar background */
         div[data-testid^="stChatMessageAvatar"] {
-            background-color: #1a1a1a !important; /* Dark grey like sidebar/chat elements */
+            background-color: #1a1a1a !important;
         }
 
-        /* STONE TABLET SIDEBAR - Always visible & expanded */
+        /* SIDEBAR - Always visible & expanded */
         [data-testid="stSidebar"] {
             background-color: #1a1a1a !important;
             border-right: 1px solid #2a2a2a !important;
             color: #f0f0f0 !important;
             visibility: visible !important;
             display: block !important;
-            position: relative !important;
             width: 300px !important;
             min-width: 300px !important;
             max-width: 300px !important;
@@ -94,21 +93,38 @@ def inject_dojo_styling():
         }
 
         [data-testid="stSidebar"] * {
-            color: #f0f0f0 !important; /* Ensure all sidebar elements are brighter */
+            color: #f0f0f0 !important;
         }
 
-        /* Force sidebar toggle button visibility and prevent collapse */
+        /* Sidebar toggle button - visible red glow, but sidebar stays open */
         [data-testid="stSidebarCollapsedControl"] {
-            display: block !important;
-            visibility: visible !important;
-            opacity: 1 !important;
             background-color: rgba(178, 34, 34, 0.2) !important;
             color: #b22222 !important;
-            pointer-events: none !important; /* Prevent click/collapse attempts */
+            visibility: visible !important;
+            opacity: 1 !important;
+        }
+
+        /* Restore full button interactivity - critical fix */
+        .stButton,
+        .stButton > button,
+        [data-testid="stSidebar"] button,
+        [data-testid="stSidebar"] .stButton > button {
+            pointer-events: auto !important;
+            cursor: pointer !important;
+            user-select: auto !important;
+            -webkit-user-select: auto !important;
+            touch-action: manipulation !important;
+        }
+
+        /* Optional: subtle hover effect for feedback */
+        [data-testid="stSidebar"] button:hover,
+        [data-testid="stSidebar"] .stButton > button:hover {
+            background-color: rgba(178, 34, 34, 0.15) !important;
+            border-color: #b22222 !important;
         }
 
         /* HIDE STREAMLIT CHROME */
-        header, footer, #MainMenu {visibility: hidden;}
+        header, footer, #MainMenu {visibility: hidden !important;}
     </style>
     
     <div class="dojo-title">The Dojo</div>
@@ -279,7 +295,6 @@ def compute_rank(count):
         return "Sentinel"
     return "Sovereign"
 
-# Count real user reflections from Supabase for rank
 user_reflection_count = supabase.table("records") \
     .select("id", count="exact") \
     .eq("user_id", USER_ID) \
@@ -343,7 +358,7 @@ def compute_evolution():
     return "Stable"
 
 # ==================================================
-# PATTERN DETECTION (Upgrade 1: per reflection, after crisis check)
+# PATTERN DETECTION
 # ==================================================
 def detect_pattern_for_message(user_id, message):
     prompt = f"""
@@ -395,7 +410,7 @@ Return JSON only:
         return None, 0.0
 
 # ==================================================
-# TOP PATTERN FREQUENCY (Upgrade 5)
+# TOP PATTERN
 # ==================================================
 def compute_top_pattern():
     r = supabase.table("dojo_patterns") \
@@ -420,7 +435,7 @@ def compute_top_pattern():
     return f"{top_pattern.replace('_', ' ').title()} ({percentage}%)"
 
 # ==================================================
-# SIDEBAR (with free reflections urgency + top pattern)
+# SIDEBAR
 # ==================================================
 with st.sidebar:
     st.markdown("### The-Dojo")
@@ -476,7 +491,7 @@ with tab_train:
         st.session_state.milestone_message = None
     st.divider()
     for msg in st.session_state.msgs[-10:]:
-        avatar = "🧑‍🎓" if msg["role"] == "user" else "🧘‍♂️"  # Customize here: emoji or URL
+        avatar = "🧑‍🎓" if msg["role"] == "user" else "🧘‍♂️"
         with st.chat_message(msg["role"], avatar=avatar):
             st.markdown(msg["content"])
     prompt = st.chat_input("Speak from center...")
@@ -524,7 +539,6 @@ The mat will still be here when you're ready. Please reach out to someone.
             detected_pattern = None
             confidence = 0.0
         else:
-            # Detect pattern only if not crisis
             detected_pattern, confidence = detect_pattern_for_message(USER_ID, prompt)
 
             persistent_pattern = None
@@ -554,20 +568,9 @@ If appropriate, weave in this teaching naturally:
 
 CRITICAL LENGTH RULES — FOLLOW EXACTLY OR RESPONSE WILL BE REJECTED:
 
-1. LIGHT/NEUTRAL INPUT (casual check-in, simple question, brief share):
-   → 1-2 sentences max
-   → Example: "Good to see you here. What's on your mind today?"
-
-2. MODERATE INPUT (mild frustration, exploring an idea, noticing a pattern):
-   → 3-5 sentences, single paragraph
-   → Example: "That awareness is the first step. What happens right before you avoid the task?"
-
-3. HEAVY INPUT (deep struggle, breakthrough moment, stuck in loop):
-   → 2 short paragraphs max (100-150 words total)
-   → Example: "This loop has deep roots. Notice how it begins... [short reflection]. What small step feels possible right now?"
-
-When uncertain, choose shorter. Default to brevity.
-NEVER exceed 150 words under any circumstance.
+1. LIGHT/NEUTRAL INPUT → 1-2 sentences max
+2. MODERATE INPUT → 3-5 sentences, single paragraph
+3. HEAVY INPUT → 2 short paragraphs max (100-150 words total)
 
 Tone: grounded, non-judgmental, quietly supportive. No fluff, no lectures.
 End in a way that invites continuation unless resolved.
@@ -588,12 +591,10 @@ End in a way that invites continuation unless resolved.
             except Exception:
                 reply = "The mentor pauses for a moment. Please try again."
 
-        # HARD WORD CAP (150 words max - stricter)
         words = reply.split()
         if len(words) > 150:
             reply = ' '.join(words[:150]) + "… (mentor pauses — reflect before continuing)"
 
-        # SINGLE ASSISTANT MESSAGE
         if st.session_state.msgs and st.session_state.msgs[-1]["role"] == "assistant" and st.session_state.msgs[-1]["content"] == reply:
             pass
         else:
@@ -643,6 +644,6 @@ with tab_history:
         .execute()
     if r.data:
         for row in r.data:
-            avatar = "🧑‍🎓" if row["role"] == "user" else "🧘‍♂️"  # Customize here: emoji or URL
+            avatar = "🧑‍🎓" if row["role"] == "user" else "🧘‍♂️"
             with st.chat_message(row["role"], avatar=avatar):
                 st.markdown(row["content"])
