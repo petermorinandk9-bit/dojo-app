@@ -13,6 +13,7 @@ from collections import Counter
 def inject_dojo_styling():
     """
     The Digital Zendo - Final Polished Weld
+    Sidebar forced always visible & non-collapsible
     """
     st.markdown("""
     <style>
@@ -77,23 +78,33 @@ def inject_dojo_styling():
             background-color: #1a1a1a !important; /* Dark grey like sidebar/chat elements */
         }
 
-        /* STONE TABLET SIDEBAR */
+        /* STONE TABLET SIDEBAR - Always visible & expanded */
         [data-testid="stSidebar"] {
             background-color: #1a1a1a !important;
             border-right: 1px solid #2a2a2a !important;
-            color: #f0f0f0 !important; /* Brighter sidebar text for visibility */
-            visibility: visible !important; /* Ensure sidebar is visible */
-            display: block !important; /* Force display if hidden */
+            color: #f0f0f0 !important;
+            visibility: visible !important;
+            display: block !important;
+            position: relative !important;
+            width: 300px !important;
+            min-width: 300px !important;
+            max-width: 300px !important;
+            transform: none !important;
+            transition: none !important;
         }
 
         [data-testid="stSidebar"] * {
             color: #f0f0f0 !important; /* Ensure all sidebar elements are brighter */
         }
 
-        /* Sidebar Trigger Fix - Red Glow */
+        /* Force sidebar toggle button visibility and prevent collapse */
         [data-testid="stSidebarCollapsedControl"] {
+            display: block !important;
+            visibility: visible !important;
+            opacity: 1 !important;
             background-color: rgba(178, 34, 34, 0.2) !important;
             color: #b22222 !important;
+            pointer-events: none !important; /* Prevent click/collapse attempts */
         }
 
         /* HIDE STREAMLIT CHROME */
