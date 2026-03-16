@@ -390,6 +390,9 @@ with tab_train:
             "timestamp": datetime.now(UTC).isoformat()
         }).execute()
 
+        # NEW: Detect pattern for EVERY reflection (Upgrade 1)
+        detected_pattern, confidence = detect_pattern_for_message(USER_ID, prompt)
+
         doctrine = "Discipline begins with attention."
 
         crisis_keywords = ["suicide", "kill myself", "want to die", "hopeless", "end it", "hurt myself", "self harm"]
@@ -404,13 +407,7 @@ Or text HOME to **741741** (Crisis Text Line)
 
 The mat will still be here when you're ready. Please reach out to someone.
 """
-            # Skip pattern detection for crisis messages
-            detected_pattern = None
-            confidence = 0.0
         else:
-            # NOW detect pattern (only if not crisis) — Claude's optimization
-            detected_pattern, confidence = detect_pattern_for_message(USER_ID, prompt)
-
             persistent_pattern = None
             try:
                 r = supabase.table("dojo_patterns") \
