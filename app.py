@@ -286,13 +286,12 @@ Return JSON only in this format:
         pass
 
 # ==================================================
-# SIDEBAR – removed remaining count display
+# SIDEBAR
 # ==================================================
 with st.sidebar:
     st.markdown("### The-Dojo")
     st.markdown(f"**{rank} · {USER_NAME}**")
     subscription = st.session_state.user.get("subscription_status", "free")
-    # Removed: free reflections remaining caption
     st.divider()
     momentum = compute_momentum()
     evolution = compute_evolution()
@@ -334,7 +333,6 @@ with tab_train:
     if prompt:
         subscription = st.session_state.user.get("subscription_status", "free")
         if subscription not in ["paid", "beta", "admin"]:
-            # Still enforce the 15 limit with real-time Supabase count
             r = supabase.table("records") \
                 .select("id", count="exact") \
                 .eq("user_id", USER_ID) \
@@ -346,9 +344,8 @@ with tab_train:
                 st.info("Join the Dojo to continue your practice.")
                 st.stop()
 
-        # Only process this exact prompt once
         if prompt == st.session_state.last_processed_prompt:
-            st.stop()  # already handled this input → skip
+            st.stop()
 
         st.session_state.last_processed_prompt = prompt
 
@@ -375,13 +372,7 @@ Or text HOME to **741741** (Crisis Text Line)
 
 The mat will still be here when you're ready. Please reach out to someone.
 """
-            # Skip pattern detection for crisis messages
-            detected_pattern = None
-            confidence = 0.0
         else:
-            # NOW detect pattern (only if not crisis)
-            detected_pattern, confidence = detect_pattern_for_message(USER_ID, prompt)
-
             # PATTERN PERSISTENCE DETECTION
             persistent_pattern = None
             try:
@@ -400,7 +391,7 @@ The mat will still be here when you're ready. Please reach out to someone.
             if persistent_pattern:
                 mirror = f"I notice **{persistent_pattern.replace('_', ' ')}** appearing repeatedly in your reflections.\n\n"
 
-            # UPDATED MENTOR PROMPT WITH LENGTH SCALING
+            # UPDATED MENTOR PROMPT
             mentor_prompt = f"""
 You are a calm, disciplined mentor guiding a practitioner through reflection.
 Your role: help them observe patterns in thinking and behavior.
@@ -442,8 +433,7 @@ RESPONSE LENGTH & STRUCTURE RULES — FOLLOW EXACTLY:
 
         # SINGLE ASSISTANT MESSAGE – with duplicate guard
         if st.session_state.msgs and st.session_state.msgs[-1]["role"] == "assistant" and st.session_state.msgs[-1]["content"] == reply:
-            # Already appended this exact reply → skip to prevent double
-            pass
+            pass  # skip
         else:
             with st.chat_message("assistant"):
                 placeholder = st.empty()
@@ -475,7 +465,7 @@ RESPONSE LENGTH & STRUCTURE RULES — FOLLOW EXACTLY:
 
         # RANK PROGRESSION CHECK
         old_rank = st.session_state.get("last_rank", "Student")
-        new_rank = compute_rank(user_reflection_count + 1)  # approximate for display
+        new_rank = compute_rank(user_reflection_count + 1)
         if new_rank != old_rank:
             st.session_state.last_rank = new_rank
             st.balloons()
