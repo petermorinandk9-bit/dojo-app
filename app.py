@@ -8,6 +8,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from datetime import datetime, UTC
 from supabase import create_client, Client
+from collections import Counter
 
 # ==================================================
 # CONFIG
@@ -237,88 +238,82 @@ def compute_evolution():
     return "Stable"
 
 # ==================================================
-# TREND ANALYSIS (The Pattern Mirror)
+# PATTERN DETECTION (UPGRADE 1)
+# Detect pattern for EVERY reflection
 # ==================================================
-def compute_trend_insight():
-    r = supabase.table("dojo_patterns") \
-        .select("pattern") \
-        .eq("user_id", USER_ID) \
-        .order("timestamp", desc=True) \
-        .limit(20) \
-        .execute()
-    
-    if not r.data or len(r.data) < 10:
-        return "Calibrating patterns..."
-    
-    recent = [p["pattern"] for p in r.data[:5]]
-    baseline = [p["pattern"] for p in r.data[5:]]
-    
-    # Avoid division by zero (though <10 guard should catch most cases)
-    if not baseline:
-        return "Calibrating patterns..."
-    
-    recent_pos = sum(1 for p in recent if p in POSITIVE_PATTERNS) / len(recent)
-    baseline_pos = sum(1 for p in baseline if p in POSITIVE_PATTERNS) / len(baseline)
-    
-    if recent_pos > baseline_pos + 0.2:
-        return "Signal: Positive Shift. You are breaking a loop."
-    if recent_pos < baseline_pos - 0.2:
-        return "Signal: Friction detected. Return to center."
-    
-    # Fallback to most frequent recent pattern
-    if recent:
-        most_frequent = max(set(recent), key=recent.count)
-        return f"Dominant Pattern: {most_frequent.replace('_', ' ').title()}"
-    return "Calibrating patterns..."
-
-# ==================================================
-# PATTERN DETECTION
-# ==================================================
-def detect_patterns(user_id):
-    recent = supabase.table("records") \
-        .select("content") \
-        .eq("user_id", user_id) \
-        .eq("role", "user") \
-        .order("timestamp", desc=True) \
-        .limit(50) \
-        .execute()
-    if not recent.data or len(recent.data) < 10:
-        return
-    reflections = [row["content"] for row in recent.data]
-    reflection_text = "\n".join(reflections)
+def detect_pattern_for_message(user_id, message):
     prompt = f"""
-You are analyzing reflection entries from a practitioner.
-Recent reflections:
-{reflection_text}
+You are analyzing a practitioner reflection.
+
+Reflection:
+{message}
+
 Choose the SINGLE most relevant behavioral pattern from this list:
 {PATTERN_LIBRARY}
-Focus on behavioral patterns rather than temporary emotions.
-Return JSON only in this format:
-{{"patterns":[{{"pattern":"name","confidence":0.0}}]}}
+
+Focus on behavior patterns rather than temporary emotions.
+
+Return JSON only:
+{{"pattern":"name","confidence":0.0}}
 """
+
     headers = {"Authorization": f"Bearer {st.secrets['GROQ_API_KEY']}"}
-    res = requests.post(
-        "https://api.groq.com/openai/v1/chat/completions",
-        json={
-            "model": "llama-3.3-70b-versatile",
-            "messages": [{"role": "system", "content": prompt}]
-        },
-        headers=headers
-    )
+
     try:
+        res = requests.post(
+            "https://api.groq.com/openai/v1/chat/completions",
+            json={
+                "model": "llama-3.3-70b-versatile",
+                "messages": [{"role": "system", "content": prompt}]
+            },
+            headers=headers
+        )
+
         content = res.json()["choices"][0]["message"]["content"]
         start = content.find("{")
         end = content.rfind("}") + 1
         data = json.loads(content[start:end])
-        for p in data["patterns"]:
-            supabase.table("dojo_patterns").insert({
-                "user_id": user_id,
-                "pattern": p["pattern"],
-                "confidence_score": p["confidence"],
-                "timestamp": datetime.now(UTC).isoformat()
-            }).execute()
-    except:
-        pass
+
+        pattern = data["pattern"]
+        confidence = data["confidence"]
+
+        supabase.table("dojo_patterns").insert({
+            "user_id": user_id,
+            "pattern": pattern,
+            "confidence_score": confidence,
+            "timestamp": datetime.now(UTC).isoformat()
+        }).execute()
+
+        return pattern, confidence
+
+    except Exception as e:
+        print(f"Pattern detection error: {e}")
+        return None, 0.0
+
+# ==================================================
+# TOP PATTERN FREQUENCY (UPGRADE 5)
+# ==================================================
+def compute_top_pattern():
+    r = supabase.table("dojo_patterns") \
+        .select("pattern") \
+        .eq("user_id", USER_ID) \
+        .order("timestamp", desc=True) \
+        .limit(50) \
+        .execute()
+    
+    if not r.data or len(r.data) < 5:
+        return "Calibrating..."
+    
+    patterns = [p["pattern"] for p in r.data]
+    counts = Counter(patterns)
+    
+    if not counts:
+        return "Calibrating..."
+    
+    top_pattern, top_count = counts.most_common(1)[0]
+    percentage = int((top_count / len(patterns)) * 100)
+    
+    return f"{top_pattern.replace('_', ' ').title()} ({percentage}%)"
 
 # ==================================================
 # SIDEBAR
@@ -331,10 +326,10 @@ with st.sidebar:
     st.divider()
     momentum = compute_momentum()
     evolution = compute_evolution()
-    trend = compute_trend_insight()
+    top_pattern = compute_top_pattern()
     st.markdown(f"Momentum: **{momentum:+.2f}**")
     st.markdown(f"Evolution: **{evolution}**")
-    st.markdown(f"Trend Insight: **{trend}**")
+    st.markdown(f"**Top Pattern:** {top_pattern}")
     st.progress((momentum + 1) / 2)
     st.divider()
     for i, phase in enumerate(PHASE_SETS[rank]):
@@ -371,7 +366,6 @@ with tab_train:
     if prompt:
         subscription = st.session_state.user.get("subscription_status", "free")
         if subscription not in ["paid", "beta", "admin"]:
-            # Still enforce the 15 limit with real-time Supabase count
             r = supabase.table("records") \
                 .select("id", count="exact") \
                 .eq("user_id", USER_ID) \
@@ -383,9 +377,8 @@ with tab_train:
                 st.info("Join the Dojo to continue your practice.")
                 st.stop()
 
-        # Only process this exact prompt once
         if prompt == st.session_state.last_processed_prompt:
-            st.stop()  # already handled this input → skip
+            st.stop()
 
         st.session_state.last_processed_prompt = prompt
 
@@ -397,12 +390,8 @@ with tab_train:
             "timestamp": datetime.now(UTC).isoformat()
         }).execute()
 
-        if len([m for m in st.session_state.msgs if m["role"] == "user"]) % 3 == 0:
-            detect_patterns(USER_ID)
-
         doctrine = "Discipline begins with attention."
 
-        # CRISIS DETECTION
         crisis_keywords = ["suicide", "kill myself", "want to die", "hopeless", "end it", "hurt myself", "self harm"]
         if any(word in prompt.lower() for word in crisis_keywords):
             reply = """
@@ -415,8 +404,13 @@ Or text HOME to **741741** (Crisis Text Line)
 
 The mat will still be here when you're ready. Please reach out to someone.
 """
+            # Skip pattern detection for crisis messages
+            detected_pattern = None
+            confidence = 0.0
         else:
-            # PATTERN PERSISTENCE DETECTION
+            # NOW detect pattern (only if not crisis) — Claude's optimization
+            detected_pattern, confidence = detect_pattern_for_message(USER_ID, prompt)
+
             persistent_pattern = None
             try:
                 r = supabase.table("dojo_patterns") \
@@ -434,7 +428,6 @@ The mat will still be here when you're ready. Please reach out to someone.
             if persistent_pattern:
                 mirror = f"I notice **{persistent_pattern.replace('_', ' ')}** appearing repeatedly in your reflections.\n\n"
 
-            # UPDATED MENTOR PROMPT WITH LENGTH SCALING
             mentor_prompt = f"""
 You are a calm, disciplined mentor guiding a practitioner through reflection.
 Your role: help them observe patterns in thinking and behavior.
@@ -466,17 +459,14 @@ RESPONSE LENGTH & STRUCTURE RULES — FOLLOW EXACTLY:
             except Exception:
                 reply = "The mentor pauses for a moment. Please try again."
 
-        # HARD WORD CAP (250 words max)
         words = reply.split()
         if len(words) > 250:
             reply = ' '.join(words[:250]) + "… (mentor pauses — reflect before continuing)"
 
         lines = reply.split('\n')
-        reply = '\n'.join(lines[:8])  # rough 3–4 paragraph cap
+        reply = '\n'.join(lines[:8])
 
-        # SINGLE ASSISTANT MESSAGE – with duplicate guard
         if st.session_state.msgs and st.session_state.msgs[-1]["role"] == "assistant" and st.session_state.msgs[-1]["content"] == reply:
-            # Already appended this exact reply → skip to prevent double
             pass
         else:
             with st.chat_message("assistant"):
@@ -500,16 +490,14 @@ RESPONSE LENGTH & STRUCTURE RULES — FOLLOW EXACTLY:
                 "timestamp": datetime.now(UTC).isoformat()
             }).execute()
 
-        # PHASE ADVANCEMENT
         user_msgs_in_session = len([m for m in st.session_state.msgs if m["role"] == "user"])
         if user_msgs_in_session % 3 == 0 and user_msgs_in_session > 0:
             st.session_state.phase = (st.session_state.phase + 1) % 4
             phase_name = PHASE_SETS[rank][st.session_state.phase]
             st.session_state.milestone_message = f"→ Moving to {phase_name}"
 
-        # RANK PROGRESSION CHECK
         old_rank = st.session_state.get("last_rank", "Student")
-        new_rank = compute_rank(user_reflection_count + 1)  # approximate for display
+        new_rank = compute_rank(user_reflection_count + 1)
         if new_rank != old_rank:
             st.session_state.last_rank = new_rank
             st.balloons()
