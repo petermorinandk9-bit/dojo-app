@@ -12,159 +12,67 @@ from collections import Counter
 
 def inject_dojo_styling():
     """
-    The Dojo UI Master Block
-    Minimalist Zen-Dark styling + PWA meta tags
+    The Digital Zendo - Final Polished Weld
     """
     st.markdown("""
-        <style>
-        /* ========================================
-           STREAMLIT CHROME REMOVAL
-        ======================================== */
-        #MainMenu {visibility: hidden;}
-        footer {visibility: hidden;}
-        header {visibility: hidden;}
-        
-        /* ========================================
-           ROOT & BACKGROUND
-        ======================================== */
+    <style>
+        /* Import a Raw Brush Font from Google */
+        @import url('https://fonts.googleapis.com/css2?family=Ma+Shan+Zheng&display=swap');
+
         .stApp {
-            background-color: #0a0a0a;
-            color: #e0e0e0;
+            background-color: #0a0a0a !important;
+            color: #dcdcdc !important;
         }
-        
-        /* ========================================
-           SIDEBAR - SLATE ZEN
-        ======================================== */
-        [data-testid="stSidebar"] {
-            background-color: #1a1a1a;
-            border-right: 1px solid #2a2a2a;
+
+        /* THE ALTAR (Title) */
+        .dojo-title {
+            font-family: 'Ma Shan Zheng', cursive !important;
+            font-size: 150px !important; /* Massive 2-inch punch */
+            color: rgba(178, 34, 34, 0.6) !important; /* Faded Cinnabar Red */
+            text-align: center !important;
+            margin-top: -20px !important;
+            margin-bottom: 40px !important;
+            text-shadow: 0 0 15px rgba(178, 34, 34, 0.2) !important;
         }
-        
-        [data-testid="stSidebar"] .element-container {
-            color: #c0c0c0;
+
+        /* INK BLEED MESSAGES */
+        [data-testid="stChatMessage"] {
+            background-color: transparent !important;
+            animation: fadeIn 2s ease-in !important;
         }
-        
-        /* ========================================
-           CHAT BUBBLES
-        ======================================== */
-        /* User messages - Right aligned, slate bubble */
-        [data-testid="stChatMessageContainer"][data-testid*="user"] {
-            background-color: #2a2a2a;
-            border-radius: 12px;
-            padding: 12px 16px;
-            margin: 8px 0;
-            margin-left: 20%;
-            border-left: 3px solid #4a4a4a;
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
         }
-        
-        /* Assistant messages - Left aligned, dark bubble */
+
+        /* MENTOR (Centered & Misty) */
         [data-testid="stChatMessageContainer"][data-testid*="assistant"] {
-            background-color: #1a1a1a;
-            border-radius: 12px;
-            padding: 12px 16px;
-            margin: 8px 0;
-            margin-right: 20%;
-            border-left: 3px solid #0a0a0a;
+            text-align: center !important;
+            background-color: rgba(47, 79, 79, 0.05) !important;
+            border-radius: 15px !important;
+            margin: 10px 10% !important;
         }
-        
-        /* ========================================
-           INPUTS & BUTTONS
-        ======================================== */
-        .stTextInput input {
-            background-color: #1a1a1a;
-            color: #e0e0e0;
-            border: 1px solid #2a2a2a;
-            border-radius: 8px;
+
+        /* STUDENT (Right Aligned & Grounded) */
+        [data-testid="stChatMessageContainer"][data-testid*="user"] {
+            text-align: right !important;
+            background-color: rgba(20, 20, 20, 0.6) !important;
+            margin-left: 20% !important;
+            border-radius: 15px 0 0 15px !important;
         }
-        
-        .stButton button {
-            background-color: #2a2a2a;
-            color: #e0e0e0;
-            border: 1px solid #3a3a3a;
-            border-radius: 8px;
-            transition: all 0.2s ease;
+
+        /* STONE TABLET SIDEBAR */
+        [data-testid="stSidebar"] {
+            background-color: #1a1a1a !important;
+            border-right: 1px solid #2a2a2a !important;
         }
-        
-        .stButton button:hover {
-            background-color: #3a3a3a;
-            border-color: #4a4a4a;
-        }
-        
-        /* ========================================
-           PROGRESS BAR
-        ======================================== */
-        .stProgress > div > div {
-            background-color: #4a4a4a;
-        }
-        
-        /* ========================================
-           TABS
-        ======================================== */
-        .stTabs [data-baseweb="tab-list"] {
-            background-color: #1a1a1a;
-            border-bottom: 1px solid #2a2a2a;
-        }
-        
-        .stTabs [data-baseweb="tab"] {
-            color: #808080;
-            border-radius: 8px 8px 0 0;
-        }
-        
-        .stTabs [aria-selected="true"] {
-            background-color: #2a2a2a;
-            color: #e0e0e0;
-        }
-        
-        /* ========================================
-           DIVIDERS
-        ======================================== */
-        hr {
-            border-color: #2a2a2a;
-        }
-        
-        /* ========================================
-           TYPOGRAPHY
-        ======================================== */
-        h1, h2, h3 {
-            color: #f0f0f0;
-            font-weight: 300;
-            letter-spacing: 0.5px;
-        }
-        
-        .stMarkdown {
-            color: #d0d0d0;
-            line-height: 1.6;
-        }
-        
-        /* ========================================
-           SCROLLBAR
-        ======================================== */
-        ::-webkit-scrollbar {
-            width: 8px;
-            height: 8px;
-        }
-        
-        ::-webkit-scrollbar-track {
-            background: #0a0a0a;
-        }
-        
-        ::-webkit-scrollbar-thumb {
-            background: #2a2a2a;
-            border-radius: 4px;
-        }
-        
-        ::-webkit-scrollbar-thumb:hover {
-            background: #3a3a3a;
-        }
-        </style>
-        
-        <!-- PWA MANIFEST & META TAGS -->
-        <link rel="manifest" href="/manifest.json">
-        <meta name="theme-color" content="#0a0a0a">
-        <meta name="apple-mobile-web-app-capable" content="yes">
-        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-        <meta name="apple-mobile-web-app-title" content="The Dojo">
-        <link rel="apple-touch-icon" href="/icon-192.png">
+
+        /* HIDE STREAMLIT CHROME */
+        header, footer, #MainMenu {visibility: hidden;}
+    </style>
+    
+    <div class="dojo-title">The Dojo</div>
     """, unsafe_allow_html=True)
 
 # ==================================================
