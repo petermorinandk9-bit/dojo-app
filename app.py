@@ -10,10 +10,168 @@ from datetime import datetime, UTC
 from supabase import create_client, Client
 from collections import Counter
 
+def inject_dojo_styling():
+    """
+    The Dojo UI Master Block
+    Minimalist Zen-Dark styling + PWA meta tags
+    """
+    st.markdown("""
+        <style>
+        /* ========================================
+           STREAMLIT CHROME REMOVAL
+        ======================================== */
+        #MainMenu {visibility: hidden;}
+        footer {visibility: hidden;}
+        header {visibility: hidden;}
+        
+        /* ========================================
+           ROOT & BACKGROUND
+        ======================================== */
+        .stApp {
+            background-color: #0a0a0a;
+            color: #e0e0e0;
+        }
+        
+        /* ========================================
+           SIDEBAR - SLATE ZEN
+        ======================================== */
+        [data-testid="stSidebar"] {
+            background-color: #1a1a1a;
+            border-right: 1px solid #2a2a2a;
+        }
+        
+        [data-testid="stSidebar"] .element-container {
+            color: #c0c0c0;
+        }
+        
+        /* ========================================
+           CHAT BUBBLES
+        ======================================== */
+        /* User messages - Right aligned, slate bubble */
+        [data-testid="stChatMessageContainer"][data-testid*="user"] {
+            background-color: #2a2a2a;
+            border-radius: 12px;
+            padding: 12px 16px;
+            margin: 8px 0;
+            margin-left: 20%;
+            border-left: 3px solid #4a4a4a;
+        }
+        
+        /* Assistant messages - Left aligned, dark bubble */
+        [data-testid="stChatMessageContainer"][data-testid*="assistant"] {
+            background-color: #1a1a1a;
+            border-radius: 12px;
+            padding: 12px 16px;
+            margin: 8px 0;
+            margin-right: 20%;
+            border-left: 3px solid #0a0a0a;
+        }
+        
+        /* ========================================
+           INPUTS & BUTTONS
+        ======================================== */
+        .stTextInput input {
+            background-color: #1a1a1a;
+            color: #e0e0e0;
+            border: 1px solid #2a2a2a;
+            border-radius: 8px;
+        }
+        
+        .stButton button {
+            background-color: #2a2a2a;
+            color: #e0e0e0;
+            border: 1px solid #3a3a3a;
+            border-radius: 8px;
+            transition: all 0.2s ease;
+        }
+        
+        .stButton button:hover {
+            background-color: #3a3a3a;
+            border-color: #4a4a4a;
+        }
+        
+        /* ========================================
+           PROGRESS BAR
+        ======================================== */
+        .stProgress > div > div {
+            background-color: #4a4a4a;
+        }
+        
+        /* ========================================
+           TABS
+        ======================================== */
+        .stTabs [data-baseweb="tab-list"] {
+            background-color: #1a1a1a;
+            border-bottom: 1px solid #2a2a2a;
+        }
+        
+        .stTabs [data-baseweb="tab"] {
+            color: #808080;
+            border-radius: 8px 8px 0 0;
+        }
+        
+        .stTabs [aria-selected="true"] {
+            background-color: #2a2a2a;
+            color: #e0e0e0;
+        }
+        
+        /* ========================================
+           DIVIDERS
+        ======================================== */
+        hr {
+            border-color: #2a2a2a;
+        }
+        
+        /* ========================================
+           TYPOGRAPHY
+        ======================================== */
+        h1, h2, h3 {
+            color: #f0f0f0;
+            font-weight: 300;
+            letter-spacing: 0.5px;
+        }
+        
+        .stMarkdown {
+            color: #d0d0d0;
+            line-height: 1.6;
+        }
+        
+        /* ========================================
+           SCROLLBAR
+        ======================================== */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        
+        ::-webkit-scrollbar-track {
+            background: #0a0a0a;
+        }
+        
+        ::-webkit-scrollbar-thumb {
+            background: #2a2a2a;
+            border-radius: 4px;
+        }
+        
+        ::-webkit-scrollbar-thumb:hover {
+            background: #3a3a3a;
+        }
+        </style>
+        
+        <!-- PWA MANIFEST & META TAGS -->
+        <link rel="manifest" href="/manifest.json">
+        <meta name="theme-color" content="#0a0a0a">
+        <meta name="apple-mobile-web-app-capable" content="yes">
+        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+        <meta name="apple-mobile-web-app-title" content="The Dojo">
+        <link rel="apple-touch-icon" href="/icon-192.png">
+    """, unsafe_allow_html=True)
+
 # ==================================================
 # CONFIG
 # ==================================================
 st.set_page_config(page_title="The-Dojo", layout="wide")
+inject_dojo_styling()
 
 # ==================================================
 # IMPORTANT NOTICE
