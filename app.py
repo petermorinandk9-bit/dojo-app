@@ -65,6 +65,13 @@ def inject_dojo_styling():
             color: #f0f0f0 !important; /* Brighter user text */
         }
 
+        /* Enforce brighter text in chat markdown */
+        [data-testid="stChatMessage"] .stMarkdown,
+        [data-testid="stChatMessage"] p,
+        [data-testid="stChatMessage"] div {
+            color: #f0f0f0 !important;
+        }
+
         /* STONE TABLET SIDEBAR */
         [data-testid="stSidebar"] {
             background-color: #1a1a1a !important;
