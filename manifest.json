@@ -1,0 +1,24 @@
+{
+  "name": "The Dojo",
+  "short_name": "Dojo",
+  "description": "A high-performance pattern recognition and reflection engine.",
+  "start_url": "/",
+  "display": "standalone",
+  "scope": "/",
+  "background_color": "#0a0a0a",
+  "theme_color": "#0a0a0a",
+  "icons": [
+    {
+      "src": "https://raw.githubusercontent.com/streamlit/Screencasts/master/site/favicon.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "https://raw.githubusercontent.com/streamlit/Screencasts/master/site/favicon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
