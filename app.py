@@ -12,7 +12,7 @@ from collections import Counter
 
 def inject_dojo_styling():
     """
-    The Digital Zendo - Sidebar collapsible + toggle always visible
+    The Digital Zendo - Sidebar collapsible + toggle ALWAYS visible & clickable
     """
     st.markdown("""
     <style>
@@ -88,34 +88,37 @@ def inject_dojo_styling():
             color: #f0f0f0 !important;
         }
 
-        /* Sidebar toggle button - ALWAYS visible, red glow, functional */
+        /* Sidebar toggle button - ALWAYS visible, top-right, high z-index, clickable */
         [data-testid="stSidebarCollapsedControl"] {
             display: block !important;
             visibility: visible !important;
             opacity: 1 !important;
-            background-color: rgba(178, 34, 34, 0.25) !important;
+            background-color: rgba(178, 34, 34, 0.3) !important;
             color: #b22222 !important;
-            border: 1px solid rgba(178, 34, 34, 0.4) !important;
-            border-radius: 6px !important;
-            padding: 8px 12px !important;
-            z-index: 9999 !important;
+            border: 1px solid rgba(178, 34, 34, 0.5) !important;
+            border-radius: 8px !important;
+            padding: 10px 14px !important;
+            font-size: 20px !important;
+            z-index: 99999 !important;
             position: fixed !important;
-            top: 12px !important;
-            right: 16px !important;
+            top: 16px !important;
+            right: 20px !important;
             cursor: pointer !important;
             pointer-events: auto !important;
             transition: all 0.2s ease !important;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.5) !important;
         }
 
-        /* Hover feedback */
+        /* Hover effect for better feedback */
         [data-testid="stSidebarCollapsedControl"]:hover {
-            background-color: rgba(178, 34, 34, 0.45) !important;
-            box-shadow: 0 0 12px rgba(178, 34, 34, 0.3) !important;
+            background-color: rgba(178, 34, 34, 0.5) !important;
+            transform: scale(1.05) !important;
+            box-shadow: 0 4px 15px rgba(178, 34, 34, 0.4) !important;
         }
 
-        /* When sidebar is open, make toggle button less prominent but still visible */
-        [data-testid="stSidebar"][aria-expanded="true"] ~ div [data-testid="stSidebarCollapsedControl"] {
-            opacity: 0.85 !important;
+        /* Slightly dim when sidebar is open (still visible & clickable) */
+        [data-testid="stSidebar"][aria-expanded="true"] ~ * [data-testid="stSidebarCollapsedControl"] {
+            opacity: 0.9 !important;
         }
 
         /* HIDE STREAMLIT CHROME */
