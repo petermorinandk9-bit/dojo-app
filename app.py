@@ -24,15 +24,19 @@ def inject_dojo_styling():
             color: #f0f0f0 !important; /* Brighter text for better visibility */
         }
 
-        /* THE ALTAR (Title) */
+        /* THE ALTAR (Title) - Fixed in background */
         .dojo-title {
             font-family: 'Ma Shan Zheng', cursive !important;
-            font-size: 150px !important; /* Massive 2-inch punch */
-            color: rgba(178, 34, 34, 0.6) !important; /* Faded Cinnabar Red */
+            font-size: 20vw !important; /* Responsive large size */
+            color: rgba(178, 34, 34, 0.1) !important; /* Very faded for background effect */
             text-align: center !important;
-            margin-top: -20px !important;
-            margin-bottom: 40px !important;
-            text-shadow: 0 0 15px rgba(178, 34, 34, 0.2) !important;
+            position: fixed !important;
+            top: 50% !important;
+            left: 50% !important;
+            transform: translate(-50%, -50%) !important;
+            z-index: -1 !important; /* Behind all content */
+            pointer-events: none !important; /* Non-interactive */
+            text-shadow: 0 0 15px rgba(178, 34, 34, 0.05) !important; /* Subtle glow */
         }
 
         /* INK BLEED MESSAGES */
