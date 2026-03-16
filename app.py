@@ -21,7 +21,7 @@ def inject_dojo_styling():
 
         .stApp {
             background-color: #0a0a0a !important;
-            color: #dcdcdc !important;
+            color: #f0f0f0 !important; /* Brighter text for better visibility */
         }
 
         /* THE ALTAR (Title) */
@@ -39,6 +39,7 @@ def inject_dojo_styling():
         [data-testid="stChatMessage"] {
             background-color: transparent !important;
             animation: fadeIn 2s ease-in !important;
+            color: #f0f0f0 !important; /* Ensure chat text is brighter */
         }
 
         @keyframes fadeIn {
@@ -52,6 +53,7 @@ def inject_dojo_styling():
             background-color: rgba(47, 79, 79, 0.05) !important;
             border-radius: 15px !important;
             margin: 10px 10% !important;
+            color: #f0f0f0 !important; /* Brighter mentor text */
         }
 
         /* STUDENT (Right Aligned & Grounded) */
@@ -60,12 +62,18 @@ def inject_dojo_styling():
             background-color: rgba(20, 20, 20, 0.6) !important;
             margin-left: 20% !important;
             border-radius: 15px 0 0 15px !important;
+            color: #f0f0f0 !important; /* Brighter user text */
         }
 
         /* STONE TABLET SIDEBAR */
         [data-testid="stSidebar"] {
             background-color: #1a1a1a !important;
             border-right: 1px solid #2a2a2a !important;
+            color: #f0f0f0 !important; /* Brighter sidebar text for visibility */
+        }
+
+        [data-testid="stSidebar"] * {
+            color: #f0f0f0 !important; /* Ensure all sidebar elements are brighter */
         }
 
         /* HIDE STREAMLIT CHROME */
