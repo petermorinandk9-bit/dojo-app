@@ -51,9 +51,6 @@ if "milestone_message" not in st.session_state:
     st.session_state.milestone_message = None
 if "last_rank" not in st.session_state:
     st.session_state.last_rank = "Student"
-# Guard to prevent double processing of the same user input
-if "last_processed_prompt" not in st.session_state:
-    st.session_state.last_processed_prompt = None
 
 # ==================================================
 # PATTERN LIBRARY
@@ -237,56 +234,53 @@ def compute_evolution():
     return "Stable"
 
 # ==================================================
-# PATTERN DETECTION (called per reflection, after crisis check)
+# PATTERN DETECTION
 # ==================================================
-def detect_pattern_for_message(user_id, message):
+def detect_patterns(user_id):
+    recent = supabase.table("records") \
+        .select("content") \
+        .eq("user_id", user_id) \
+        .eq("role", "user") \
+        .order("timestamp", desc=True) \
+        .limit(50) \
+        .execute()
+    if not recent.data or len(recent.data) < 10:
+        return
+    reflections = [row["content"] for row in recent.data]
+    reflection_text = "\n".join(reflections)
     prompt = f"""
-You are analyzing a practitioner reflection.
-
-Reflection:
-{message}
-
+You are analyzing reflection entries from a practitioner.
+Recent reflections:
+{reflection_text}
 Choose the SINGLE most relevant behavioral pattern from this list:
 {PATTERN_LIBRARY}
-
-Focus on behavior patterns rather than temporary emotions.
-
-Return JSON only:
-{{"pattern":"name","confidence":0.0}}
+Focus on behavioral patterns rather than temporary emotions.
+Return JSON only in this format:
+{{"patterns":[{{"pattern":"name","confidence":0.0}}]}}
 """
-
     headers = {"Authorization": f"Bearer {st.secrets['GROQ_API_KEY']}"}
-
+    res = requests.post(
+        "https://api.groq.com/openai/v1/chat/completions",
+        json={
+            "model": "llama-3.3-70b-versatile",
+            "messages": [{"role": "system", "content": prompt}]
+        },
+        headers=headers
+    )
     try:
-        res = requests.post(
-            "https://api.groq.com/openai/v1/chat/completions",
-            json={
-                "model": "llama-3.3-70b-versatile",
-                "messages": [{"role": "system", "content": prompt}]
-            },
-            headers=headers
-        )
-
         content = res.json()["choices"][0]["message"]["content"]
         start = content.find("{")
         end = content.rfind("}") + 1
         data = json.loads(content[start:end])
-
-        pattern = data["pattern"]
-        confidence = data["confidence"]
-
-        supabase.table("dojo_patterns").insert({
-            "user_id": user_id,
-            "pattern": pattern,
-            "confidence_score": confidence,
-            "timestamp": datetime.now(UTC).isoformat()
-        }).execute()
-
-        return pattern, confidence
-
-    except Exception as e:
-        print(f"Pattern detection error: {e}")
-        return None, 0.0
+        for p in data["patterns"]:
+            supabase.table("dojo_patterns").insert({
+                "user_id": user_id,
+                "pattern": p["pattern"],
+                "confidence_score": p["confidence"],
+                "timestamp": datetime.now(UTC).isoformat()
+            }).execute()
+    except:
+        pass
 
 # ==================================================
 # SIDEBAR
@@ -347,11 +341,6 @@ with tab_train:
                 st.info("Join the Dojo to continue your practice.")
                 st.stop()
 
-        if prompt == st.session_state.last_processed_prompt:
-            st.stop()
-
-        st.session_state.last_processed_prompt = prompt
-
         st.session_state.msgs.append({"role": "user", "content": prompt})
         supabase.table("records").insert({
             "user_id": USER_ID,
@@ -359,6 +348,9 @@ with tab_train:
             "content": prompt,
             "timestamp": datetime.now(UTC).isoformat()
         }).execute()
+
+        if len([m for m in st.session_state.msgs if m["role"] == "user"]) % 3 == 0:
+            detect_patterns(USER_ID)
 
         doctrine = "Discipline begins with attention."
 
@@ -375,7 +367,6 @@ Or text HOME to **741741** (Crisis Text Line)
 The mat will still be here when you're ready. Please reach out to someone.
 """
         else:
-            # PATTERN PERSISTENCE DETECTION
             persistent_pattern = None
             try:
                 r = supabase.table("dojo_patterns") \
@@ -393,7 +384,6 @@ The mat will still be here when you're ready. Please reach out to someone.
             if persistent_pattern:
                 mirror = f"I notice **{persistent_pattern.replace('_', ' ')}** appearing repeatedly in your reflections.\n\n"
 
-            # UPDATED MENTOR PROMPT WITH LENGTH SCALING
             mentor_prompt = f"""
 You are a calm, disciplined mentor guiding a practitioner through reflection.
 Your role: help them observe patterns in thinking and behavior.
@@ -425,49 +415,42 @@ RESPONSE LENGTH & STRUCTURE RULES — FOLLOW EXACTLY:
             except Exception:
                 reply = "The mentor pauses for a moment. Please try again."
 
-        # HARD WORD CAP (250 words max)
         words = reply.split()
         if len(words) > 250:
             reply = ' '.join(words[:250]) + "… (mentor pauses — reflect before continuing)"
 
         lines = reply.split('\n')
-        reply = '\n'.join(lines[:8])  # rough 3–4 paragraph cap
+        reply = '\n'.join(lines[:8])
 
-        # SINGLE ASSISTANT MESSAGE – with duplicate guard
-        if st.session_state.msgs and st.session_state.msgs[-1]["role"] == "assistant" and st.session_state.msgs[-1]["content"] == reply:
-            pass  # skip
-        else:
-            with st.chat_message("assistant"):
-                placeholder = st.empty()
-                placeholder.markdown("The mentor reflects...")
-                time.sleep(1.5)
+        with st.chat_message("assistant"):
+            placeholder = st.empty()
+            placeholder.markdown("The mentor reflects...")
+            time.sleep(1.5)
 
-                text = ""
-                for sentence in reply.split(". "):
-                    text += sentence + ". "
-                    placeholder.markdown(text)
-                    time.sleep(0.2)
+            text = ""
+            for sentence in reply.split(". "):
+                text += sentence + ". "
+                placeholder.markdown(text)
+                time.sleep(0.2)
 
-                placeholder.markdown(reply)
+            placeholder.markdown(reply)
 
-            st.session_state.msgs.append({"role": "assistant", "content": reply})
-            supabase.table("records").insert({
-                "user_id": USER_ID,
-                "role": "assistant",
-                "content": reply,
-                "timestamp": datetime.now(UTC).isoformat()
-            }).execute()
+        st.session_state.msgs.append({"role": "assistant", "content": reply})
+        supabase.table("records").insert({
+            "user_id": USER_ID,
+            "role": "assistant",
+            "content": reply,
+            "timestamp": datetime.now(UTC).isoformat()
+        }).execute()
 
-        # PHASE ADVANCEMENT
         user_msgs_in_session = len([m for m in st.session_state.msgs if m["role"] == "user"])
         if user_msgs_in_session % 3 == 0 and user_msgs_in_session > 0:
             st.session_state.phase = (st.session_state.phase + 1) % 4
             phase_name = PHASE_SETS[rank][st.session_state.phase]
             st.session_state.milestone_message = f"→ Moving to {phase_name}"
 
-        # RANK PROGRESSION CHECK
         old_rank = st.session_state.get("last_rank", "Student")
-        new_rank = compute_rank(user_reflection_count + 1)  # approximate for display
+        new_rank = compute_rank(user_reflection_count + 1)
         if new_rank != old_rank:
             st.session_state.last_rank = new_rank
             st.balloons()
