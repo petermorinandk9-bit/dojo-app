@@ -237,6 +237,41 @@ def compute_evolution():
     return "Stable"
 
 # ==================================================
+# TREND ANALYSIS (The Pattern Mirror)
+# ==================================================
+def compute_trend_insight():
+    r = supabase.table("dojo_patterns") \
+        .select("pattern") \
+        .eq("user_id", USER_ID) \
+        .order("timestamp", desc=True) \
+        .limit(20) \
+        .execute()
+    
+    if not r.data or len(r.data) < 10:
+        return "Calibrating patterns..."
+    
+    recent = [p["pattern"] for p in r.data[:5]]
+    baseline = [p["pattern"] for p in r.data[5:]]
+    
+    # Avoid division by zero (though <10 guard should catch most cases)
+    if not baseline:
+        return "Calibrating patterns..."
+    
+    recent_pos = sum(1 for p in recent if p in POSITIVE_PATTERNS) / len(recent)
+    baseline_pos = sum(1 for p in baseline if p in POSITIVE_PATTERNS) / len(baseline)
+    
+    if recent_pos > baseline_pos + 0.2:
+        return "Signal: Positive Shift. You are breaking a loop."
+    if recent_pos < baseline_pos - 0.2:
+        return "Signal: Friction detected. Return to center."
+    
+    # Fallback to most frequent recent pattern
+    if recent:
+        most_frequent = max(set(recent), key=recent.count)
+        return f"Dominant Pattern: {most_frequent.replace('_', ' ').title()}"
+    return "Calibrating patterns..."
+
+# ==================================================
 # PATTERN DETECTION
 # ==================================================
 def detect_patterns(user_id):
@@ -286,7 +321,7 @@ Return JSON only in this format:
         pass
 
 # ==================================================
-# SIDEBAR – removed remaining count display
+# SIDEBAR
 # ==================================================
 with st.sidebar:
     st.markdown("### The-Dojo")
@@ -296,8 +331,10 @@ with st.sidebar:
     st.divider()
     momentum = compute_momentum()
     evolution = compute_evolution()
+    trend = compute_trend_insight()
     st.markdown(f"Momentum: **{momentum:+.2f}**")
     st.markdown(f"Evolution: **{evolution}**")
+    st.markdown(f"Trend Insight: **{trend}**")
     st.progress((momentum + 1) / 2)
     st.divider()
     for i, phase in enumerate(PHASE_SETS[rank]):
