@@ -15,7 +15,7 @@ def inject_dojo_styling():
     The Digital Zendo - Final Polished Weld
     Sidebar PERMANENTLY visible (no collapse)
     Toggle button removed / disabled for simplicity
-    Sidebar buttons: subtle idle, no red on hover, readable text always
+    Sidebar buttons: red-tint idle (pop), dark slate on hover (calm)
     """
     st.markdown("""
     <style>
@@ -114,12 +114,12 @@ def inject_dojo_styling():
             color: #f0f0f0 !important;
         }
 
-        /* Sidebar buttons - subtle dark idle, light readable text, minimal hover feedback */
+        /* Sidebar buttons - red-tint idle (pop), dark slate on hover (calm) */
         [data-testid="stSidebar"] .stButton > button,
         [data-testid="stSidebar"] button {
-            background-color: rgba(30, 30, 30, 0.85) !important; /* darker, stone-like idle */
-            color: #dcdcdc !important; /* soft readable light grey when idle */
-            border: 1px solid #2f4f4f !important;
+            background: rgba(178, 34, 34, 0.12) !important; /* subtle red idle - pops without being bright */
+            color: #ffdddd !important; /* bright readable red-tint white when idle */
+            border: 1px solid rgba(178, 34, 34, 0.4) !important;
             border-radius: 6px !important;
             padding: 10px 16px !important;
             margin: 4px 0 !important;
@@ -129,16 +129,16 @@ def inject_dojo_styling():
 
         [data-testid="stSidebar"] .stButton > button:hover,
         [data-testid="stSidebar"] button:hover {
-            background: rgba(47, 79, 79, 0.6) !important; /* very subtle slate hover, no red */
-            color: #ffffff !important; /* pure white for max readability on hover */
-            border-color: #3a5a5a !important;
+            background: rgba(30, 30, 30, 0.85) !important; /* dark slate on hover - calm */
+            color: #dcdcdc !important; /* soft light grey on hover */
+            border-color: #2f4f4f !important;
             transform: translateX(4px) !important;
             box-shadow: 0 2px 8px rgba(0,0,0,0.4) !important;
         }
 
         [data-testid="stSidebar"] .stButton > button:active,
         [data-testid="stSidebar"] button:active {
-            background: rgba(47, 79, 79, 0.8) !important;
+            background: rgba(178, 34, 34, 0.35) !important;
             color: #ffffff !important;
             transform: translateX(2px) !important;
         }
