@@ -12,7 +12,8 @@ from collections import Counter
 
 def inject_dojo_styling():
     """
-    The Digital Zendo - Sidebar PERMANENTLY visible (no collapse)
+    The Digital Zendo - Final Polished Weld
+    Sidebar PERMANENTLY visible (no collapse)
     Toggle button removed / disabled for simplicity
     """
     st.markdown("""
@@ -25,45 +26,60 @@ def inject_dojo_styling():
             color: #f0f0f0 !important;
         }
 
-        /* THE ALTAR (Title) */
+        /* THE ALTAR (Title) - hand-painted feel with slight rotation, ink bleed shadow, reduced opacity layers */
         .dojo-title {
             font-family: 'Ma Shan Zheng', cursive !important;
-            font-size: 150px !important;
-            color: rgba(178, 34, 34, 0.6) !important;
+            font-size: 160px !important;
+            color: rgba(178,34,34,0.75) !important;
             text-align: center !important;
-            margin-top: -20px !important;
-            margin-bottom: 40px !important;
-            text-shadow: 0 0 15px rgba(178, 34, 34, 0.2) !important;
+            margin-top: -30px !important;
+            margin-bottom: 60px !important;
+            letter-spacing: 4px;
+            transform: rotate(-1.5deg);
+            text-shadow: 
+                0 0 6px rgba(178,34,34,0.25),
+                0 0 30px rgba(178,34,34,0.12),
+                0 0 80px rgba(178,34,34,0.06);
+            animation: titleFade 2.5s ease;
         }
 
-        /* INK BLEED MESSAGES */
+        @keyframes titleFade {
+            from { opacity: 0; transform: translateY(-30px) rotate(-3deg); }
+            to   { opacity: 1; transform: translateY(0) rotate(-1.5deg); }
+        }
+
+        /* INK BLEED MESSAGES - improved ink-like bloom */
         [data-testid="stChatMessage"] {
             background-color: transparent !important;
-            animation: fadeIn 2s ease-in !important;
+            animation: inkBloom 1.4s ease !important;
             color: #f0f0f0 !important;
         }
 
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
+        @keyframes inkBloom {
+            0%   { opacity: 0; transform: translateY(10px); filter: blur(6px); }
+            40%  { opacity: 0.6; filter: blur(2px); }
+            100% { opacity: 1; transform: translateY(0); filter: blur(0px); }
         }
 
-        /* MENTOR (Centered & Misty) */
-        [data-testid="stChatMessageContainer"][data-testid*="assistant"] {
+        /* MENTOR — center mist with true ink diffusion */
+        [data-testid="stChatMessage"][aria-label="assistant message"] {
             text-align: center !important;
-            background-color: rgba(47, 79, 79, 0.05) !important;
-            border-radius: 15px !important;
-            margin: 10px 10% !important;
-            color: #f0f0f0 !important;
+            background: radial-gradient(circle at 50% 40%, rgba(220,220,220,0.06), rgba(255,255,255,0.02)) !important;
+            margin: 16px 12% !important;
+            padding: 18px 22px !important;
+            border-radius: 16px !important;
+            backdrop-filter: blur(3px);
+            box-shadow: 0 0 30px rgba(255,255,255,0.03);
         }
 
-        /* STUDENT (Right Aligned & Grounded) */
-        [data-testid="stChatMessageContainer"][data-testid*="user"] {
+        /* STUDENT — right aligned ink with diffusion */
+        [data-testid="stChatMessage"][aria-label="user message"] {
             text-align: right !important;
-            background-color: rgba(20, 20, 20, 0.6) !important;
-            margin-left: 20% !important;
-            border-radius: 15px 0 0 15px !important;
-            color: #f0f0f0 !important;
+            background: radial-gradient(circle at 70% 40%, rgba(178,34,34,0.12), rgba(255,255,255,0.02)) !important;
+            margin-left: 22% !important;
+            padding: 16px 20px !important;
+            border-radius: 16px 4px 4px 16px !important;
+            box-shadow: 0 0 25px rgba(178,34,34,0.15);
         }
 
         /* Enforce brighter text in chat markdown */
@@ -78,10 +94,10 @@ def inject_dojo_styling():
             background-color: #1a1a1a !important;
         }
 
-        /* SIDEBAR - Permanently visible & expanded */
+        /* STONE TABLET SIDEBAR - mineral slate gradient + aged wood hover */
         [data-testid="stSidebar"] {
-            background-color: #1a1a1a !important;
-            border-right: 1px solid #2a2a2a !important;
+            background: linear-gradient(180deg, #2f4f4f 0%, #1b2a2a 100%) !important;
+            border-right: 1px solid rgba(139,69,19,0.25) !important;
             color: #f0f0f0 !important;
             visibility: visible !important;
             display: block !important;
@@ -95,6 +111,24 @@ def inject_dojo_styling():
 
         [data-testid="stSidebar"] * {
             color: #f0f0f0 !important;
+        }
+
+        [data-testid="stSidebar"] button:hover,
+        [data-testid="stSidebar"] .stButton > button:hover {
+            color: #b22222 !important;
+            transform: translateX(4px);
+        }
+
+        /* Ambient temple lighting - soft light from above */
+        body::before {
+            content: "";
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: radial-gradient(circle at 50% 10%, rgba(255,255,255,0.03), transparent 60%);
+            pointer-events: none;
         }
 
         /* Completely hide / disable the collapse toggle button */
@@ -405,7 +439,7 @@ def compute_top_pattern():
     return f"{top_pattern.replace('_', ' ').title()} ({percentage}%)"
 
 # ==================================================
-# SIDEBAR - Now permanently visible
+# SIDEBAR - Permanently visible
 # ==================================================
 with st.sidebar:
     st.markdown("### The-Dojo")
