@@ -15,6 +15,7 @@ def inject_dojo_styling():
     The Digital Zendo - Final Polished Weld
     Sidebar PERMANENTLY visible (no collapse)
     Toggle button removed / disabled for simplicity
+    Buttons now readable on hover (no white-on-blue)
     """
     st.markdown("""
     <style>
@@ -113,10 +114,27 @@ def inject_dojo_styling():
             color: #f0f0f0 !important;
         }
 
-        [data-testid="stSidebar"] button:hover,
-        [data-testid="stSidebar"] .stButton > button:hover {
-            color: #b22222 !important;
-            transform: translateX(4px);
+        /* Sidebar buttons - readable on hover (no white-on-blue) */
+        [data-testid="stSidebar"] .stButton > button,
+        [data-testid="stSidebar"] button {
+            background-color: transparent !important;
+            color: #f0f0f0 !important;
+            border: 1px solid #2f4f4f !important;
+            transition: all 0.2s ease !important;
+        }
+
+        [data-testid="stSidebar"] .stButton > button:hover,
+        [data-testid="stSidebar"] button:hover {
+            background: rgba(178, 34, 34, 0.15) !important; /* subtle red tint */
+            color: #ffcccc !important; /* light readable red-tinted white */
+            border-color: #b22222 !important;
+            transform: translateX(4px) !important;
+        }
+
+        [data-testid="stSidebar"] .stButton > button:active,
+        [data-testid="stSidebar"] button:active {
+            background: rgba(178, 34, 34, 0.3) !important;
+            color: #ffffff !important;
         }
 
         /* Ambient temple lighting - soft light from above */
