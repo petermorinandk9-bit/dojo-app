@@ -498,7 +498,7 @@ with tab_train:
         avatar = "🧑‍🎓" if msg["role"] == "user" else "🧘‍♂️"
         with st.chat_message(msg["role"], avatar=avatar):
             st.markdown(msg["content"])
-    prompt = st.chat_input("Speak from center...")
+    prompt = st.chat_input("What arises in your mind?")
     if prompt:
         subscription = st.session_state.user.get("subscription_status", "free")
         if subscription not in ["paid", "beta", "admin"]:
