@@ -15,7 +15,7 @@ def inject_dojo_styling():
     The Digital Zendo - Final Polished Weld
     Sidebar PERMANENTLY visible (no collapse)
     Toggle button removed / disabled for simplicity
-    Sidebar buttons: red-tint idle (pop), dark slate on hover (calm)
+    Sidebar buttons: white-on-slate idle, dark-on-slate hover (reversed from last version)
     """
     st.markdown("""
     <style>
@@ -114,12 +114,12 @@ def inject_dojo_styling():
             color: #f0f0f0 !important;
         }
 
-        /* Sidebar buttons - red-tint idle (pop), dark slate on hover (calm) */
+        /* Sidebar buttons - white-on-slate idle (pop), dark-on-slate hover (calm) */
         [data-testid="stSidebar"] .stButton > button,
         [data-testid="stSidebar"] button {
-            background: rgba(178, 34, 34, 0.12) !important; /* subtle red idle - pops without being bright */
-            color: #ffdddd !important; /* bright readable red-tint white when idle */
-            border: 1px solid rgba(178, 34, 34, 0.4) !important;
+            background: rgba(47, 79, 79, 0.6) !important; /* slate idle - calm base */
+            color: #ffffff !important; /* pure white text when idle - easy to read */
+            border: 1px solid #3a5a5a !important;
             border-radius: 6px !important;
             padding: 10px 16px !important;
             margin: 4px 0 !important;
@@ -129,7 +129,7 @@ def inject_dojo_styling():
 
         [data-testid="stSidebar"] .stButton > button:hover,
         [data-testid="stSidebar"] button:hover {
-            background: rgba(30, 30, 30, 0.85) !important; /* dark slate on hover - calm */
+            background: rgba(30, 30, 30, 0.85) !important; /* darker slate on hover */
             color: #dcdcdc !important; /* soft light grey on hover */
             border-color: #2f4f4f !important;
             transform: translateX(4px) !important;
@@ -138,7 +138,7 @@ def inject_dojo_styling():
 
         [data-testid="stSidebar"] .stButton > button:active,
         [data-testid="stSidebar"] button:active {
-            background: rgba(178, 34, 34, 0.35) !important;
+            background: rgba(20, 20, 20, 0.95) !important;
             color: #ffffff !important;
             transform: translateX(2px) !important;
         }
