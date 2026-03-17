@@ -15,7 +15,7 @@ def inject_dojo_styling():
     The Digital Zendo - Final Polished Weld
     Sidebar PERMANENTLY visible (no collapse)
     Toggle button removed / disabled for simplicity
-    Buttons now readable on hover (no white-on-blue)
+    Sidebar buttons: subtle idle, no red on hover, readable text always
     """
     st.markdown("""
     <style>
@@ -95,7 +95,7 @@ def inject_dojo_styling():
             background-color: #1a1a1a !important;
         }
 
-        /* STONE TABLET SIDEBAR - mineral slate gradient + aged wood hover */
+        /* STONE TABLET SIDEBAR - mineral slate gradient */
         [data-testid="stSidebar"] {
             background: linear-gradient(180deg, #2f4f4f 0%, #1b2a2a 100%) !important;
             border-right: 1px solid rgba(139,69,19,0.25) !important;
@@ -114,27 +114,33 @@ def inject_dojo_styling():
             color: #f0f0f0 !important;
         }
 
-        /* Sidebar buttons - readable on hover (no white-on-blue) */
+        /* Sidebar buttons - subtle dark idle, light readable text, minimal hover feedback */
         [data-testid="stSidebar"] .stButton > button,
         [data-testid="stSidebar"] button {
-            background-color: transparent !important;
-            color: #f0f0f0 !important;
+            background-color: rgba(30, 30, 30, 0.85) !important; /* darker, stone-like idle */
+            color: #dcdcdc !important; /* soft readable light grey when idle */
             border: 1px solid #2f4f4f !important;
+            border-radius: 6px !important;
+            padding: 10px 16px !important;
+            margin: 4px 0 !important;
             transition: all 0.2s ease !important;
+            font-weight: 400 !important;
         }
 
         [data-testid="stSidebar"] .stButton > button:hover,
         [data-testid="stSidebar"] button:hover {
-            background: rgba(178, 34, 34, 0.15) !important; /* subtle red tint */
-            color: #ffcccc !important; /* light readable red-tinted white */
-            border-color: #b22222 !important;
+            background: rgba(47, 79, 79, 0.6) !important; /* very subtle slate hover, no red */
+            color: #ffffff !important; /* pure white for max readability on hover */
+            border-color: #3a5a5a !important;
             transform: translateX(4px) !important;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.4) !important;
         }
 
         [data-testid="stSidebar"] .stButton > button:active,
         [data-testid="stSidebar"] button:active {
-            background: rgba(178, 34, 34, 0.3) !important;
+            background: rgba(47, 79, 79, 0.8) !important;
             color: #ffffff !important;
+            transform: translateX(2px) !important;
         }
 
         /* Ambient temple lighting - soft light from above */
