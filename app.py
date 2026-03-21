@@ -729,7 +729,6 @@ with tab_train:
                         supabase.table("dojo_patterns").insert({
                             "user_id": USER_ID,
                             "pattern": str(pattern) if pattern else "clarity",
-                            "confidence_score": float(confidence) if confidence else 0.5,
                             "timestamp": datetime.now(UTC).isoformat()
                         }).execute()
                     except Exception as e:
