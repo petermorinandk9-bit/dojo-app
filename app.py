@@ -11,14 +11,10 @@ from datetime import datetime, UTC
 from supabase import create_client, Client
 from collections import Counter
 
-def st.set_page_config(
-    page_title="The-Dojo",
-    layout="wide",
-    initial_sidebar_state="expanded"  # <-- forces sidebar open on load
-) inject_dojo_styling():
+def inject_dojo_styling():
     """
     The Digital Zendo - Final Polished Weld
-    Sidebar collapse button now visible and styled
+    Sidebar collapse button visible and styled
     """
     st.markdown("""
     <style>
@@ -28,7 +24,7 @@ def st.set_page_config(
             background-color: #0a0a0a !important;
             color: #f0f0f0 !important;
         }
-        /* THE ALTAR (Title) - hand-painted feel with slight rotation, ink bleed shadow, reduced opacity layers */
+        /* THE ALTAR (Title) - hand-painted feel with slight rotation, ink bleed shadow */
         .dojo-title {
             font-family: 'Ma Shan Zheng', cursive !important;
             font-size: 160px !important;
@@ -123,7 +119,7 @@ def st.set_page_config(
             color: #ffffff !important;
             transform: translateX(2px) !important;
         }
-        /* Collapse button styled to match dojo aesthetic */
+        /* Collapse button - visible and styled to match sidebar buttons */
         [data-testid="stSidebarCollapsedControl"] {
             background: rgba(47, 79, 79, 0.4) !important;
             color: #a8b5b5 !important;
@@ -151,14 +147,18 @@ def st.set_page_config(
         /* HIDE STREAMLIT CHROME */
         header, footer, #MainMenu {visibility: hidden !important;}
     </style>
-   
     <div class="dojo-title">The Dojo</div>
     """, unsafe_allow_html=True)
 
 # ==================================================
-# CONFIG
+# CONFIG - Force sidebar expanded on load
 # ==================================================
-st.set_page_config(page_title="The-Dojo", layout="wide")
+st.set_page_config(
+    page_title="The-Dojo",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
 inject_dojo_styling()
 
 # ==================================================
@@ -661,11 +661,9 @@ The mat will still be here when you're ready. Please reach out to someone.
             confidence = 0.0
         else:
             detected_pattern, confidence = detect_pattern_for_message(USER_ID, prompt)
-            # Tone + Loop + Voice
             tone_mode = detect_tone_mode(prompt)
             is_loop, loop_theme = detect_thought_loop(USER_ID, prompt)
             voice_instruction = get_voice_for_count(user_reflection_count)
-            # Persistent pattern check (existing logic preserved)
             persistent_pattern = None
             try:
                 rp = supabase.table("dojo_patterns") \
