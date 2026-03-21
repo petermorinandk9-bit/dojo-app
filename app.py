@@ -435,27 +435,43 @@ class DojoOrchestrator:
         return self._call_text(payload)
 
     def agent_synthesizer(self, raw_response, user_text, tone_mode, pressure):
-        base_len = len(user_text.split())
+        # Base length no longer depends on user input
+        base_len = 50
         
         if tone_mode in ["crisis", "anxiety"]:
             pacing = "Short, firm, grounded sentences. Deep pressure. Force calm focus."
-            target_len = max(20, base_len * 0.8)
         elif tone_mode in ["depression", "sadness"]:
             pacing = "Slower pacing. Warmer, observant tone. Leave space for reflection."
-            target_len = max(30, base_len * 1.5)
         elif tone_mode in ["frustration", "excitement"]:
             pacing = "Match the high energy but ground it. Direct, clear, structural."
-            target_len = max(20, base_len * 1.0)
         elif tone_mode == "just_listen":
             pacing = "Lightly reflective. Minimal guidance, but allow insight if present."
-            target_len = max(40, base_len * 1.0)
         else:
             pacing = "Steady, disciplined rhythm. Standard balanced mentor pacing."
-            target_len = max(20, base_len * 1.2)
 
-        # Override: pressure always wins over tone
+        # --- STATE-BASED LENGTH SCALING ---
+
+        # Base range
+        target_len = 60
+
+        # Tone-based modulation (emotional depth)
+        if tone_mode in ["depression", "sadness"]:
+            target_len = 90  # deeper reflection
+        elif tone_mode in ["anxiety"]:
+            target_len = 70  # grounding but not overwhelming
+        elif tone_mode in ["frustration", "excitement"]:
+            target_len = 65  # structured, controlled
+        elif tone_mode == "just_listen":
+            target_len = 55  # light presence, but not minimal
+        else:
+            target_len = 60  # default balanced
+
+        # Pressure overrides (system authority)
         if pressure >= 0.6:
-            target_len = max(target_len, base_len * 1.2)
+            target_len = max(target_len, 75)
+
+        if pressure >= 0.8:
+            target_len = 40  # sharp + direct (intentional compression)
 
         if pressure >= 0.8:
             pacing += " STRICT LOOP OVERRIDE: The user is stuck in a behavioral loop. Restrict word count drastically. Refuse to engage with their narrative content. Deliver a single, unavoidable structural challenge."
