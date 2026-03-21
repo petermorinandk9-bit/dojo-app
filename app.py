@@ -3,7 +3,6 @@ import requests
 import time
 import json
 import bcrypt
-import random
 import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
@@ -247,6 +246,8 @@ if "last_rank" not in st.session_state:
     st.session_state.last_rank = "Student"
 if "last_processed_prompt" not in st.session_state:
     st.session_state.last_processed_prompt = None
+if "loop_streak" not in st.session_state:
+    st.session_state.loop_streak = 0  
 
 # ==================================================
 # PATTERN LIBRARY
@@ -336,10 +337,138 @@ if not st.session_state.history_loaded:
     st.session_state.history_loaded = True
 
 # ==================================================
-# TONE & VOICE SYSTEM
+# THE 6-AGENT COGNITIVE ENGINE (v11.5 - Tribal Genesis)
 # ==================================================
-TONE_MODES = ["crisis", "depression", "anxiety", "sadness", "boredom", "excitement", "advice", "just_listen"]
+class DojoOrchestrator:
+    def __init__(self, api_key):
+        self.headers = {"Authorization": f"Bearer {api_key}"}
+        self.model = "llama-3.3-70b-versatile"
 
+    def _call_json(self, system_prompt, user_content):
+        try:
+            res = requests.post(
+                "https://api.groq.com/openai/v1/chat/completions",
+                json={
+                    "model": self.model,
+                    "messages": [
+                        {"role": "system", "content": system_prompt + "\nRETURN ONLY VALID JSON."},
+                        {"role": "user", "content": user_content}
+                    ],
+                    "response_format": {"type": "json_object"},
+                    "temperature": 0.2
+                },
+                headers=self.headers
+            )
+            content = res.json()["choices"][0]["message"]["content"]
+            return json.loads(content)
+        except Exception as e:
+            return {}
+
+    def _call_text(self, messages_payload):
+        try:
+            res = requests.post(
+                "https://api.groq.com/openai/v1/chat/completions",
+                json={
+                    "model": self.model,
+                    "messages": messages_payload,
+                    "temperature": 0.6
+                },
+                headers=self.headers
+            )
+            return res.json()["choices"][0]["message"]["content"]
+        except Exception as e:
+            return "The mentor pauses... (Engine Error)"
+
+    def compute_pressure(self, loop_streak, tone_mode):
+        """Calculates system gravity based on avoidance streak."""
+        if tone_mode in ["crisis"]:
+            return 0.0 # Never apply pressure to a fracture
+        if loop_streak <= 0: return 0.2
+        elif loop_streak == 1: return 0.4
+        elif loop_streak == 2: return 0.6
+        elif loop_streak == 3: return 0.8
+        else: return 1.0
+
+    def agent_pattern_detector(self, text):
+        prompt = "Identify one pattern: [overthinking, avoidance, self_doubt, clarity, momentum, discipline, frustration, creative_flow]. Return JSON: {\"pattern\": \"name\", \"confidence\": 0.0-1.0}"
+        data = self._call_json(prompt, text)
+        return data.get("pattern", "clarity"), data.get("confidence", 0.5)
+
+    def agent_tone_detector(self, text):
+        prompt = "Detect tone: [crisis, depression, anxiety, sadness, boredom, excitement, advice, just_listen]. Return JSON: {\"tone\": \"mode\"}"
+        data = self._call_json(prompt, text)
+        return data.get("tone", "just_listen")
+
+    def detect_loop_fast(self, current_pattern):
+        """Fast Pattern-Based Loop Detection"""
+        try:
+            r = supabase.table("dojo_patterns").select("pattern").eq("user_id", USER_ID).order("timestamp", desc=True).limit(2).execute()
+            if r.data and len(r.data) == 2:
+                if current_pattern == r.data[0]["pattern"] == r.data[1]["pattern"]:
+                    return True, current_pattern 
+            return False, None
+        except Exception:
+            return False, None
+
+    def agent_strategic_critic(self, text, pattern, tone, is_loop, loop_theme, streak, pressure):
+        prompt = f"Signals - Pattern:{pattern}, Tone:{tone}, Loop Streak:{streak} ({loop_theme}), System Pressure:{pressure}. Provide strategic guidance. Assess if the user's state is spiraling dangerously. JSON: {{\"insight\": \"string\", \"risk_flag\": bool, \"approach\": \"curiosity/witness/challenge/ground\"}}"
+        data = self._call_json(prompt, text)
+        data['pressure_level'] = pressure 
+        return data
+
+    def agent_mentor(self, critic_data, voice_style, doctrine, history):
+        pressure = critic_data.get('pressure_level', 0.5)
+        
+        # Dynamic Mentor Authority
+        if pressure >= 0.8:
+            enforcement = "CRITICAL DIRECTIVE: Do NOT validate the user's narrative. Do NOT offer comfort. Deliver a direct, unavoidable structural challenge based on the Insight. Be sharp and decisive."
+        elif pressure >= 0.6:
+            enforcement = "DIRECTIVE: Point out the recurring pattern directly. Do not cushion the observation."
+        else:
+            enforcement = "Speak as a veteran teammate. No clichés. No therapy talk."
+
+        system = f"""You are a grounded mentor. Voice: {voice_style}. Doctrine: {doctrine}. 
+        Strategy: {critic_data.get('approach', 'witness')}. Insight: {critic_data.get('insight', '')}. 
+        {enforcement}"""
+        
+        payload = [{"role": "system", "content": system}] + history
+        return self._call_text(payload)
+
+    def agent_synthesizer(self, raw_response, user_text, tone_mode, pressure):
+        base_len = len(user_text.split())
+        
+        # The Tone Matrix
+        if tone_mode in ["crisis", "anxiety"]:
+            pacing = "Short, firm, grounded sentences. Deep pressure. Force calm focus."
+            target_len = max(20, base_len * 0.8)
+        elif tone_mode in ["depression", "sadness"]:
+            pacing = "Slower pacing. Warmer, observant tone. Leave space for reflection."
+            target_len = max(30, base_len * 1.5)
+        elif tone_mode in ["frustration", "excitement"]:
+            pacing = "Match the high energy but ground it. Direct, clear, structural."
+            target_len = max(20, base_len * 1.0)
+        elif tone_mode == "just_listen":
+            pacing = "Extremely minimal. Pure witness. One or two sentences maximum."
+            target_len = 30
+        else:
+            pacing = "Steady, disciplined rhythm. Standard balanced mentor pacing."
+            target_len = max(20, base_len * 1.2)
+
+        # The Loop Pressure Clamp
+        if pressure >= 0.8:
+            pacing += " STRICT LOOP OVERRIDE: The user is stuck in a behavioral loop. Restrict word count drastically. Refuse to engage with their narrative content. Deliver a single, unavoidable structural challenge."
+            target_len = max(15, target_len * 0.5)
+
+        prompt = f"Ensure brevity and apply the following pacing rules based on emotional state and pressure level: '{pacing}'. Target word count: {int(target_len)}. Remove conversational fluff. Return finalized text."
+        payload = [{"role": "system", "content": prompt}, {"role": "user", "content": raw_response}]
+        return self._call_text(payload)
+
+# Initialize Engine
+engine = DojoOrchestrator(st.secrets['GROQ_API_KEY'])
+
+# ==================================================
+# RANK & VOICE LOGIC
+# ==================================================
 RANK_VOICE = {
     "Student": "gentle and curious — ask open questions to help the practitioner explore gently. Never push. Earn trust slowly.",
     "Practitioner": "observant and pattern-naming — quietly point out recurring themes without judgment. 'This sounds familiar — what do you notice?'",
@@ -365,117 +494,6 @@ def get_voice_for_count(count):
         return RANK_VOICE[prev_map[band]]
     return RANK_VOICE[band]
 
-def detect_tone_mode(message):
-    prompt = f"""
-Analyze this practitioner reflection and classify its dominant emotional/energetic tone.
-Return JSON only with ONE of these exact modes: {', '.join(TONE_MODES)}
-Reflection:
-{message}
-{{"tone": "one_of_the_modes"}}
-"""
-    headers = {"Authorization": f"Bearer {st.secrets['GROQ_API_KEY']}"}
-    try:
-        res = requests.post(
-            "https://api.groq.com/openai/v1/chat/completions",
-            json={"model": "llama-3.3-70b-versatile", "messages": [{"role": "system", "content": prompt}]},
-            headers=headers
-        )
-        content = res.json()["choices"][0]["message"]["content"]
-        start = content.find("{")
-        end = content.rfind("}") + 1
-        data = json.loads(content[start:end])
-        tone = data.get("tone", "just_listen")
-        return tone if tone in TONE_MODES else "just_listen"
-    except:
-        return "just_listen"
-
-# ==================================================
-# THOUGHT LOOP DETECTION
-# ==================================================
-def detect_thought_loop(user_id, current_message, window=6):
-    try:
-        r = supabase.table("records") \
-            .select("content") \
-            .eq("user_id", user_id) \
-            .eq("role", "user") \
-            .order("timestamp", desc=True) \
-            .limit(window) \
-            .execute()
-        if not r.data or len(r.data) < 3:
-            return False, None
-        recent_msgs = [row["content"] for row in r.data]
-        history_text = "\n".join([f"- {m}" for m in recent_msgs])
-        prompt = f"""
-You are detecting if the practitioner is in a thought loop.
-Previous reflections (most recent first):
-{history_text}
-Current new reflection:
-{current_message}
-Is the core underlying theme, fear, avoidance, or doubt semantically repeating — same emotional core even if worded differently?
-Answer with JSON only:
-{{"is_loop": true, "loop_theme": "short description"}}
-or
-{{"is_loop": false, "loop_theme": null}}
-"""
-        headers = {"Authorization": f"Bearer {st.secrets['GROQ_API_KEY']}"}
-        res = requests.post(
-            "https://api.groq.com/openai/v1/chat/completions",
-            json={"model": "llama-3.3-70b-versatile", "messages": [{"role": "system", "content": prompt}]},
-            headers=headers
-        )
-        content = res.json()["choices"][0]["message"]["content"]
-        start = content.find("{")
-        end = content.rfind("}") + 1
-        data = json.loads(content[start:end])
-        return data.get("is_loop", False), data.get("loop_theme", None)
-    except Exception as e:
-        print(f"Loop detection error: {e}")
-        return False, None
-
-# ==================================================
-# PATTERN DETECTION
-# ==================================================
-def detect_pattern_for_message(user_id, message):
-    prompt = f"""
-You are analyzing a practitioner reflection.
-Reflection:
-{message}
-Choose the SINGLE most relevant behavioral pattern from this list:
-{PATTERN_LIBRARY}
-Focus on behavior patterns rather than temporary emotions.
-Return JSON only:
-{{"pattern":"name","confidence":0.0}}
-"""
-    headers = {"Authorization": f"Bearer {st.secrets['GROQ_API_KEY']}"}
-    try:
-        res = requests.post(
-            "https://api.groq.com/openai/v1/chat/completions",
-            json={
-                "model": "llama-3.3-70b-versatile",
-                "messages": [{"role": "system", "content": prompt}]
-            },
-            headers=headers
-        )
-        content = res.json()["choices"][0]["message"]["content"]
-        start = content.find("{")
-        end = content.rfind("}") + 1
-        data = json.loads(content[start:end])
-        pattern = data["pattern"]
-        confidence = data["confidence"]
-        supabase.table("dojo_patterns").insert({
-            "user_id": user_id,
-            "pattern": pattern,
-            "confidence_score": confidence,
-            "timestamp": datetime.now(UTC).isoformat()
-        }).execute()
-        return pattern, confidence
-    except Exception as e:
-        print(f"Pattern detection error: {e}")
-        return None, 0.0
-
-# ==================================================
-# RANK
-# ==================================================
 def compute_rank(count):
     if count < 15:
         return "Student"
@@ -493,7 +511,7 @@ user_reflection_count = supabase.table("records") \
 rank = compute_rank(user_reflection_count)
 
 # ==================================================
-# MOMENTUM
+# METRICS (Momentum, Evolution, Top Pattern)
 # ==================================================
 def compute_momentum():
     r = supabase.table("dojo_patterns") \
@@ -510,9 +528,6 @@ def compute_momentum():
     )
     return score / 10
 
-# ==================================================
-# EVOLUTION
-# ==================================================
 def compute_evolution():
     r = supabase.table("dojo_patterns") \
         .select("pattern") \
@@ -532,9 +547,6 @@ def compute_evolution():
         return "Declining"
     return "Stable"
 
-# ==================================================
-# TOP PATTERN
-# ==================================================
 def compute_top_pattern():
     r = supabase.table("dojo_patterns") \
         .select("pattern") \
@@ -552,9 +564,6 @@ def compute_top_pattern():
     percentage = int((top_count / len(patterns)) * 100)
     return f"{top_pattern.replace('_', ' ').title()} ({percentage}%)"
 
-# ==================================================
-# TRAJECTORY PLOT
-# ==================================================
 def plot_trajectory():
     r = supabase.table("dojo_patterns") \
         .select("pattern, timestamp") \
@@ -634,6 +643,7 @@ with st.sidebar:
     if st.button("Clear Session (Bow Out)", help="Clears current chat but keeps your full history in Training tab"):
         st.session_state.phase = 0
         st.session_state.msgs = []
+        st.session_state.loop_streak = 0
         st.success("Session cleared. You bow out from the mat.")
         time.sleep(1)
         st.rerun()
@@ -645,7 +655,45 @@ with st.sidebar:
 # ==================================================
 # TABS
 # ==================================================
-tab_train, tab_trajectory, tab_history = st.tabs(["Training", "Trajectory", "History"])
+# Added tab_field here v11.5
+tab_train, tab_trajectory, tab_field, tab_history = st.tabs(["Training", "Trajectory", "The Field", "History"])
+
+# ==================================================
+# THE FIELD TAB (Tribal Dashboard v11.5)
+# ==================================================
+with tab_field:
+    st.markdown("### The Tribal Field")
+    st.caption("Real-time behavioral topology of the community. Fully anonymous.")
+    
+    # Fetch recent tribe events (last 50 for the weather report)
+    try:
+        r_tribe = supabase.table("tribe_events").select("*").order("created_at", desc=True).limit(50).execute()
+        
+        if r_tribe.data and len(r_tribe.data) > 0:
+            df_tribe = pd.DataFrame(r_tribe.data)
+            
+            # Basic aggregations
+            top_tribe_pattern = df_tribe['pattern'].mode()[0] if not df_tribe.empty else "None"
+            top_tribe_tone = df_tribe['tone'].mode()[0] if not df_tribe.empty else "None"
+            avg_pressure = df_tribe['pressure_level'].mean() if not df_tribe.empty else 0.0
+            
+            # Metric Layout
+            col1, col2, col3 = st.columns(3)
+            col1.metric("Dominant Pattern", top_tribe_pattern.replace('_', ' ').title())
+            col2.metric("Primary Tone", top_tribe_tone.title())
+            col3.metric("Avg Field Pressure", f"{avg_pressure:.2f}")
+            
+            st.divider()
+            st.markdown("**Recent Signals (Last 50)**")
+            
+            # Simple bar chart of patterns to visualize the "weather"
+            pattern_counts = df_tribe['pattern'].value_counts()
+            st.bar_chart(pattern_counts, color="#b22222")
+            
+        else:
+            st.info("The Field is currently quiet. Awaiting signals.")
+    except Exception as e:
+        st.error(f"Could not load Field data. Ensure tribe_events table exists.")
 
 # ==================================================
 # TRAJECTORY TAB
@@ -667,10 +715,15 @@ with tab_train:
         st.success(st.session_state.milestone_message)
         st.session_state.milestone_message = None
     st.divider()
+    
+    if st.session_state.loop_streak >= 2:
+        st.caption(f"⚠️ *System Pressure Elevated (Level {st.session_state.loop_streak})*")
+        
     for msg in st.session_state.msgs[-10:]:
         avatar = "🧑‍🎓" if msg["role"] == "user" else "🧘‍♂️"
         with st.chat_message(msg["role"], avatar=avatar):
             st.markdown(msg["content"])
+            
     prompt = st.chat_input("What arises in your mind?")
     if prompt:
         subscription = st.session_state.user.get("subscription_status", "free")
@@ -685,121 +738,112 @@ with tab_train:
                 st.warning("You have reached the free training limit of 15 reflections.")
                 st.info("Join the Dojo to continue your practice.")
                 st.stop()
+                
         if prompt == st.session_state.last_processed_prompt:
             st.stop()
+            
         st.session_state.last_processed_prompt = prompt
         st.session_state.msgs.append({"role": "user", "content": prompt})
+        
         supabase.table("records").insert({
             "user_id": USER_ID,
             "role": "user",
             "content": prompt,
             "timestamp": datetime.now(UTC).isoformat()
         }).execute()
+        
         doctrine = "Discipline begins with attention."
         crisis_keywords = ["suicide", "kill myself", "want to die", "hopeless", "end it", "hurt myself", "self harm"]
+        
         if any(word in prompt.lower() for word in crisis_keywords):
-            reply = """
+            st.session_state.loop_streak = 0 
+            final_reply = """
 I'm stopping here.
 What you're describing is serious and needs real support right now.
 Call or text **988** (US Suicide & Crisis Lifeline, 24/7)
 Or text HOME to **741741** (Crisis Text Line)
 The mat will still be here when you're ready. Please reach out to someone.
 """
-            detected_pattern = None
-            confidence = 0.0
-        else:
-            detected_pattern, confidence = detect_pattern_for_message(USER_ID, prompt)
-            tone_mode = detect_tone_mode(prompt)
-            is_loop, loop_theme = detect_thought_loop(USER_ID, prompt)
-            voice_instruction = get_voice_for_count(user_reflection_count)
-            persistent_pattern = None
-            try:
-                rp = supabase.table("dojo_patterns") \
-                    .select("pattern") \
-                    .eq("user_id", USER_ID) \
-                    .order("timestamp", desc=True) \
-                    .limit(3) \
-                    .execute()
-                if rp.data and len(rp.data) == 3:
-                    if rp.data[0]["pattern"] == rp.data[1]["pattern"] == rp.data[2]["pattern"]:
-                        persistent_pattern = rp.data[0]["pattern"]
-            except:
-                pass
-            mirror = ""
-            if persistent_pattern:
-                mirror = f"I notice **{persistent_pattern.replace('_', ' ')}** appearing repeatedly in your reflections.\n\n"
-            loop_instruction = ""
-            if is_loop and loop_theme:
-                loop_instruction = f"""
-LOOP DETECTED: The practitioner is circling '{loop_theme}' again.
-Do NOT name the loop directly. Approach from a completely different angle.
-Ask a question they have not been asked before. Interrupt the pattern with novelty, not confrontation.
-"""
-            tone_instruction = f"Current emotional tone: {tone_mode}. Adapt accordingly — more grounding for anxiety, more presence for sadness, more curiosity for boredom, pure witness for just_listen, immediate calm anchoring for crisis."
-            mentor_prompt = f"""
-You are a calm, disciplined mentor guiding a practitioner through reflection.
-Your role: help them observe patterns in thinking and behavior.
-Never give direct advice. Guide with questions, clarity, and grounded insight.
-Voice style: {voice_instruction}
-{tone_instruction}
-{loop_instruction}
-{mirror}
-If appropriate, weave in this teaching naturally:
-{doctrine}
-CRITICAL LENGTH RULES — FOLLOW EXACTLY OR RESPONSE WILL BE REJECTED:
-1. LIGHT/NEUTRAL INPUT → 1-2 sentences max
-2. MODERATE INPUT → 3-5 sentences, single paragraph
-3. HEAVY INPUT → 2 short paragraphs max (100-150 words total)
-Tone: grounded, non-judgmental, quietly supportive. No fluff, no lectures.
-End in a way that invites continuation unless resolved.
-"""
-            try:
-                headers = {"Authorization": f"Bearer {st.secrets['GROQ_API_KEY']}"}
-                res = requests.post(
-                    "https://api.groq.com/openai/v1/chat/completions",
-                    json={
-                        "model": "llama-3.3-70b-versatile",
-                        "messages": [{"role": "system", "content": mentor_prompt}] + st.session_state.msgs[-10:]
-                    },
-                    headers=headers
-                )
-                reply = res.json()["choices"][0]["message"]["content"]
-            except Exception:
-                reply = "The mentor pauses for a moment. Please try again."
-        words = reply.split()
-        if len(words) > 150:
-            reply = ' '.join(words[:150]) + "… (mentor pauses — reflect before continuing)"
-        if st.session_state.msgs and st.session_state.msgs[-1]["role"] == "assistant" and st.session_state.msgs[-1]["content"] == reply:
-            pass
+            with st.chat_message("assistant", avatar="🧘‍♂️"):
+                st.markdown(final_reply)
         else:
             with st.chat_message("assistant", avatar="🧘‍♂️"):
+                with st.spinner("Scouting Patterns & Tone..."):
+                    pattern, confidence = engine.agent_pattern_detector(prompt)
+                    tone_mode = engine.agent_tone_detector(prompt)
+                    
+                    supabase.table("dojo_patterns").insert({
+                        "user_id": USER_ID,
+                        "pattern": pattern,
+                        "confidence_score": confidence,
+                        "timestamp": datetime.now(UTC).isoformat()
+                    }).execute()
+                
+                with st.spinner("Checking for Loops..."):
+                    is_loop, loop_theme = engine.detect_loop_fast(pattern)
+                    
+                    if is_loop:
+                        st.session_state.loop_streak += 1
+                    else:
+                        st.session_state.loop_streak = max(0, st.session_state.loop_streak - 1)
+                        
+                    current_pressure = engine.compute_pressure(st.session_state.loop_streak, tone_mode)
+                    
+                    # v11.5 Tribal Ledger Insert (Anonymous)
+                    try:
+                        supabase.table("tribe_events").insert({
+                            "pattern": pattern,
+                            "tone": tone_mode,
+                            "pressure_level": current_pressure
+                        }).execute()
+                    except Exception as e:
+                        pass # Fail silently if table isn't ready
+                    
+                with st.spinner(f"Critic Strategizing (Pressure: {current_pressure})..."):
+                    critic_data = engine.agent_strategic_critic(prompt, pattern, tone_mode, is_loop, loop_theme, st.session_state.loop_streak, current_pressure)
+                
+                if critic_data.get("risk_flag") is True or tone_mode == "crisis":
+                    st.session_state.loop_streak = 0 
+                    final_reply = f"**[CRITIC OVERRIDE]**\nThe Dojo senses a severe escalation in your state. \nInsight: *{critic_data.get('insight')}*\n\nWe are stopping the drill. Step off the mat. If you are overwhelmed, dial **988**. We do not push through crisis; we ground."
+                    st.warning("Protocol Shifted to Safety Mode.")
+                else:
+                    with st.spinner("Mentor Formulating..."):
+                        voice_instruction = get_voice_for_count(user_reflection_count)
+                        raw_reply = engine.agent_mentor(critic_data, voice_instruction, doctrine, st.session_state.msgs[-10:])
+                        
+                    with st.spinner("Synthesizing..."):
+                        final_reply = engine.agent_synthesizer(raw_reply, prompt, tone_mode, current_pressure)
+                
                 placeholder = st.empty()
-                placeholder.markdown("The mentor reflects...")
-                time.sleep(1.5)
                 text = ""
-                for sentence in reply.split(". "):
-                    text += sentence + ". "
-                    placeholder.markdown(text)
-                    time.sleep(0.2)
-                placeholder.markdown(reply)
-            st.session_state.msgs.append({"role": "assistant", "content": reply})
-            supabase.table("records").insert({
-                "user_id": USER_ID,
-                "role": "assistant",
-                "content": reply,
-                "timestamp": datetime.now(UTC).isoformat()
-            }).execute()
+                for sentence in final_reply.split(". "):
+                    if sentence:
+                        text += sentence + ". "
+                        placeholder.markdown(text)
+                        time.sleep(0.15)
+                placeholder.markdown(final_reply)
+                
+        st.session_state.msgs.append({"role": "assistant", "content": final_reply})
+        supabase.table("records").insert({
+            "user_id": USER_ID,
+            "role": "assistant",
+            "content": final_reply,
+            "timestamp": datetime.now(UTC).isoformat()
+        }).execute()
+        
         user_msgs_in_session = len([m for m in st.session_state.msgs if m["role"] == "user"])
         if user_msgs_in_session % 3 == 0 and user_msgs_in_session > 0:
             st.session_state.phase = (st.session_state.phase + 1) % 4
             phase_name = PHASE_SETS[rank][st.session_state.phase]
             st.session_state.milestone_message = f"→ Moving to {phase_name}"
+            
         old_rank = st.session_state.get("last_rank", "Student")
         new_rank = compute_rank(user_reflection_count + 1)
         if new_rank != old_rank:
             st.session_state.last_rank = new_rank
             st.balloons()
             st.session_state.milestone_message = f"🥋 Rank Advanced: {new_rank}"
+            
         st.rerun()
 
 # ==================================================
