@@ -340,7 +340,7 @@ if not st.session_state.history_loaded:
     st.session_state.history_loaded = True
 
 # ==================================================
-# THE 6-AGENT COGNITIVE ENGINE (v11.6.1 - Integer Timestamp Fix)
+# THE 6-AGENT COGNITIVE ENGINE (v11.6.2 - Instant Response Fix)
 # ==================================================
 class DojoOrchestrator:
     def __init__(self, api_key):
@@ -774,14 +774,7 @@ with tab_train:
                     with st.spinner("Synthesizing..."):
                         final_reply = engine.agent_synthesizer(raw_reply, prompt, tone_mode, current_pressure)
                 
-                placeholder = st.empty()
-                text = ""
-                for sentence in final_reply.split(". "):
-                    if sentence:
-                        text += sentence + ". "
-                        placeholder.markdown(text)
-                        time.sleep(0.15)
-                placeholder.markdown(final_reply)
+                st.markdown(final_reply)
                 
         st.session_state.msgs.append({"role": "assistant", "content": final_reply})
         try:
