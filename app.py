@@ -789,7 +789,8 @@ The mat will still be here when you're ready. Please reach out to someone.
                         
                     current_pressure = engine.compute_pressure(st.session_state.loop_streak, tone_mode)
                     
-                    # v11.5 Tribal Ledger Insert (Anonymous)
+                   
+                  # v11.5 Tribal Ledger Insert (Anonymous)
                     try:
                         supabase.table("tribe_events").insert({
                             "pattern": pattern,
@@ -797,8 +798,8 @@ The mat will still be here when you're ready. Please reach out to someone.
                             "pressure_level": current_pressure
                         }).execute()
                     except Exception as e:
-                        pass # Fail silently if table isn't ready
-                    
+                        st.error(f"TRIBAL DATABASE ERROR: {e}")
+                        
                 with st.spinner(f"Critic Strategizing (Pressure: {current_pressure})..."):
                     critic_data = engine.agent_strategic_critic(prompt, pattern, tone_mode, is_loop, loop_theme, st.session_state.loop_streak, current_pressure)
                 
