@@ -11,7 +11,11 @@ from datetime import datetime, UTC
 from supabase import create_client, Client
 from collections import Counter
 
-def inject_dojo_styling():
+def st.set_page_config(
+    page_title="The-Dojo",
+    layout="wide",
+    initial_sidebar_state="expanded"  # <-- forces sidebar open on load
+) inject_dojo_styling():
     """
     The Digital Zendo - Final Polished Weld
     Sidebar collapse button now visible and styled
