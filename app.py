@@ -340,7 +340,7 @@ if not st.session_state.history_loaded:
     st.session_state.history_loaded = True
 
 # ==================================================
-# THE 6-AGENT COGNITIVE ENGINE (v11.6 - Structural Armor)
+# THE 6-AGENT COGNITIVE ENGINE (v11.6.1 - Integer Timestamp Fix)
 # ==================================================
 class DojoOrchestrator:
     def __init__(self, api_key):
@@ -726,10 +726,11 @@ with tab_train:
                     tone_mode = engine.agent_tone_detector(prompt)
                     
                     try:
+                        # v11.6.1 Timestamp fix applied here:
                         supabase.table("dojo_patterns").insert({
                             "user_id": USER_ID,
                             "pattern": str(pattern) if pattern else "clarity",
-                            "timestamp": datetime.now(UTC).isoformat()
+                            "timestamp": int(time.time() * 1000)
                         }).execute()
                     except Exception as e:
                         st.warning(f"🛡️ Pattern Ledger Offline: {getattr(e, 'message', str(e))}")
@@ -744,7 +745,6 @@ with tab_train:
                         
                     current_pressure = engine.compute_pressure(st.session_state.loop_streak, tone_mode)
                     
-                    # v11.6 Structural Armor for Tribal Insert
                     try:
                         safe_pattern = str(pattern) if pattern else "clarity"
                         safe_tone = str(tone_mode) if tone_mode else "just_listen"
