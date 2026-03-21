@@ -447,17 +447,21 @@ class DojoOrchestrator:
             pacing = "Match the high energy but ground it. Direct, clear, structural."
             target_len = max(20, base_len * 1.0)
         elif tone_mode == "just_listen":
-            pacing = "Extremely minimal. Pure witness. One or two sentences maximum."
-            target_len = 30
+            pacing = "Lightly reflective. Minimal guidance, but allow insight if present."
+            target_len = max(40, base_len * 1.0)
         else:
             pacing = "Steady, disciplined rhythm. Standard balanced mentor pacing."
             target_len = max(20, base_len * 1.2)
+
+        # Override: pressure always wins over tone
+        if pressure >= 0.6:
+            target_len = max(target_len, base_len * 1.2)
 
         if pressure >= 0.8:
             pacing += " STRICT LOOP OVERRIDE: The user is stuck in a behavioral loop. Restrict word count drastically. Refuse to engage with their narrative content. Deliver a single, unavoidable structural challenge."
             target_len = max(15, target_len * 0.5)
 
-        prompt = f"Ensure brevity and apply the following pacing rules based on emotional state and pressure level: '{pacing}'. Target word count: {int(target_len)}. Remove conversational fluff. Return finalized text."
+        prompt = f"Ensure brevity and apply the following pacing rules based on emotional state and pressure level: '{pacing}'. Target word count: {int(target_len)}. Refine clarity, but preserve insight and structure. Return finalized text."
         payload = [{"role": "system", "content": prompt}, {"role": "user", "content": raw_response}]
         return self._call_text(payload)
 
