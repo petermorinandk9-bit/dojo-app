@@ -477,7 +477,20 @@ class DojoOrchestrator:
             pacing += " STRICT LOOP OVERRIDE: The user is stuck in a behavioral loop. Restrict word count drastically. Refuse to engage with their narrative content. Deliver a single, unavoidable structural challenge."
             target_len = max(15, target_len * 0.5)
 
-        prompt = f"Ensure brevity and apply the following pacing rules based on emotional state and pressure level: '{pacing}'. Target word count: {int(target_len)}. Refine clarity, but preserve insight and structure. Return finalized text."
+        prompt = f"""You are refining a mentor response.
+
+Preserve the full meaning, structure, and depth of the original response.
+
+Apply this pacing:
+{pacing}
+
+Do NOT significantly shorten the response.
+Do NOT remove key insights.
+You may slightly tighten phrasing, but preserve substance.
+
+Target length is a guideline, not a constraint: {int(target_len)} words.
+
+Return the refined version."""
         payload = [{"role": "system", "content": prompt}, {"role": "user", "content": raw_response}]
         return self._call_text(payload)
 
@@ -792,7 +805,10 @@ with tab_train:
                         raw_reply = engine.agent_mentor(critic_data, voice_instruction, doctrine, st.session_state.msgs[-10:])
                         
                     with st.spinner("Synthesizing..."):
-                        final_reply = engine.agent_synthesizer(raw_reply, prompt, tone_mode, current_pressure)
+                        if current_pressure < 0.6:
+                            final_reply = raw_reply
+                        else:
+                            final_reply = engine.agent_synthesizer(raw_reply, prompt, tone_mode, current_pressure)
                 
                 st.markdown(final_reply)
                 
