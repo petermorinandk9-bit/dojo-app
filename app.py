@@ -91,13 +91,6 @@ def inject_dojo_styling():
             background: linear-gradient(180deg, #2f4f4f 0%, #1b2a2a 100%) !important;
             border-right: 1px solid rgba(139,69,19,0.25) !important;
             color: #f0f0f0 !important;
-            visibility: visible !important;
-            display: block !important;
-            width: 300px !important;
-            min-width: 300px !important;
-            max-width: 300px !important;
-            transform: none !important;
-            transition: none !important;
             position: relative !important;
         }
         [data-testid="stSidebar"] * {
@@ -129,6 +122,17 @@ def inject_dojo_styling():
             color: #ffffff !important;
             transform: translateX(2px) !important;
         }
+        /* Collapse button styled to match dojo aesthetic */
+        [data-testid="stSidebarCollapsedControl"] {
+            background: rgba(47, 79, 79, 0.4) !important;
+            color: #a8b5b5 !important;
+            border: 1px solid rgba(58, 90, 90, 0.6) !important;
+        }
+        [data-testid="stSidebarCollapsedControl"]:hover {
+            background: rgba(60, 95, 95, 0.75) !important;
+            color: #ffffff !important;
+            border-color: rgba(100, 140, 140, 0.8) !important;
+        }
         /* Ambient temple lighting - soft light from above */
         body::before {
             content: "";
@@ -139,13 +143,6 @@ def inject_dojo_styling():
             bottom: 0;
             background: radial-gradient(circle at 50% 10%, rgba(255,255,255,0.03), transparent 60%);
             pointer-events: none;
-        }
-        /* Completely hide / disable the collapse toggle button */
-        [data-testid="stSidebarCollapsedControl"] {
-            display: none !important;
-            visibility: hidden !important;
-            opacity: 0 !important;
-            pointer-events: none !important;
         }
         /* HIDE STREAMLIT CHROME */
         header, footer, #MainMenu {visibility: hidden !important;}
@@ -265,7 +262,6 @@ if st.session_state.user is None:
                 st.success("Account created — please log in")
     st.stop()
 
-# Moved here — this is now safe because auth succeeded (st.stop() prevents reaching this line if not logged in)
 USER_ID = st.session_state.user["id"]
 USER_NAME = st.session_state.user["display_name"]
 
