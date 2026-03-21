@@ -6,7 +6,6 @@ import bcrypt
 import random
 import pandas as pd
 import matplotlib.pyplot as plt
-import numpy as np
 from datetime import datetime, UTC
 from supabase import create_client, Client
 from collections import Counter
@@ -16,16 +15,18 @@ def inject_dojo_styling():
     The Digital Zendo - Final Polished Weld
     Sidebar PERMANENTLY visible (no collapse)
     Toggle button removed / disabled for simplicity
-    Sidebar buttons: white-on-slate idle, dark-on-slate hover (reversed from last version)
+    Sidebar buttons: SUBTLE IDLE → BRIGHT HOVER (proper hierarchy)
     """
     st.markdown("""
     <style>
         /* Import a Raw Brush Font from Google */
         @import url('https://fonts.googleapis.com/css2?family=Ma+Shan+Zheng&display=swap');
+
         .stApp {
             background-color: #0a0a0a !important;
             color: #f0f0f0 !important;
         }
+
         /* THE ALTAR (Title) - hand-painted feel with slight rotation, ink bleed shadow, reduced opacity layers */
         .dojo-title {
             font-family: 'Ma Shan Zheng', cursive !important;
@@ -36,27 +37,31 @@ def inject_dojo_styling():
             margin-bottom: 60px !important;
             letter-spacing: 4px;
             transform: rotate(-1.5deg);
-            text-shadow:
+            text-shadow: 
                 0 0 6px rgba(178,34,34,0.25),
                 0 0 30px rgba(178,34,34,0.12),
                 0 0 80px rgba(178,34,34,0.06);
             animation: titleFade 2.5s ease;
         }
+
         @keyframes titleFade {
             from { opacity: 0; transform: translateY(-30px) rotate(-3deg); }
-            to { opacity: 1; transform: translateY(0) rotate(-1.5deg); }
+            to   { opacity: 1; transform: translateY(0) rotate(-1.5deg); }
         }
+
         /* INK BLEED MESSAGES - improved ink-like bloom */
         [data-testid="stChatMessage"] {
             background-color: transparent !important;
             animation: inkBloom 1.4s ease !important;
             color: #f0f0f0 !important;
         }
+
         @keyframes inkBloom {
-            0% { opacity: 0; transform: translateY(10px); filter: blur(6px); }
-            40% { opacity: 0.6; filter: blur(2px); }
+            0%   { opacity: 0; transform: translateY(10px); filter: blur(6px); }
+            40%  { opacity: 0.6; filter: blur(2px); }
             100% { opacity: 1; transform: translateY(0); filter: blur(0px); }
         }
+
         /* MENTOR — center mist with true ink diffusion */
         [data-testid="stChatMessage"][aria-label="assistant message"] {
             text-align: center !important;
@@ -67,6 +72,7 @@ def inject_dojo_styling():
             backdrop-filter: blur(3px);
             box-shadow: 0 0 30px rgba(255,255,255,0.03);
         }
+
         /* STUDENT — right aligned ink with diffusion */
         [data-testid="stChatMessage"][aria-label="user message"] {
             text-align: right !important;
@@ -76,16 +82,19 @@ def inject_dojo_styling():
             border-radius: 16px 4px 4px 16px !important;
             box-shadow: 0 0 25px rgba(178,34,34,0.15);
         }
+
         /* Enforce brighter text in chat markdown */
         [data-testid="stChatMessage"] .stMarkdown,
         [data-testid="stChatMessage"] p,
         [data-testid="stChatMessage"] div {
             color: #f0f0f0 !important;
         }
+
         /* Avatar background */
         div[data-testid^="stChatMessageAvatar"] {
             background-color: #1a1a1a !important;
         }
+
         /* STONE TABLET SIDEBAR - mineral slate gradient */
         [data-testid="stSidebar"] {
             background: linear-gradient(180deg, #2f4f4f 0%, #1b2a2a 100%) !important;
@@ -100,35 +109,43 @@ def inject_dojo_styling():
             transition: none !important;
             position: relative !important;
         }
+
         [data-testid="stSidebar"] * {
             color: #f0f0f0 !important;
         }
-        /* Sidebar buttons - white-on-slate idle (pop), dark-on-slate hover (calm) */
+
+        /* Sidebar buttons - subtle idle, bright hover (proper hierarchy) */
         [data-testid="stSidebar"] .stButton > button,
         [data-testid="stSidebar"] button {
-            background: rgba(47, 79, 79, 0.6) !important;
-            color: #ffffff !important;
-            border: 1px solid #3a5a5a !important;
+            background: rgba(47, 79, 79, 0.4) !important; /* subtle slate idle - recedes */
+            color: #a8b5b5 !important; /* muted grey text idle - calm */
+            border: 1px solid rgba(58, 90, 90, 0.6) !important;
             border-radius: 6px !important;
             padding: 10px 16px !important;
             margin: 4px 0 !important;
-            transition: all 0.2s ease !important;
+            transition: all 0.25s ease !important;
             font-weight: 400 !important;
+            text-shadow: none !important;
         }
+
         [data-testid="stSidebar"] .stButton > button:hover,
         [data-testid="stSidebar"] button:hover {
-            background: rgba(30, 30, 30, 0.85) !important;
-            color: #dcdcdc !important;
-            border-color: #2f4f4f !important;
-            transform: translateX(4px) !important;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.4) !important;
+            background: rgba(60, 95, 95, 0.75) !important; /* brighter slate on hover */
+            color: #ffffff !important; /* pure white on hover - pops */
+            border-color: rgba(100, 140, 140, 0.8) !important;
+            transform: translateX(3px) !important;
+            box-shadow: 0 3px 12px rgba(0,0,0,0.5) !important;
+            text-shadow: 0 0 8px rgba(255,255,255,0.3) !important; /* subtle glow */
         }
+
         [data-testid="stSidebar"] .stButton > button:active,
         [data-testid="stSidebar"] button:active {
-            background: rgba(20, 20, 20, 0.95) !important;
+            background: rgba(70, 110, 110, 0.85) !important;
             color: #ffffff !important;
-            transform: translateX(2px) !important;
+            transform: translateX(1px) !important;
+            box-shadow: 0 1px 6px rgba(0,0,0,0.6) !important;
         }
+
         /* Ambient temple lighting - soft light from above */
         body::before {
             content: "";
@@ -140,6 +157,7 @@ def inject_dojo_styling():
             background: radial-gradient(circle at 50% 10%, rgba(255,255,255,0.03), transparent 60%);
             pointer-events: none;
         }
+
         /* Completely hide / disable the collapse toggle button */
         [data-testid="stSidebarCollapsedControl"] {
             display: none !important;
@@ -147,10 +165,11 @@ def inject_dojo_styling():
             opacity: 0 !important;
             pointer-events: none !important;
         }
+
         /* HIDE STREAMLIT CHROME */
         header, footer, #MainMenu {visibility: hidden !important;}
     </style>
-
+    
     <div class="dojo-title">The Dojo</div>
     """, unsafe_allow_html=True)
 
@@ -204,24 +223,32 @@ if "last_processed_prompt" not in st.session_state:
 # PATTERN LIBRARY
 # ==================================================
 PATTERN_LIBRARY = [
-    "overthinking", "avoidance", "self_doubt", "clarity",
-    "momentum", "discipline", "frustration", "creative_flow"
+    "overthinking",
+    "avoidance",
+    "self_doubt",
+    "clarity",
+    "momentum",
+    "discipline",
+    "frustration",
+    "creative_flow"
 ]
-NEGATIVE_PATTERNS = ["overthinking", "avoidance", "self_doubt", "frustration"]
-POSITIVE_PATTERNS = ["clarity", "momentum", "discipline", "creative_flow"]
+
+NEGATIVE_PATTERNS = [
+    "overthinking",
+    "avoidance",
+    "self_doubt",
+    "frustration"
+]
+
+POSITIVE_PATTERNS = [
+    "clarity",
+    "momentum",
+    "discipline",
+    "creative_flow"
+]
 
 # ==================================================
-# PHASE SETS
-# ==================================================
-PHASE_SETS = {
-    "Student":      ["Welcome", "Warm-Up", "Training", "Cool Down"],
-    "Practitioner": ["Welcome", "Warm-Up", "Training", "Cool Down"],
-    "Sentinel":     ["Welcome", "Warm-Up", "Training", "Cool Down"],
-    "Sovereign":    ["Welcome", "Warm-Up", "Training", "Cool Down"]
-}
-
-# ==================================================
-# AUTH
+# AUTH SYSTEM
 # ==================================================
 if st.session_state.user is None:
     st.markdown("# The-Dojo")
@@ -288,152 +315,6 @@ if not st.session_state.history_loaded:
     st.session_state.history_loaded = True
 
 # ==================================================
-# TONE & VOICE SYSTEM
-# ==================================================
-TONE_MODES = ["crisis", "depression", "anxiety", "sadness", "boredom", "excitement", "advice", "just_listen"]
-
-RANK_VOICE = {
-    "Student":      "gentle and curious — ask open questions to help the practitioner explore gently. Never push. Earn trust slowly.",
-    "Practitioner": "observant and pattern-naming — quietly point out recurring themes without judgment. 'This sounds familiar — what do you notice?'",
-    "Sentinel":     "clear and direct mirror — hold up an honest reflection of what is seen. Name patterns without cushioning. Trust them to handle it.",
-    "Sovereign":    "peer-level and blunt — speak as an equal. Honest and grounded. They've earned truth over comfort. 'You already know this — say it.'"
-}
-
-def get_voice_for_count(count):
-    if count < 15:
-        band = "Student"
-        weight = count / 15.0
-    elif count < 40:
-        band = "Practitioner"
-        weight = (count - 15) / 25.0
-    elif count < 80:
-        band = "Sentinel"
-        weight = (count - 40) / 40.0
-    else:
-        band = "Sovereign"
-        weight = 1.0
-
-    prev_map = {"Practitioner": "Student", "Sentinel": "Practitioner", "Sovereign": "Sentinel"}
-    if weight < 0.4 and band in prev_map:
-        return RANK_VOICE[prev_map[band]]
-    return RANK_VOICE[band]
-
-def detect_tone_mode(message):
-    prompt = f"""
-Analyze this practitioner reflection and classify its dominant emotional/energetic tone.
-Return JSON only with ONE of these exact modes: {', '.join(TONE_MODES)}
-
-Reflection:
-{message}
-
-{{"tone": "one_of_the_modes"}}
-"""
-    headers = {"Authorization": f"Bearer {st.secrets['GROQ_API_KEY']}"}
-    try:
-        res = requests.post(
-            "https://api.groq.com/openai/v1/chat/completions",
-            json={"model": "llama-3.3-70b-versatile", "messages": [{"role": "system", "content": prompt}]},
-            headers=headers
-        )
-        content = res.json()["choices"][0]["message"]["content"]
-        start = content.find("{")
-        end = content.rfind("}") + 1
-        data = json.loads(content[start:end])
-        tone = data.get("tone", "just_listen")
-        return tone if tone in TONE_MODES else "just_listen"
-    except:
-        return "just_listen"
-
-# ==================================================
-# THOUGHT LOOP DETECTION
-# ==================================================
-def detect_thought_loop(user_id, current_message, window=6):
-    try:
-        r = supabase.table("records") \
-            .select("content") \
-            .eq("user_id", user_id) \
-            .eq("role", "user") \
-            .order("timestamp", desc=True) \
-            .limit(window) \
-            .execute()
-
-        if not r.data or len(r.data) < 3:
-            return False, None
-
-        recent_msgs = [row["content"] for row in r.data]
-        history_text = "\n".join([f"- {m}" for m in recent_msgs])
-
-        prompt = f"""
-You are detecting if the practitioner is in a thought loop.
-Previous reflections (most recent first):
-{history_text}
-
-Current new reflection:
-{current_message}
-
-Is the core underlying theme, fear, avoidance, or doubt semantically repeating — same emotional core even if worded differently?
-Answer with JSON only:
-{{"is_loop": true, "loop_theme": "short description"}}
-or
-{{"is_loop": false, "loop_theme": null}}
-"""
-        headers = {"Authorization": f"Bearer {st.secrets['GROQ_API_KEY']}"}
-        res = requests.post(
-            "https://api.groq.com/openai/v1/chat/completions",
-            json={"model": "llama-3.3-70b-versatile", "messages": [{"role": "system", "content": prompt}]},
-            headers=headers
-        )
-        content = res.json()["choices"][0]["message"]["content"]
-        start = content.find("{")
-        end = content.rfind("}") + 1
-        data = json.loads(content[start:end])
-        return data.get("is_loop", False), data.get("loop_theme", None)
-    except Exception as e:
-        print(f"Loop detection error: {e}")
-        return False, None
-
-# ==================================================
-# PATTERN DETECTION
-# ==================================================
-def detect_pattern_for_message(user_id, message):
-    prompt = f"""
-You are analyzing a practitioner reflection.
-Reflection:
-{message}
-Choose the SINGLE most relevant behavioral pattern from this list:
-{PATTERN_LIBRARY}
-Focus on behavior patterns rather than temporary emotions.
-Return JSON only:
-{{"pattern":"name","confidence":0.0}}
-"""
-    headers = {"Authorization": f"Bearer {st.secrets['GROQ_API_KEY']}"}
-    try:
-        res = requests.post(
-            "https://api.groq.com/openai/v1/chat/completions",
-            json={
-                "model": "llama-3.3-70b-versatile",
-                "messages": [{"role": "system", "content": prompt}]
-            },
-            headers=headers
-        )
-        content = res.json()["choices"][0]["message"]["content"]
-        start = content.find("{")
-        end = content.rfind("}") + 1
-        data = json.loads(content[start:end])
-        pattern = data["pattern"]
-        confidence = data["confidence"]
-        supabase.table("dojo_patterns").insert({
-            "user_id": user_id,
-            "pattern": pattern,
-            "confidence_score": confidence,
-            "timestamp": datetime.now(UTC).isoformat()
-        }).execute()
-        return pattern, confidence
-    except Exception as e:
-        print(f"Pattern detection error: {e}")
-        return None, 0.0
-
-# ==================================================
 # RANK
 # ==================================================
 def compute_rank(count):
@@ -454,6 +335,16 @@ user_reflection_count = supabase.table("records") \
 rank = compute_rank(user_reflection_count)
 
 # ==================================================
+# PHASES
+# ==================================================
+PHASE_SETS = {
+    "Student": ["Welcome", "Warm-Up", "Training", "Cool Down"],
+    "Practitioner": ["Welcome", "Warm-Up", "Training", "Cool Down"],
+    "Sentinel": ["Welcome", "Warm-Up", "Training", "Cool Down"],
+    "Sovereign": ["Welcome", "Warm-Up", "Training", "Cool Down"]
+}
+
+# ==================================================
 # MOMENTUM
 # ==================================================
 def compute_momentum():
@@ -465,10 +356,12 @@ def compute_momentum():
         .execute()
     if not r.data:
         return 0
-    score = sum(
-        1 if p["pattern"] in POSITIVE_PATTERNS else -1 if p["pattern"] in NEGATIVE_PATTERNS else 0
-        for p in r.data
-    )
+    score = 0
+    for p in r.data:
+        if p["pattern"] in POSITIVE_PATTERNS:
+            score += 1
+        if p["pattern"] in NEGATIVE_PATTERNS:
+            score -= 1
     return score / 10
 
 # ==================================================
@@ -483,15 +376,69 @@ def compute_evolution():
         .execute()
     if not r.data:
         return "Unknown"
-    score = sum(
-        1 if p["pattern"] in POSITIVE_PATTERNS else -1 if p["pattern"] in NEGATIVE_PATTERNS else 0
-        for p in r.data
-    )
+    score = 0
+    for p in r.data:
+        if p["pattern"] in POSITIVE_PATTERNS:
+            score += 1
+        if p["pattern"] in NEGATIVE_PATTERNS:
+            score -= 1
     if score > 3:
         return "Rising"
     if score < -3:
         return "Declining"
     return "Stable"
+
+# ==================================================
+# PATTERN DETECTION
+# ==================================================
+def detect_pattern_for_message(user_id, message):
+    prompt = f"""
+You are analyzing a practitioner reflection.
+
+Reflection:
+{message}
+
+Choose the SINGLE most relevant behavioral pattern from this list:
+{PATTERN_LIBRARY}
+
+Focus on behavior patterns rather than temporary emotions.
+
+Return JSON only:
+{{"pattern":"name","confidence":0.0}}
+"""
+
+    headers = {"Authorization": f"Bearer {st.secrets['GROQ_API_KEY']}"}
+
+    try:
+        res = requests.post(
+            "https://api.groq.com/openai/v1/chat/completions",
+            json={
+                "model": "llama-3.3-70b-versatile",
+                "messages": [{"role": "system", "content": prompt}]
+            },
+            headers=headers
+        )
+
+        content = res.json()["choices"][0]["message"]["content"]
+        start = content.find("{")
+        end = content.rfind("}") + 1
+        data = json.loads(content[start:end])
+
+        pattern = data["pattern"]
+        confidence = data["confidence"]
+
+        supabase.table("dojo_patterns").insert({
+            "user_id": user_id,
+            "pattern": pattern,
+            "confidence_score": confidence,
+            "timestamp": datetime.now(UTC).isoformat()
+        }).execute()
+
+        return pattern, confidence
+
+    except Exception as e:
+        print(f"Pattern detection error: {e}")
+        return None, 0.0
 
 # ==================================================
 # TOP PATTERN
@@ -503,65 +450,23 @@ def compute_top_pattern():
         .order("timestamp", desc=True) \
         .limit(50) \
         .execute()
+    
     if not r.data or len(r.data) < 5:
         return "Calibrating..."
+    
     patterns = [p["pattern"] for p in r.data]
     counts = Counter(patterns)
+    
     if not counts:
         return "Calibrating..."
+    
     top_pattern, top_count = counts.most_common(1)[0]
     percentage = int((top_count / len(patterns)) * 100)
+    
     return f"{top_pattern.replace('_', ' ').title()} ({percentage}%)"
 
 # ==================================================
-# TRAJECTORY PLOT
-# ==================================================
-def plot_trajectory():
-    r = supabase.table("dojo_patterns") \
-        .select("pattern, timestamp") \
-        .eq("user_id", USER_ID) \
-        .order("timestamp") \
-        .execute()
-    if not r.data or len(r.data) < 5:
-        return None
-
-    df = pd.DataFrame(r.data)
-    df['score'] = df['pattern'].apply(
-        lambda p: 1 if p in POSITIVE_PATTERNS else -1 if p in NEGATIVE_PATTERNS else 0
-    )
-    df['index'] = range(len(df))
-    df['rolling_avg'] = df['score'].rolling(window=5, min_periods=1).mean()
-
-    x = df['index'].values
-    y = df['rolling_avg'].values
-    projection = None
-    if len(x) >= 2:
-        coeffs = np.polyfit(x, y, 1)
-        future_x = np.array([x[-1] + i for i in range(1, 6)])
-        projection = np.polyval(coeffs, future_x)
-
-    fig, ax = plt.subplots(figsize=(8, 4), facecolor='#0a0a0a')
-    ax.set_facecolor('#0a0a0a')
-    ax.plot(df['index'], df['score'], color='grey', alpha=0.4, label='Raw Score')
-    ax.plot(df['index'], df['rolling_avg'], color='#b22222', linewidth=2.5, label='Rolling Avg (5)')
-    if projection is not None:
-        ax.plot(
-            np.concatenate(([x[-1]], future_x)),
-            np.concatenate(([y[-1]], projection)),
-            color='white', linestyle='--', linewidth=1.5, label='Projection'
-        )
-    ax.axhline(0, color='gray', linestyle='--', alpha=0.5)
-    ax.set_title("Your Trajectory", color='white')
-    ax.set_xlabel("Session Index", color='lightgray')
-    ax.set_ylabel("Momentum Score", color='lightgray')
-    ax.tick_params(colors='lightgray')
-    ax.legend(facecolor='#1a1a1a', edgecolor='gray', labelcolor='white')
-    ax.grid(True, alpha=0.15, color='gray')
-    plt.tight_layout()
-    return fig
-
-# ==================================================
-# SIDEBAR
+# SIDEBAR - Permanently visible
 # ==================================================
 with st.sidebar:
     st.markdown("### The-Dojo")
@@ -607,24 +512,9 @@ with st.sidebar:
         st.rerun()
 
 # ==================================================
-# TABS
+# CHAT
 # ==================================================
-tab_train, tab_trajectory, tab_history = st.tabs(["Training", "Trajectory", "History"])
-
-# ==================================================
-# TRAJECTORY TAB
-# ==================================================
-with tab_trajectory:
-    st.markdown("### Your Path")
-    fig = plot_trajectory()
-    if fig:
-        st.pyplot(fig)
-    else:
-        st.info("Keep training — trajectory builds after 5 sessions.")
-
-# ==================================================
-# TRAINING TAB
-# ==================================================
+tab_train, tab_history = st.tabs(["Training", "History"])
 with tab_train:
     st.markdown("### Dojo Awareness")
     if st.session_state.milestone_message:
@@ -654,6 +544,7 @@ with tab_train:
             st.stop()
 
         st.session_state.last_processed_prompt = prompt
+
         st.session_state.msgs.append({"role": "user", "content": prompt})
         supabase.table("records").insert({
             "user_id": USER_ID,
@@ -663,8 +554,8 @@ with tab_train:
         }).execute()
 
         doctrine = "Discipline begins with attention."
-        crisis_keywords = ["suicide", "kill myself", "want to die", "hopeless", "end it", "hurt myself", "self harm"]
 
+        crisis_keywords = ["suicide", "kill myself", "want to die", "hopeless", "end it", "hurt myself", "self harm"]
         if any(word in prompt.lower() for word in crisis_keywords):
             reply = """
 I'm stopping here.
@@ -681,63 +572,57 @@ The mat will still be here when you're ready. Please reach out to someone.
         else:
             detected_pattern, confidence = detect_pattern_for_message(USER_ID, prompt)
 
-            # Tone + Loop + Voice
-            tone_mode = detect_tone_mode(prompt)
-            is_loop, loop_theme = detect_thought_loop(USER_ID, prompt)
-            voice_instruction = get_voice_for_count(user_reflection_count)
-
-            # Persistent pattern check (existing logic preserved)
             persistent_pattern = None
             try:
-                rp = supabase.table("dojo_patterns") \
+                r = supabase.table("dojo_patterns") \
                     .select("pattern") \
                     .eq("user_id", USER_ID) \
                     .order("timestamp", desc=True) \
                     .limit(3) \
                     .execute()
-                if rp.data and len(rp.data) == 3:
-                    if rp.data[0]["pattern"] == rp.data[1]["pattern"] == rp.data[2]["pattern"]:
-                        persistent_pattern = rp.data[0]["pattern"]
+                if r.data and len(r.data) == 3:
+                    if r.data[0]["pattern"] == r.data[1]["pattern"] == r.data[2]["pattern"]:
+                        persistent_pattern = r.data[0]["pattern"]
             except:
                 pass
-
+            
             mirror = ""
             if persistent_pattern:
                 mirror = f"I notice **{persistent_pattern.replace('_', ' ')}** appearing repeatedly in your reflections.\n\n"
 
-            loop_instruction = ""
-            if is_loop and loop_theme:
-                loop_instruction = f"""
-LOOP DETECTED: The practitioner is circling '{loop_theme}' again.
-Do NOT name the loop directly. Approach from a completely different angle.
-Ask a question they have not been asked before. Interrupt the pattern with novelty, not confrontation.
-"""
-
-            tone_instruction = f"Current emotional tone: {tone_mode}. Adapt accordingly — more grounding for anxiety, more presence for sadness, more curiosity for boredom, pure witness for just_listen, immediate calm anchoring for crisis."
-
             mentor_prompt = f"""
-You are a calm, disciplined mentor guiding a practitioner through reflection.
-Your role: help them observe patterns in thinking and behavior.
-Never give direct advice. Guide with questions, clarity, and grounded insight.
+You are a calm, disciplined Zen mentor. Your wisdom comes through brevity.
 
-Voice style: {voice_instruction}
-
-{tone_instruction}
-
-{loop_instruction}
+Your role: help practitioners observe their own patterns. Mirror what you see. Ask grounding questions.
 
 {mirror}
 
-If appropriate, weave in this teaching naturally:
-{doctrine}
+If fitting, weave in naturally: "{doctrine}"
 
-CRITICAL LENGTH RULES — FOLLOW EXACTLY OR RESPONSE WILL BE REJECTED:
-1. LIGHT/NEUTRAL INPUT → 1-2 sentences max
-2. MODERATE INPUT → 3-5 sentences, single paragraph
-3. HEAVY INPUT → 2 short paragraphs max (100-150 words total)
+RESPONSE LENGTH (CRITICAL):
+- Simple check-in or light topic: 1-2 sentences only
+- Moderate reflection: 3-4 sentences, single focused paragraph  
+- Deep struggle or complex pattern: 2 short paragraphs maximum (under 120 words total)
 
-Tone: grounded, non-judgmental, quietly supportive. No fluff, no lectures.
-End in a way that invites continuation unless resolved.
+Style:
+- Grounded, not flowery
+- Questions over answers
+- Silence has power — say less, mean more
+- End with space for them to continue or complete
+
+Example lengths:
+User: "Had a good day"
+You: "What made it good?" (4 words)
+
+User: "I keep procrastinating on this project"  
+You: "You've noticed this pattern before. What happens right before you avoid it? What are you protecting yourself from?" (20 words)
+
+User: "I'm overwhelmed, everything feels impossible, I don't know where to start"
+You: "You're carrying a lot right now. Let's simplify.
+
+What's one thing — just one — that would feel like progress today? Not the whole mountain. One step." (35 words)
+
+Respond now with the same restraint.
 """
 
             try:
@@ -746,7 +631,8 @@ End in a way that invites continuation unless resolved.
                     "https://api.groq.com/openai/v1/chat/completions",
                     json={
                         "model": "llama-3.3-70b-versatile",
-                        "messages": [{"role": "system", "content": mentor_prompt}] + st.session_state.msgs[-10:]
+                        "messages": [{"role": "system", "content": mentor_prompt}]
+                        + st.session_state.msgs[-10:]
                     },
                     headers=headers
                 )
@@ -754,9 +640,8 @@ End in a way that invites continuation unless resolved.
             except Exception:
                 reply = "The mentor pauses for a moment. Please try again."
 
-        words = reply.split()
-        if len(words) > 150:
-            reply = ' '.join(words[:150]) + "… (mentor pauses — reflect before continuing)"
+        # AI should naturally stay brief due to prompt engineering
+        # No truncation needed - if response is long, that's a prompt refinement issue
 
         if st.session_state.msgs and st.session_state.msgs[-1]["role"] == "assistant" and st.session_state.msgs[-1]["content"] == reply:
             pass
@@ -765,11 +650,13 @@ End in a way that invites continuation unless resolved.
                 placeholder = st.empty()
                 placeholder.markdown("The mentor reflects...")
                 time.sleep(1.5)
+
                 text = ""
                 for sentence in reply.split(". "):
                     text += sentence + ". "
                     placeholder.markdown(text)
                     time.sleep(0.2)
+
                 placeholder.markdown(reply)
 
             st.session_state.msgs.append({"role": "assistant", "content": reply})
@@ -795,9 +682,6 @@ End in a way that invites continuation unless resolved.
 
         st.rerun()
 
-# ==================================================
-# HISTORY TAB
-# ==================================================
 with tab_history:
     st.markdown("### Training History")
     r = supabase.table("records") \
