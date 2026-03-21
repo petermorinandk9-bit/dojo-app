@@ -14,9 +14,7 @@ from collections import Counter
 def inject_dojo_styling():
     """
     The Digital Zendo - Final Polished Weld
-    Sidebar PERMANENTLY visible (no collapse)
-    Toggle button removed / disabled for simplicity
-    Sidebar buttons: white-on-slate idle, dark-on-slate hover (reversed from last version)
+    Sidebar collapse button now visible and styled
     """
     st.markdown("""
     <style>
@@ -91,7 +89,6 @@ def inject_dojo_styling():
             background: linear-gradient(180deg, #2f4f4f 0%, #1b2a2a 100%) !important;
             border-right: 1px solid rgba(139,69,19,0.25) !important;
             color: #f0f0f0 !important;
-            position: relative !important;
         }
         [data-testid="stSidebar"] * {
             color: #f0f0f0 !important;
@@ -127,6 +124,9 @@ def inject_dojo_styling():
             background: rgba(47, 79, 79, 0.4) !important;
             color: #a8b5b5 !important;
             border: 1px solid rgba(58, 90, 90, 0.6) !important;
+            border-radius: 4px !important;
+            padding: 6px 10px !important;
+            transition: all 0.2s ease !important;
         }
         [data-testid="stSidebarCollapsedControl"]:hover {
             background: rgba(60, 95, 95, 0.75) !important;
@@ -147,6 +147,7 @@ def inject_dojo_styling():
         /* HIDE STREAMLIT CHROME */
         header, footer, #MainMenu {visibility: hidden !important;}
     </style>
+   
     <div class="dojo-title">The Dojo</div>
     """, unsafe_allow_html=True)
 
