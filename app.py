@@ -20,10 +20,12 @@ def inject_dojo_styling():
     <style>
         /* Import a Raw Brush Font from Google */
         @import url('https://fonts.googleapis.com/css2?family=Ma+Shan+Zheng&display=swap');
+        
         .stApp {
             background-color: #0a0a0a !important;
             color: #f0f0f0 !important;
         }
+        
         /* THE ALTAR (Title) - hand-painted feel with slight rotation, ink bleed shadow */
         .dojo-title {
             font-family: 'Ma Shan Zheng', cursive !important;
@@ -40,21 +42,25 @@ def inject_dojo_styling():
                 0 0 80px rgba(178,34,34,0.06);
             animation: titleFade 2.5s ease;
         }
+        
         @keyframes titleFade {
             from { opacity: 0; transform: translateY(-30px) rotate(-3deg); }
             to { opacity: 1; transform: translateY(0) rotate(-1.5deg); }
         }
+        
         /* INK BLEED MESSAGES - improved ink-like bloom */
         [data-testid="stChatMessage"] {
             background-color: transparent !important;
             animation: inkBloom 1.4s ease !important;
             color: #f0f0f0 !important;
         }
+        
         @keyframes inkBloom {
             0% { opacity: 0; transform: translateY(10px); filter: blur(6px); }
             40% { opacity: 0.6; filter: blur(2px); }
             100% { opacity: 1; transform: translateY(0); filter: blur(0px); }
         }
+        
         /* MENTOR — center mist with true ink diffusion */
         [data-testid="stChatMessage"][aria-label="assistant message"] {
             text-align: center !important;
@@ -65,6 +71,7 @@ def inject_dojo_styling():
             backdrop-filter: blur(3px);
             box-shadow: 0 0 30px rgba(255,255,255,0.03);
         }
+        
         /* STUDENT — right aligned ink with diffusion */
         [data-testid="stChatMessage"][aria-label="user message"] {
             text-align: right !important;
@@ -74,25 +81,30 @@ def inject_dojo_styling():
             border-radius: 16px 4px 4px 16px !important;
             box-shadow: 0 0 25px rgba(178,34,34,0.15);
         }
+        
         /* Enforce brighter text in chat markdown */
         [data-testid="stChatMessage"] .stMarkdown,
         [data-testid="stChatMessage"] p,
         [data-testid="stChatMessage"] div {
             color: #f0f0f0 !important;
         }
+        
         /* Avatar background */
         div[data-testid^="stChatMessageAvatar"] {
             background-color: #1a1a1a !important;
         }
+        
         /* STONE TABLET SIDEBAR - mineral slate gradient */
         [data-testid="stSidebar"] {
             background: linear-gradient(180deg, #2f4f4f 0%, #1b2a2a 100%) !important;
             border-right: 1px solid rgba(139,69,19,0.25) !important;
             color: #f0f0f0 !important;
         }
+        
         [data-testid="stSidebar"] * {
             color: #f0f0f0 !important;
         }
+        
         /* Sidebar buttons - white-on-slate idle (pop), dark-on-slate hover (calm) */
         [data-testid="stSidebar"] .stButton > button,
         [data-testid="stSidebar"] button {
@@ -105,6 +117,7 @@ def inject_dojo_styling():
             transition: all 0.2s ease !important;
             font-weight: 400 !important;
         }
+        
         [data-testid="stSidebar"] .stButton > button:hover,
         [data-testid="stSidebar"] button:hover {
             background: rgba(30, 30, 30, 0.85) !important;
@@ -113,12 +126,14 @@ def inject_dojo_styling():
             transform: translateX(4px) !important;
             box-shadow: 0 2px 8px rgba(0,0,0,0.4) !important;
         }
+        
         [data-testid="stSidebar"] .stButton > button:active,
         [data-testid="stSidebar"] button:active {
             background: rgba(20, 20, 20, 0.95) !important;
             color: #ffffff !important;
             transform: translateX(2px) !important;
         }
+        
         /* Collapse button - visible and styled to match sidebar buttons */
         [data-testid="stSidebarCollapsedControl"] {
             background: rgba(47, 79, 79, 0.4) !important;
@@ -127,12 +142,15 @@ def inject_dojo_styling():
             border-radius: 4px !important;
             padding: 6px 10px !important;
             transition: all 0.2s ease !important;
+            z-index: 99999 !important; /* Ensure it stays above other elements */
         }
+        
         [data-testid="stSidebarCollapsedControl"]:hover {
             background: rgba(60, 95, 95, 0.75) !important;
             color: #ffffff !important;
             border-color: rgba(100, 140, 140, 0.8) !important;
         }
+        
         /* Ambient temple lighting - soft light from above */
         body::before {
             content: "";
@@ -144,9 +162,13 @@ def inject_dojo_styling():
             background: radial-gradient(circle at 50% 10%, rgba(255,255,255,0.03), transparent 60%);
             pointer-events: none;
         }
-        /* HIDE STREAMLIT CHROME */
-        header, footer, #MainMenu {visibility: hidden !important;}
+        
+        /* HIDE STREAMLIT CHROME BUT PRESERVE HEADER FOR BUTTON VISIBILITY */
+        #MainMenu {visibility: hidden !important;}
+        footer {visibility: hidden !important;}
+        header {background-color: transparent !important;}
     </style>
+    
     <div class="dojo-title">The Dojo</div>
     """, unsafe_allow_html=True)
 
