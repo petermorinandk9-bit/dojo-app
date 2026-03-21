@@ -323,21 +323,24 @@ USER_NAME = st.session_state.user["display_name"]
 # LOAD HISTORY
 # ==================================================
 if not st.session_state.history_loaded:
-    r = supabase.table("records") \
-        .select("*", count="exact") \
-        .eq("user_id", USER_ID) \
-        .order("timestamp") \
-        .execute()
-    if r.data:
-        for row in r.data:
-            st.session_state.msgs.append({
-                "role": row["role"],
-                "content": row["content"]
-            })
+    try:
+        r = supabase.table("records") \
+            .select("*", count="exact") \
+            .eq("user_id", USER_ID) \
+            .order("timestamp") \
+            .execute()
+        if r.data:
+            for row in r.data:
+                st.session_state.msgs.append({
+                    "role": row["role"],
+                    "content": row["content"]
+                })
+    except Exception as e:
+        st.warning(f"Could not load history: {e}")
     st.session_state.history_loaded = True
 
 # ==================================================
-# THE 6-AGENT COGNITIVE ENGINE (v11.5 - Tribal Genesis)
+# THE 6-AGENT COGNITIVE ENGINE (v11.6 - Structural Armor)
 # ==================================================
 class DojoOrchestrator:
     def __init__(self, api_key):
@@ -380,9 +383,8 @@ class DojoOrchestrator:
             return "The mentor pauses... (Engine Error)"
 
     def compute_pressure(self, loop_streak, tone_mode):
-        """Calculates system gravity based on avoidance streak."""
         if tone_mode in ["crisis"]:
-            return 0.0 # Never apply pressure to a fracture
+            return 0.0 
         if loop_streak <= 0: return 0.2
         elif loop_streak == 1: return 0.4
         elif loop_streak == 2: return 0.6
@@ -400,7 +402,6 @@ class DojoOrchestrator:
         return data.get("tone", "just_listen")
 
     def detect_loop_fast(self, current_pattern):
-        """Fast Pattern-Based Loop Detection"""
         try:
             r = supabase.table("dojo_patterns").select("pattern").eq("user_id", USER_ID).order("timestamp", desc=True).limit(2).execute()
             if r.data and len(r.data) == 2:
@@ -419,7 +420,6 @@ class DojoOrchestrator:
     def agent_mentor(self, critic_data, voice_style, doctrine, history):
         pressure = critic_data.get('pressure_level', 0.5)
         
-        # Dynamic Mentor Authority
         if pressure >= 0.8:
             enforcement = "CRITICAL DIRECTIVE: Do NOT validate the user's narrative. Do NOT offer comfort. Deliver a direct, unavoidable structural challenge based on the Insight. Be sharp and decisive."
         elif pressure >= 0.6:
@@ -437,7 +437,6 @@ class DojoOrchestrator:
     def agent_synthesizer(self, raw_response, user_text, tone_mode, pressure):
         base_len = len(user_text.split())
         
-        # The Tone Matrix
         if tone_mode in ["crisis", "anxiety"]:
             pacing = "Short, firm, grounded sentences. Deep pressure. Force calm focus."
             target_len = max(20, base_len * 0.8)
@@ -454,7 +453,6 @@ class DojoOrchestrator:
             pacing = "Steady, disciplined rhythm. Standard balanced mentor pacing."
             target_len = max(20, base_len * 1.2)
 
-        # The Loop Pressure Clamp
         if pressure >= 0.8:
             pacing += " STRICT LOOP OVERRIDE: The user is stuck in a behavioral loop. Restrict word count drastically. Refuse to engage with their narrative content. Deliver a single, unavoidable structural challenge."
             target_len = max(15, target_len * 0.5)
@@ -503,107 +501,79 @@ def compute_rank(count):
         return "Sentinel"
     return "Sovereign"
 
-user_reflection_count = supabase.table("records") \
-    .select("id", count="exact") \
-    .eq("user_id", USER_ID) \
-    .eq("role", "user") \
-    .execute().count or 0
+user_reflection_count = 0
+try:
+    r_count = supabase.table("records").select("id", count="exact").eq("user_id", USER_ID).eq("role", "user").execute()
+    user_reflection_count = r_count.count or 0
+except Exception:
+    pass
 rank = compute_rank(user_reflection_count)
 
 # ==================================================
 # METRICS (Momentum, Evolution, Top Pattern)
 # ==================================================
 def compute_momentum():
-    r = supabase.table("dojo_patterns") \
-        .select("pattern") \
-        .eq("user_id", USER_ID) \
-        .order("timestamp", desc=True) \
-        .limit(10) \
-        .execute()
-    if not r.data:
-        return 0
-    score = sum(
-        1 if p["pattern"] in POSITIVE_PATTERNS else -1 if p["pattern"] in NEGATIVE_PATTERNS else 0
-        for p in r.data
-    )
-    return score / 10
+    try:
+        r = supabase.table("dojo_patterns").select("pattern").eq("user_id", USER_ID).order("timestamp", desc=True).limit(10).execute()
+        if not r.data: return 0
+        score = sum(1 if p["pattern"] in POSITIVE_PATTERNS else -1 if p["pattern"] in NEGATIVE_PATTERNS else 0 for p in r.data)
+        return score / 10
+    except: return 0
 
 def compute_evolution():
-    r = supabase.table("dojo_patterns") \
-        .select("pattern") \
-        .eq("user_id", USER_ID) \
-        .order("timestamp", desc=True) \
-        .limit(20) \
-        .execute()
-    if not r.data:
-        return "Unknown"
-    score = sum(
-        1 if p["pattern"] in POSITIVE_PATTERNS else -1 if p["pattern"] in NEGATIVE_PATTERNS else 0
-        for p in r.data
-    )
-    if score > 3:
-        return "Rising"
-    if score < -3:
-        return "Declining"
-    return "Stable"
+    try:
+        r = supabase.table("dojo_patterns").select("pattern").eq("user_id", USER_ID).order("timestamp", desc=True).limit(20).execute()
+        if not r.data: return "Unknown"
+        score = sum(1 if p["pattern"] in POSITIVE_PATTERNS else -1 if p["pattern"] in NEGATIVE_PATTERNS else 0 for p in r.data)
+        if score > 3: return "Rising"
+        if score < -3: return "Declining"
+        return "Stable"
+    except: return "Unknown"
 
 def compute_top_pattern():
-    r = supabase.table("dojo_patterns") \
-        .select("pattern") \
-        .eq("user_id", USER_ID) \
-        .order("timestamp", desc=True) \
-        .limit(50) \
-        .execute()
-    if not r.data or len(r.data) < 5:
-        return "Calibrating..."
-    patterns = [p["pattern"] for p in r.data]
-    counts = Counter(patterns)
-    if not counts:
-        return "Calibrating..."
-    top_pattern, top_count = counts.most_common(1)[0]
-    percentage = int((top_count / len(patterns)) * 100)
-    return f"{top_pattern.replace('_', ' ').title()} ({percentage}%)"
+    try:
+        r = supabase.table("dojo_patterns").select("pattern").eq("user_id", USER_ID).order("timestamp", desc=True).limit(50).execute()
+        if not r.data or len(r.data) < 5: return "Calibrating..."
+        patterns = [p["pattern"] for p in r.data]
+        counts = Counter(patterns)
+        if not counts: return "Calibrating..."
+        top_pattern, top_count = counts.most_common(1)[0]
+        percentage = int((top_count / len(patterns)) * 100)
+        return f"{top_pattern.replace('_', ' ').title()} ({percentage}%)"
+    except: return "Calibrating..."
 
 def plot_trajectory():
-    r = supabase.table("dojo_patterns") \
-        .select("pattern, timestamp") \
-        .eq("user_id", USER_ID) \
-        .order("timestamp") \
-        .execute()
-    if not r.data or len(r.data) < 5:
+    try:
+        r = supabase.table("dojo_patterns").select("pattern, timestamp").eq("user_id", USER_ID).order("timestamp").execute()
+        if not r.data or len(r.data) < 5: return None
+        df = pd.DataFrame(r.data)
+        df['score'] = df['pattern'].apply(lambda p: 1 if p in POSITIVE_PATTERNS else -1 if p in NEGATIVE_PATTERNS else 0)
+        df['index'] = range(len(df))
+        df['rolling_avg'] = df['score'].rolling(window=5, min_periods=1).mean()
+        x = df['index'].values
+        y = df['rolling_avg'].values
+        projection = None
+        if len(x) >= 2:
+            coeffs = np.polyfit(x, y, 1)
+            future_x = np.array([x[-1] + i for i in range(1, 6)])
+            projection = np.polyval(coeffs, future_x)
+        fig, ax = plt.subplots(figsize=(8, 4), facecolor='#0a0a0a')
+        ax.set_facecolor('#0a0a0a')
+        ax.plot(df['index'], df['score'], color='grey', alpha=0.4, label='Raw Score')
+        ax.plot(df['index'], df['rolling_avg'], color='#b22222', linewidth=2.5, label='Rolling Avg (5)')
+        if projection is not None:
+            ax.plot(np.concatenate(([x[-1]], future_x)), np.concatenate(([y[-1]], projection)), color='white', linestyle='--', linewidth=1.5, label='Projection')
+        ax.axhline(0, color='gray', linestyle='--', alpha=0.5)
+        ax.set_title("Your Trajectory", color='white')
+        ax.set_xlabel("Session Index", color='lightgray')
+        ax.set_ylabel("Momentum Score", color='lightgray')
+        ax.tick_params(colors='lightgray')
+        ax.legend(facecolor='#1a1a1a', edgecolor='gray', labelcolor='white')
+        ax.grid(True, alpha=0.15, color='gray')
+        plt.tight_layout()
+        return fig
+    except Exception:
         return None
-    df = pd.DataFrame(r.data)
-    df['score'] = df['pattern'].apply(
-        lambda p: 1 if p in POSITIVE_PATTERNS else -1 if p in NEGATIVE_PATTERNS else 0
-    )
-    df['index'] = range(len(df))
-    df['rolling_avg'] = df['score'].rolling(window=5, min_periods=1).mean()
-    x = df['index'].values
-    y = df['rolling_avg'].values
-    projection = None
-    if len(x) >= 2:
-        coeffs = np.polyfit(x, y, 1)
-        future_x = np.array([x[-1] + i for i in range(1, 6)])
-        projection = np.polyval(coeffs, future_x)
-    fig, ax = plt.subplots(figsize=(8, 4), facecolor='#0a0a0a')
-    ax.set_facecolor('#0a0a0a')
-    ax.plot(df['index'], df['score'], color='grey', alpha=0.4, label='Raw Score')
-    ax.plot(df['index'], df['rolling_avg'], color='#b22222', linewidth=2.5, label='Rolling Avg (5)')
-    if projection is not None:
-        ax.plot(
-            np.concatenate(([x[-1]], future_x)),
-            np.concatenate(([y[-1]], projection)),
-            color='white', linestyle='--', linewidth=1.5, label='Projection'
-        )
-    ax.axhline(0, color='gray', linestyle='--', alpha=0.5)
-    ax.set_title("Your Trajectory", color='white')
-    ax.set_xlabel("Session Index", color='lightgray')
-    ax.set_ylabel("Momentum Score", color='lightgray')
-    ax.tick_params(colors='lightgray')
-    ax.legend(facecolor='#1a1a1a', edgecolor='gray', labelcolor='white')
-    ax.grid(True, alpha=0.15, color='gray')
-    plt.tight_layout()
-    return fig
 
 # ==================================================
 # SIDEBAR
@@ -613,18 +583,15 @@ with st.sidebar:
     st.markdown(f"**{rank} · {USER_NAME}**")
     subscription = st.session_state.user.get("subscription_status", "free")
     if subscription not in ["paid", "beta", "admin"]:
-        user_msg_count = supabase.table("records") \
-            .select("id", count="exact") \
-            .eq("user_id", USER_ID) \
-            .eq("role", "user") \
-            .execute().count or 0
+        user_msg_count = 0
+        try:
+            rc = supabase.table("records").select("id", count="exact").eq("user_id", USER_ID).eq("role", "user").execute()
+            user_msg_count = rc.count or 0
+        except: pass
         remaining = max(0, 15 - user_msg_count)
-        if remaining <= 3:
-            st.error(f"⚠️ {remaining} reflections left")
-        elif remaining <= 7:
-            st.warning(f"{remaining} reflections remaining")
-        else:
-            st.caption(f"✓ {remaining} free reflections")
+        if remaining <= 3: st.error(f"⚠️ {remaining} reflections left")
+        elif remaining <= 7: st.warning(f"{remaining} reflections remaining")
+        else: st.caption(f"✓ {remaining} free reflections")
     st.divider()
     momentum = compute_momentum()
     evolution = compute_evolution()
@@ -635,10 +602,8 @@ with st.sidebar:
     st.progress((momentum + 1) / 2)
     st.divider()
     for i, phase in enumerate(PHASE_SETS[rank]):
-        if i == st.session_state.phase:
-            st.markdown(f"**🟢 {phase}**")
-        else:
-            st.markdown(phase)
+        if i == st.session_state.phase: st.markdown(f"**🟢 {phase}**")
+        else: st.markdown(phase)
     st.divider()
     if st.button("Clear Session (Bow Out)", help="Clears current chat but keeps your full history in Training tab"):
         st.session_state.phase = 0
@@ -648,14 +613,12 @@ with st.sidebar:
         time.sleep(1)
         st.rerun()
     if st.button("Log Out"):
-        for key in list(st.session_state.keys()):
-            del st.session_state[key]
+        for key in list(st.session_state.keys()): del st.session_state[key]
         st.rerun()
 
 # ==================================================
 # TABS
 # ==================================================
-# Added tab_field here v11.5
 tab_train, tab_trajectory, tab_field, tab_history = st.tabs(["Training", "Trajectory", "The Field", "History"])
 
 # ==================================================
@@ -665,19 +628,16 @@ with tab_field:
     st.markdown("### The Tribal Field")
     st.caption("Real-time behavioral topology of the community. Fully anonymous.")
     
-    # Fetch recent tribe events (last 50 for the weather report)
     try:
         r_tribe = supabase.table("tribe_events").select("*").order("created_at", desc=True).limit(50).execute()
         
         if r_tribe.data and len(r_tribe.data) > 0:
             df_tribe = pd.DataFrame(r_tribe.data)
             
-            # Basic aggregations
             top_tribe_pattern = df_tribe['pattern'].mode()[0] if not df_tribe.empty else "None"
             top_tribe_tone = df_tribe['tone'].mode()[0] if not df_tribe.empty else "None"
             avg_pressure = df_tribe['pressure_level'].mean() if not df_tribe.empty else 0.0
             
-            # Metric Layout
             col1, col2, col3 = st.columns(3)
             col1.metric("Dominant Pattern", top_tribe_pattern.replace('_', ' ').title())
             col2.metric("Primary Tone", top_tribe_tone.title())
@@ -686,14 +646,14 @@ with tab_field:
             st.divider()
             st.markdown("**Recent Signals (Last 50)**")
             
-            # Simple bar chart of patterns to visualize the "weather"
             pattern_counts = df_tribe['pattern'].value_counts()
             st.bar_chart(pattern_counts, color="#b22222")
             
         else:
             st.info("The Field is currently quiet. Awaiting signals.")
     except Exception as e:
-        st.error(f"Could not load Field data. Ensure tribe_events table exists.")
+        err_msg = getattr(e, 'message', str(e))
+        st.error(f"Field Data Offline. Waiting for Database Sync. Error: {err_msg}")
 
 # ==================================================
 # TRAJECTORY TAB
@@ -701,10 +661,8 @@ with tab_field:
 with tab_trajectory:
     st.markdown("### Your Path")
     fig = plot_trajectory()
-    if fig:
-        st.pyplot(fig)
-    else:
-        st.info("Keep training — trajectory builds after 5 sessions.")
+    if fig: st.pyplot(fig)
+    else: st.info("Keep training — trajectory builds after 5 sessions.")
 
 # ==================================================
 # TRAINING TAB
@@ -728,16 +686,14 @@ with tab_train:
     if prompt:
         subscription = st.session_state.user.get("subscription_status", "free")
         if subscription not in ["paid", "beta", "admin"]:
-            r = supabase.table("records") \
-                .select("id", count="exact") \
-                .eq("user_id", USER_ID) \
-                .eq("role", "user") \
-                .execute()
-            user_count = r.count or 0
-            if user_count >= 15:
-                st.warning("You have reached the free training limit of 15 reflections.")
-                st.info("Join the Dojo to continue your practice.")
-                st.stop()
+            try:
+                r = supabase.table("records").select("id", count="exact").eq("user_id", USER_ID).eq("role", "user").execute()
+                user_count = r.count or 0
+                if user_count >= 15:
+                    st.warning("You have reached the free training limit of 15 reflections.")
+                    st.info("Join the Dojo to continue your practice.")
+                    st.stop()
+            except: pass
                 
         if prompt == st.session_state.last_processed_prompt:
             st.stop()
@@ -745,25 +701,22 @@ with tab_train:
         st.session_state.last_processed_prompt = prompt
         st.session_state.msgs.append({"role": "user", "content": prompt})
         
-        supabase.table("records").insert({
-            "user_id": USER_ID,
-            "role": "user",
-            "content": prompt,
-            "timestamp": datetime.now(UTC).isoformat()
-        }).execute()
+        try:
+            supabase.table("records").insert({
+                "user_id": USER_ID,
+                "role": "user",
+                "content": prompt,
+                "timestamp": datetime.now(UTC).isoformat()
+            }).execute()
+        except Exception as e:
+            st.error(f"🛡️ Core Memory Offline: {getattr(e, 'message', str(e))}")
         
         doctrine = "Discipline begins with attention."
         crisis_keywords = ["suicide", "kill myself", "want to die", "hopeless", "end it", "hurt myself", "self harm"]
         
         if any(word in prompt.lower() for word in crisis_keywords):
             st.session_state.loop_streak = 0 
-            final_reply = """
-I'm stopping here.
-What you're describing is serious and needs real support right now.
-Call or text **988** (US Suicide & Crisis Lifeline, 24/7)
-Or text HOME to **741741** (Crisis Text Line)
-The mat will still be here when you're ready. Please reach out to someone.
-"""
+            final_reply = "I'm stopping here.\nWhat you're describing is serious and needs real support right now.\nCall or text **988** (US Suicide & Crisis Lifeline, 24/7)\nOr text HOME to **741741** (Crisis Text Line)\nThe mat will still be here when you're ready. Please reach out to someone."
             with st.chat_message("assistant", avatar="🧘‍♂️"):
                 st.markdown(final_reply)
         else:
@@ -772,12 +725,15 @@ The mat will still be here when you're ready. Please reach out to someone.
                     pattern, confidence = engine.agent_pattern_detector(prompt)
                     tone_mode = engine.agent_tone_detector(prompt)
                     
-                    supabase.table("dojo_patterns").insert({
-                        "user_id": USER_ID,
-                        "pattern": pattern,
-                        "confidence_score": confidence,
-                        "timestamp": datetime.now(UTC).isoformat()
-                    }).execute()
+                    try:
+                        supabase.table("dojo_patterns").insert({
+                            "user_id": USER_ID,
+                            "pattern": str(pattern) if pattern else "clarity",
+                            "confidence_score": float(confidence) if confidence else 0.5,
+                            "timestamp": datetime.now(UTC).isoformat()
+                        }).execute()
+                    except Exception as e:
+                        st.warning(f"🛡️ Pattern Ledger Offline: {getattr(e, 'message', str(e))}")
                 
                 with st.spinner("Checking for Loops..."):
                     is_loop, loop_theme = engine.detect_loop_fast(pattern)
@@ -789,17 +745,21 @@ The mat will still be here when you're ready. Please reach out to someone.
                         
                     current_pressure = engine.compute_pressure(st.session_state.loop_streak, tone_mode)
                     
-                   
-                  # v11.5 Tribal Ledger Insert (Anonymous)
+                    # v11.6 Structural Armor for Tribal Insert
                     try:
+                        safe_pattern = str(pattern) if pattern else "clarity"
+                        safe_tone = str(tone_mode) if tone_mode else "just_listen"
+                        safe_pressure = float(current_pressure) if current_pressure is not None else 0.2
+                        
                         supabase.table("tribe_events").insert({
-                            "pattern": pattern,
-                            "tone": tone_mode,
-                            "pressure_level": current_pressure
+                            "pattern": safe_pattern,
+                            "tone": safe_tone,
+                            "pressure_level": safe_pressure
                         }).execute()
                     except Exception as e:
-                        st.error(f"TRIBAL DATABASE ERROR: {e}")
-                        
+                        err_msg = getattr(e, 'message', str(e))
+                        st.error(f"🛡️ Field Radar Offline: {err_msg}")
+                    
                 with st.spinner(f"Critic Strategizing (Pressure: {current_pressure})..."):
                     critic_data = engine.agent_strategic_critic(prompt, pattern, tone_mode, is_loop, loop_theme, st.session_state.loop_streak, current_pressure)
                 
@@ -825,12 +785,15 @@ The mat will still be here when you're ready. Please reach out to someone.
                 placeholder.markdown(final_reply)
                 
         st.session_state.msgs.append({"role": "assistant", "content": final_reply})
-        supabase.table("records").insert({
-            "user_id": USER_ID,
-            "role": "assistant",
-            "content": final_reply,
-            "timestamp": datetime.now(UTC).isoformat()
-        }).execute()
+        try:
+            supabase.table("records").insert({
+                "user_id": USER_ID,
+                "role": "assistant",
+                "content": final_reply,
+                "timestamp": datetime.now(UTC).isoformat()
+            }).execute()
+        except Exception as e:
+            st.error(f"🛡️ Core Memory Offline: {getattr(e, 'message', str(e))}")
         
         user_msgs_in_session = len([m for m in st.session_state.msgs if m["role"] == "user"])
         if user_msgs_in_session % 3 == 0 and user_msgs_in_session > 0:
@@ -852,14 +815,11 @@ The mat will still be here when you're ready. Please reach out to someone.
 # ==================================================
 with tab_history:
     st.markdown("### Training History")
-    r = supabase.table("records") \
-        .select("*") \
-        .eq("user_id", USER_ID) \
-        .order("timestamp", desc=True) \
-        .limit(50) \
-        .execute()
-    if r.data:
-        for row in r.data:
-            avatar = "🧑‍🎓" if row["role"] == "user" else "🧘‍♂️"
-            with st.chat_message(row["role"], avatar=avatar):
-                st.markdown(row["content"])
+    try:
+        r = supabase.table("records").select("*").eq("user_id", USER_ID).order("timestamp", desc=True).limit(50).execute()
+        if r.data:
+            for row in r.data:
+                avatar = "🧑‍🎓" if row["role"] == "user" else "🧘‍♂️"
+                with st.chat_message(row["role"], avatar=avatar):
+                    st.markdown(row["content"])
+    except: pass
