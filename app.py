@@ -14,7 +14,7 @@ from collections import Counter
 def inject_dojo_styling():
     """
     The Digital Zendo - Final Polished Weld
-    Sidebar collapse button visible and styled
+    Sidebar collapse button visible, styled, and hover-fixed to grey.
     """
     st.markdown("""
     <style>
@@ -145,10 +145,11 @@ def inject_dojo_styling():
             z-index: 99999 !important; /* Ensure it stays above other elements */
         }
         
+        /* THE FIX: Force a clean grey hover state */
         [data-testid="stSidebarCollapsedControl"]:hover {
-            background: rgba(60, 95, 95, 0.75) !important;
+            background: rgba(105, 105, 105, 0.8) !important;
             color: #ffffff !important;
-            border-color: rgba(100, 140, 140, 0.8) !important;
+            border-color: rgba(150, 150, 150, 0.8) !important;
         }
         
         /* Ambient temple lighting - soft light from above */
