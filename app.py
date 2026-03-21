@@ -14,7 +14,8 @@ from collections import Counter
 def inject_dojo_styling():
     """
     The Digital Zendo - Final Polished Weld
-    Sidebar collapse button visible, styled, and hover-fixed to grey.
+    Sidebar collapse button visible, styled, hover-fixed to grey.
+    Login/Enter buttons styled for high-contrast tactile feedback.
     """
     st.markdown("""
     <style>
@@ -93,6 +94,30 @@ def inject_dojo_styling():
         div[data-testid^="stChatMessageAvatar"] {
             background-color: #1a1a1a !important;
         }
+
+        /* MAIN PAGE FORM BUTTONS (Login / Create) */
+        div[data-testid="stFormSubmitButton"] > button {
+            background-color: #222222 !important; /* Brighter black / Charcoal */
+            color: #f0f0f0 !important; /* White text when idle */
+            border: 1px solid #444444 !important;
+            border-radius: 6px !important;
+            transition: all 0.3s ease !important;
+            font-weight: 500 !important;
+            letter-spacing: 1px !important;
+        }
+        
+        div[data-testid="stFormSubmitButton"] > button:hover {
+            background-color: #ffffff !important; /* Pure white on hover */
+            color: #000000 !important; /* Black text on hover for contrast */
+            border-color: #ffffff !important;
+            box-shadow: 0 0 15px rgba(255, 255, 255, 0.4) !important; /* Soft white glow */
+        }
+        
+        div[data-testid="stFormSubmitButton"] > button:active {
+            background-color: #dddddd !important;
+            color: #000000 !important;
+            transform: scale(0.98) !important;
+        }
         
         /* STONE TABLET SIDEBAR - mineral slate gradient */
         [data-testid="stSidebar"] {
@@ -145,7 +170,7 @@ def inject_dojo_styling():
             z-index: 99999 !important; /* Ensure it stays above other elements */
         }
         
-        /* THE FIX: Force a clean grey hover state */
+        /* Force a clean grey hover state for sidebar collapse */
         [data-testid="stSidebarCollapsedControl"]:hover {
             background: rgba(105, 105, 105, 0.8) !important;
             color: #ffffff !important;
