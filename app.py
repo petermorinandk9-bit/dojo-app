@@ -498,8 +498,8 @@ Return the refined version."""
         """
         Sensei Protocol - Sovereign Update v11.6.5
         Absolute minimum legal/ethical trigger only.
-        No filtering, no context analysis, no business/velocity detection.
-        Triggers exclusively on explicit lethal self-harm language.
+        No filtering, no context analysis.
+        Triggers exclusively on explicit lethal self-harm or direct harm on others language.
         """
         lowered = text.lower()
 
