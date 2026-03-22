@@ -340,7 +340,7 @@ if not st.session_state.history_loaded:
     st.session_state.history_loaded = True
 
 # ==================================================
-# THE 6-AGENT COGNITIVE ENGINE (v11.6.2 - Instant Response Fix)
+# THE 6-AGENT COGNITIVE ENGINE (v11.6.3)
 # ==================================================
 class DojoOrchestrator:
     def __init__(self, api_key):
@@ -493,6 +493,76 @@ Target length is a guideline, not a constraint: {int(target_len)} words.
 Return the refined version."""
         payload = [{"role": "system", "content": prompt}, {"role": "user", "content": raw_response}]
         return self._call_text(payload)
+
+    def sensei_protocol(self, prompt: str) -> dict:
+        """
+        Sensei Protocol Failsafe v11.6.4
+        Distinguishes Business Velocity from Personal Crisis
+        """
+        text = prompt.lower()
+
+        # ====================
+        # HARD SAFETY - Absolute override (never bypassed)
+        # ====================
+        hard_crisis_keywords = [
+            "suicide", "kill myself", "want to die", "end my life", "end it",
+            "hurt myself", "self harm", "self-harm", "988", "crisis line",
+            "hopeless", "no point living", "better off dead"
+        ]
+        if any(kw in text for kw in hard_crisis_keywords):
+            return {"is_crisis": True, "reason": "Hard safety trigger (self-harm / suicide language)"}
+
+        # ====================
+        # BUSINESS VELOCITY KEYWORDS
+        # ====================
+        business_keywords = [
+            "million", "billion", "valuation", "funding", "equity", "raise", "round",
+            "market", "stock", "shares", "exit", "acquisition", "growth", "revenue",
+            "profit", "loss", "scale", "investor", "pitch", "cap table", "burn rate",
+            "half million", "quarter million", "market moves", "bull run", "bear market"
+        ]
+
+        has_business = any(kw in text for kw in business_keywords)
+
+        # ====================
+        # PANIC / CRISIS CONTEXT KEYWORDS
+        # (must be present WITH business talk to trigger crisis)
+        # ====================
+        panic_keywords = [
+            "overwhelmed", "spiraling", "breaking", "can't handle", "falling apart",
+            "panic", "anxiety attack", "losing it", "freaking out", "can't breathe",
+            "heart racing", "trapped", "drowning", "crashing", "ruined", "destroyed",
+            "end of the world", "everything's falling apart"
+        ]
+
+        has_panic = any(kw in text for kw in panic_keywords)
+
+        # ====================
+        # DECISION LOGIC
+        # ====================
+        if has_business:
+            if has_panic:
+                return {
+                    "is_crisis": True,
+                    "reason": "Business context + strong panic indicators present"
+                }
+            else:
+                return {
+                    "is_crisis": False,
+                    "reason": "Business velocity detected, no personal panic indicators"
+                }
+        else:
+            # No business keywords → fall back to tone-based detection
+            # (existing logic preserved)
+            if any(kw in text for kw in panic_keywords):
+                return {
+                    "is_crisis": True,
+                    "reason": "Panic indicators detected outside business context"
+                }
+            return {
+                "is_crisis": False,
+                "reason": "No crisis indicators detected"
+            }
 
 # Initialize Engine
 engine = DojoOrchestrator(st.secrets['GROQ_API_KEY'])
@@ -747,7 +817,10 @@ with tab_train:
         doctrine = "Discipline begins with attention."
         crisis_keywords = ["suicide", "kill myself", "want to die", "hopeless", "end it", "hurt myself", "self harm"]
         
-        if any(word in prompt.lower() for word in crisis_keywords):
+        # Sensei Protocol Check
+        protocol_result = engine.sensei_protocol(prompt)
+        
+        if protocol_result["is_crisis"]:
             st.session_state.loop_streak = 0 
             final_reply = "I'm stopping here.\nWhat you're describing is serious and needs real support right now.\nCall or text **988** (US Suicide & Crisis Lifeline, 24/7)\nOr text HOME to **741741** (Crisis Text Line)\nThe mat will still be here when you're ready. Please reach out to someone."
             with st.chat_message("assistant", avatar="🧘‍♂️"):
@@ -759,7 +832,6 @@ with tab_train:
                     tone_mode = engine.agent_tone_detector(prompt)
                     
                     try:
-                        # v11.6.1 Timestamp fix applied here:
                         supabase.table("dojo_patterns").insert({
                             "user_id": USER_ID,
                             "pattern": str(pattern) if pattern else "clarity",
