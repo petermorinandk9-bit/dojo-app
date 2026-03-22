@@ -340,7 +340,7 @@ if not st.session_state.history_loaded:
     st.session_state.history_loaded = True
 
 # ==================================================
-# THE 6-AGENT COGNITIVE ENGINE (v11.6.5 Sovereign Update)
+# THE 6-AGENT COGNITIVE ENGINE (v11.6.6 Sovereign Update)
 # ==================================================
 class DojoOrchestrator:
     def __init__(self, api_key):
@@ -496,10 +496,8 @@ Return the refined version."""
 
     def sensei_protocol(self, text: str) -> dict:
         """
-        Sensei Protocol - Sovereign Update v11.6.5
-        Absolute minimum legal/ethical trigger only.
-        No filtering, no context analysis.
-        Triggers exclusively on explicit lethal self-harm or direct harm on others language.
+        Sensei Protocol - Sovereign Update v11.6.6
+        Lethal keywords only. No context, no business filtering.
         """
         lowered = text.lower()
 
@@ -510,15 +508,9 @@ Return the refined version."""
         ]
 
         if any(kw in lowered for kw in lethal_keywords):
-            return {
-                "is_crisis": True,
-                "reason": "Explicit lethal self-harm language detected"
-            }
+            return {"is_crisis": True, "reason": "Explicit lethal self-harm language"}
 
-        return {
-            "is_crisis": False,
-            "reason": "No explicit lethal self-harm indicators"
-        }
+        return {"is_crisis": False, "reason": "No lethal trigger"}
 
 # Initialize Engine
 engine = DojoOrchestrator(st.secrets['GROQ_API_KEY'])
@@ -773,7 +765,7 @@ with tab_train:
         doctrine = "Discipline begins with attention."
         crisis_keywords = ["suicide", "kill myself", "want to die", "hopeless", "end it", "hurt myself", "self harm"]
         
-        # Sensei Protocol Check (Sovereign Update v11.6.5)
+        # Sensei Protocol Check (Sovereign Update v11.6.6)
         protocol_result = engine.sensei_protocol(prompt)
         
         if protocol_result["is_crisis"]:
@@ -788,7 +780,6 @@ with tab_train:
                     tone_mode = engine.agent_tone_detector(prompt)
                     
                     try:
-                        # v11.6.1 Timestamp fix applied here:
                         supabase.table("dojo_patterns").insert({
                             "user_id": USER_ID,
                             "pattern": str(pattern) if pattern else "clarity",
@@ -824,20 +815,15 @@ with tab_train:
                 with st.spinner(f"Critic Strategizing (Pressure: {current_pressure})..."):
                     critic_data = engine.agent_strategic_critic(prompt, pattern, tone_mode, is_loop, loop_theme, st.session_state.loop_streak, current_pressure)
                 
-                if critic_data.get("risk_flag") is True or tone_mode == "crisis":
-                    st.session_state.loop_streak = 0 
-                    final_reply = f"**[CRITIC OVERRIDE]**\nThe Dojo senses a severe escalation in your state. \nInsight: *{critic_data.get('insight')}*\n\nWe are stopping the drill. Step off the mat. If you are overwhelmed, dial **988**. We do not push through crisis; we ground."
-                    st.warning("Protocol Shifted to Safety Mode.")
-                else:
-                    with st.spinner("Mentor Formulating..."):
-                        voice_instruction = get_voice_for_count(user_reflection_count)
-                        raw_reply = engine.agent_mentor(critic_data, voice_instruction, doctrine, st.session_state.msgs[-10:])
-                        
-                    with st.spinner("Synthesizing..."):
-                        if current_pressure < 0.6:
-                            final_reply = raw_reply
-                        else:
-                            final_reply = engine.agent_synthesizer(raw_reply, prompt, tone_mode, current_pressure)
+                with st.spinner("Mentor Formulating..."):
+                    voice_instruction = get_voice_for_count(user_reflection_count)
+                    raw_reply = engine.agent_mentor(critic_data, voice_instruction, doctrine, st.session_state.msgs[-10:])
+                    
+                with st.spinner("Synthesizing..."):
+                    if current_pressure < 0.6:
+                        final_reply = raw_reply
+                    else:
+                        final_reply = engine.agent_synthesizer(raw_reply, prompt, tone_mode, current_pressure)
                 
                 st.markdown(final_reply)
                 
